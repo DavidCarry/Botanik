@@ -7,6 +7,9 @@ services -- une base Azure, par exemple -- sans toucher au code.
 
 import os
 
+# "faux" : capteurs simules -- "reel" : materiel branche sur la Pi
+MODE = os.getenv("MODE", "faux")
+
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 

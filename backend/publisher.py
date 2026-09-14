@@ -1,62 +1,65 @@
-"""Publie des mesures simulees sur MQTT.
+"""Lit les capteurs declares dans capteurs.yaml et les publie sur MQTT.
 
-Tient lieu de capteurs tant qu'aucun materiel n'est branche. Le jour ou les
-sondes arrivent, seule `lire_capteurs()` change : le reste de la chaine
-(broker, collecteur, base, API) n'a pas a bouger.
+Ne connait aucun capteur en particulier : il parcourt le registre et appelle
+le driver indique. Brancher une nouvelle sonde ne demande donc aucune
+modification ici -- seulement une entree dans capteurs.yaml, et un driver
+dans drivers/ si son type est nouveau.
 """
 
 import json
-import math
-import random
 import signal
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 
 import paho.mqtt.client as mqtt
+import yaml
 
-from config import INTERVALLE_S, MQTT_HOST, MQTT_PORT, TOPIC_MESURES
+from config import INTERVALLE_S, MODE, MQTT_HOST, MQTT_PORT, TOPIC_MESURES
+from drivers import DRIVERS
 
-# Unite de chaque capteur, telle qu'elle part dans le payload
-UNITES = {
-    "humidite_sol_a": "%",
-    "humidite_sol_b": "%",
-    "temperature_air": "degC",
-    "humidite_air": "%",
-    "temperature_sol": "degC",
-    "luminosite": "lux",
-}
-
-# L'humidite du sol derive lentement : on garde son etat entre deux tours
-_humidite_sol = 55.0
+REGISTRE = Path(__file__).parent / "capteurs.yaml"
 
 _tourne = True
 
 
-def _cycle_jour():
-    """-1 au coeur de la nuit, +1 en milieu de journee."""
-    maintenant = datetime.now()
-    heure = maintenant.hour + maintenant.minute / 60
-    return math.sin((heure - 6) / 24 * 2 * math.pi)
+def charger_capteurs():
+    """Resout le registre selon MODE et ne garde que les capteurs actifs."""
+    with open(REGISTRE, encoding="utf-8") as f:
+        declares = yaml.safe_load(f)["capteurs"]
+
+    retenus = []
+    for c in declares:
+        if not c.get("actif", False):
+            continue
+
+        if MODE == "faux":
+            driver, params = "simule", c["simule"]
+        else:
+            bloc = dict(c["reel"])
+            driver, params = bloc.pop("driver"), bloc
+
+        if driver not in DRIVERS:
+            print(f"{c['id']} ignore : driver '{driver}' non implemente",
+                  flush=True)
+            continue
+
+        retenus.append(
+            {"id": c["id"], "unite": c["unite"], "driver": driver,
+             "params": params}
+        )
+    return retenus
 
 
-def lire_capteurs():
-    """Renvoie {capteur: valeur}. Valeurs simulees, mais plausibles."""
-    global _humidite_sol
-
-    jour = _cycle_jour()
-
-    # le sol seche, d'autant plus vite qu'il fait chaud et clair
-    _humidite_sol -= 0.05 + 0.04 * max(jour, 0)
-    _humidite_sol = max(_humidite_sol, 12.0)
-
-    return {
-        "humidite_sol_a": round(_humidite_sol + random.gauss(0, 0.3), 2),
-        "humidite_sol_b": round(_humidite_sol - 2 + random.gauss(0, 0.3), 2),
-        "temperature_air": round(21 + 3 * jour + random.gauss(0, 0.2), 2),
-        "humidite_air": round(55 - 8 * jour + random.gauss(0, 1), 2),
-        "temperature_sol": round(20 + 2 * jour + random.gauss(0, 0.1), 2),
-        "luminosite": round(max(0.0, 7000 * jour + random.gauss(0, 150)), 1),
-    }
+def lire_capteurs(capteurs):
+    """Un capteur illisible est signale, les autres continuent d'etre lus."""
+    valeurs = {}
+    for c in capteurs:
+        try:
+            valeurs[c["id"]] = DRIVERS[c["driver"]].lire(c["id"], c["params"])
+        except Exception as e:
+            print(f"Capteur {c['id']} illisible : {e}", flush=True)
+    return valeurs
 
 
 def _arreter(signum, frame):
@@ -68,18 +71,25 @@ def main():
     signal.signal(signal.SIGINT, _arreter)
     signal.signal(signal.SIGTERM, _arreter)
 
+    capteurs = charger_capteurs()
+    if not capteurs:
+        print("Aucun capteur actif dans capteurs.yaml", flush=True)
+        return
+    unites = {c["id"]: c["unite"] for c in capteurs}
+
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.connect(MQTT_HOST, MQTT_PORT)
     client.loop_start()
-    print(f"Publisher connecte a {MQTT_HOST}:{MQTT_PORT}, "
-          f"une mesure toutes les {INTERVALLE_S}s", flush=True)
+    print(f"Publisher connecte a {MQTT_HOST}:{MQTT_PORT} -- mode {MODE}, "
+          f"{len(capteurs)} capteurs, toutes les {INTERVALLE_S}s", flush=True)
 
     while _tourne:
         ts = datetime.now(timezone.utc).isoformat()
-        for capteur, valeur in lire_capteurs().items():
-            payload = {"valeur": valeur, "unite": UNITES[capteur], "ts": ts}
+        valeurs = lire_capteurs(capteurs)
+        for capteur, valeur in valeurs.items():
+            payload = {"valeur": valeur, "unite": unites[capteur], "ts": ts}
             client.publish(f"{TOPIC_MESURES}/{capteur}", json.dumps(payload))
-        print(f"{ts} -- {len(UNITES)} mesures publiees", flush=True)
+        print(f"{ts} -- {len(valeurs)} mesures publiees", flush=True)
         time.sleep(INTERVALLE_S)
 
     client.loop_stop()
