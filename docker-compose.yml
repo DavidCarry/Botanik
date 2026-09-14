@@ -1,0 +1,41 @@
+# Services tiers de Botanik.
+# Ne contient PAS notre code : le backend et le frontend tournent en direct
+# pendant le developpement. Ces deux services sont juste de l'infrastructure.
+
+services:
+  broker:
+    image: eclipse-mosquitto:2
+    container_name: botanik-broker
+    ports:
+      - "1883:1883"
+    volumes:
+      - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - broker-data:/mosquitto/data
+    restart: unless-stopped
+
+  db:
+    image: postgres:17-alpine
+    container_name: botanik-db
+    environment:
+      # Identifiants locaux, volontairement en clair : le service n'est pas
+      # expose hors du LAN. A passer en variables d'environnement le jour
+      # ou la base part dans Azure.
+      POSTGRES_USER: botanik
+      POSTGRES_PASSWORD: botanik
+      POSTGRES_DB: botanik
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      # Joue une seule fois, a la creation du volume
+      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U botanik -d botanik"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  broker-data:
+  db-data:
