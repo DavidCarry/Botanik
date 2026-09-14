@@ -1,0 +1,48 @@
+@import "tailwindcss";
+
+/* Jetons de couleur.
+   Le mode sombre n'est pas un simple inversement : chaque valeur est choisie
+   pour son propre fond, pour que les contrastes tiennent dans les deux modes. */
+:root {
+  --plane:     #f9f9f7;   /* fond de page */
+  --surface:   #fcfcfb;   /* fond des cartes */
+  --ink:       #0b0b0b;   /* texte principal */
+  --ink-2:     #52514e;   /* texte secondaire */
+  --muted:     #898781;   /* libellés, unités */
+  --hairline:  rgba(11, 11, 11, 0.10);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --plane:    #0d0d0d;
+    --surface:  #1a1a19;
+    --ink:      #ffffff;
+    --ink-2:    #c3c2b7;
+    --muted:    #898781;
+    --hairline: rgba(255, 255, 255, 0.10);
+  }
+}
+
+/* Etats : toujours accompagnes d'un libelle, jamais la couleur seule. */
+:root {
+  --bon:      #0ca30c;
+  --attention:#fab219;
+  --critique: #d03b3b;
+}
+
+@theme inline {
+  --color-plane:    var(--plane);
+  --color-surface:  var(--surface);
+  --color-ink:      var(--ink);
+  --color-ink-2:    var(--ink-2);
+  --color-muted:    var(--muted);
+  --color-hairline: var(--hairline);
+  --color-bon:      var(--bon);
+  --color-attention:var(--attention);
+  --color-critique: var(--critique);
+}
+
+html {
+  background: var(--plane);
+  color-scheme: light dark;
+}

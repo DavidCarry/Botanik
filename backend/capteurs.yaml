@@ -1,89 +1,96 @@
 # Registre des capteurs de Botanik.
 #
+# Source unique de verite : le backend le lit pour publier, l'API l'expose,
+# et le dashboard s'y adapte. Ajouter un capteur ici le fait apparaitre a
+# l'ecran sans toucher au front.
+#
 # Chaque capteur declare DEUX facons d'etre lu :
 #   reel   : le materiel, quand il est branche
 #   simule : des valeurs plausibles, en attendant
 # La variable d'environnement MODE (faux|reel) choisit laquelle s'applique.
-#
-# Brancher un capteur = renseigner son bloc "reel" et passer "actif" a true.
-# Aucun code a modifier.
 
 capteurs:
+  - id: temperature_air
+    libelle: Température
+    unite: "°C"
+    actif: true
+    ideal: {min: 18, max: 24}      # plage favorable a la germination
+    echelle: {min: 10, max: 35}    # bornes de la jauge affichee
+    reel:
+      driver: bme280
+      adresse: 0x76
+      grandeur: temperature
+    simule: {profil: cycle_jour, base: 21, amplitude: 3, bruit: 0.2}
+
   - id: humidite_sol_a
+    libelle: Humidité du sol
     unite: "%"
     actif: true
+    ideal: {min: 50, max: 70}
+    echelle: {min: 0, max: 100}
     reel:
-      driver: ads1115          # analogique : passe par un convertisseur
+      driver: ads1115
       adresse: 0x48
       canal: 0
       calibration: {sec_v: 3.0, mouille_v: 1.5}
-    simule:
-      profil: decroissant
-      depart: 55
-      vitesse: 0.05
-      plancher: 12
-      bruit: 0.3
+    simule: {profil: decroissant, depart: 62, vitesse: 0.05, plancher: 12, bruit: 0.3}
 
-  - id: humidite_sol_b
+  - id: luminosite
+    libelle: Luminosité
+    unite: lux
+    actif: true
+    ideal: {min: 4000, max: 10000}
+    echelle: {min: 0, max: 12000}
+    reel:
+      driver: bh1750
+      adresse: 0x23
+    simule: {profil: lumiere, maximum: 7000, bruit: 150}
+
+  - id: niveau_eau
+    libelle: Niveau d'eau
     unite: "%"
     actif: true
+    ideal: {min: 20, max: 100}     # sous 20 %, il faut remplir la reserve
+    echelle: {min: 0, max: 100}
+    reel:
+      driver: flotteur
+      broche: 17
+    simule: {profil: decroissant, depart: 85, vitesse: 0.02, plancher: 0, bruit: 0.1}
+
+  # ---- non achetes pour l'instant : declares mais inactifs ----
+
+  - id: humidite_sol_b
+    libelle: Humidité du sol (2)
+    unite: "%"
+    actif: false
+    ideal: {min: 50, max: 70}
+    echelle: {min: 0, max: 100}
     reel:
       driver: ads1115
       adresse: 0x48
       canal: 1
       calibration: {sec_v: 3.0, mouille_v: 1.5}
-    simule:
-      profil: decroissant
-      depart: 53
-      vitesse: 0.05
-      plancher: 12
-      bruit: 0.3
-
-  - id: temperature_air
-    unite: degC
-    actif: true
-    reel:
-      driver: bme280           # numerique I2C : valeur deja convertie
-      adresse: 0x76
-      grandeur: temperature
-    simule:
-      profil: cycle_jour
-      base: 21
-      amplitude: 3
-      bruit: 0.2
+    simule: {profil: decroissant, depart: 60, vitesse: 0.05, plancher: 12, bruit: 0.3}
 
   - id: humidite_air
+    libelle: Humidité de l'air
     unite: "%"
-    actif: true
+    actif: false
+    ideal: {min: 50, max: 70}
+    echelle: {min: 0, max: 100}
     reel:
       driver: bme280
       adresse: 0x76
       grandeur: humidite
-    simule:
-      profil: cycle_jour
-      base: 55
-      amplitude: -8           # plus sec quand il fait chaud
-      bruit: 1.0
+    simule: {profil: cycle_jour, base: 55, amplitude: -8, bruit: 1.0}
 
   - id: temperature_sol
-    unite: degC
-    actif: true
+    libelle: Température du sol
+    unite: "°C"
+    actif: false
+    ideal: {min: 15, max: 22}
+    echelle: {min: 10, max: 35}
     reel:
-      driver: ds18b20          # numerique 1-Wire
+      driver: ds18b20
       identifiant: "28-000000000000"
-    simule:
-      profil: cycle_jour
-      base: 20
-      amplitude: 2
-      bruit: 0.1
-
-  - id: luminosite
-    unite: lux
-    actif: true
-    reel:
-      driver: bh1750
-      adresse: 0x23
-    simule:
-      profil: lumiere
-      maximum: 7000
-      bruit: 150
+    simule: {profil: cycle_jour, base: 20, amplitude: 2, bruit: 0.1}
