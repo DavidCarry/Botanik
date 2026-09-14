@@ -1,0 +1,18 @@
+[Unit]
+Description=Botanik - lecture des capteurs et publication MQTT
+# Les conteneurs (broker, base) doivent tourner en premier. Si le service
+# demarre trop tot, Restart=always le fera reessayer jusqu'a ce qu'ils repondent.
+After=network-online.target docker.service
+Wants=network-online.target
+After=botanik-collecteur.service
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__RACINE__/backend
+ExecStart=__RACINE__/backend/.venv/bin/python publisher.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

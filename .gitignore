@@ -24,3 +24,6 @@ __pycache__/
 
 # OS
 .DS_Store
+
+# Journaux d execution
+logs/
