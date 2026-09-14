@@ -39,6 +39,26 @@ if [ ! -d frontend/dist ] || echo "$MODIFIES" | grep -q '^frontend/'; then
   (cd frontend && npm run build 2>&1 | tail -4 | sed 's/^/  /')
 fi
 
+echo "== conteneurs =="
+# Idempotent : garantit qu'ils tournent, et les recree si docker-compose.yml
+# a change. Sans ca, une modif d'infra passait silencieusement a la trappe.
+docker compose up -d 2>&1 | grep -v '^$' | tail -3 | sed 's/^/  /'
+
+# Une config montee en volume n'est relue qu'au redemarrage du conteneur :
+# `up -d` ne suffit pas, le conteneur n'ayant pas change.
+if echo "$MODIFIES" | grep -q '^infra/mosquitto/'; then
+  echo "  config mosquitto modifiee -> redemarrage du broker"
+  docker compose restart broker > /dev/null
+fi
+
+if echo "$MODIFIES" | grep -q '^infra/postgres/init\.sql$'; then
+  echo "  ATTENTION : init.sql a change, mais il n'est joue qu'a la CREATION"
+  echo "  du volume. Pour l'appliquer :  docker compose down -v && docker compose up -d"
+  echo "  (cela supprime toutes les mesures deja enregistrees)"
+fi
+
+docker compose ps --format '  {{.Name}}  {{.Status}}'
+
 echo "== redemarrage =="
 UNITES="botanik-collecteur botanik-publisher botanik-api"
 if systemctl list-unit-files 'botanik-*.service' --no-legend 2>/dev/null | grep -q .; then
