@@ -1,5 +1,6 @@
 # Dépendances
 node_modules
+.venv
 
 # Build
 dist
@@ -16,6 +17,10 @@ npm-debug.log*
 # Éditeurs
 .vscode/*
 !.vscode/extensions.json
+
+# Python
+__pycache__/
+*.py[cod]
 
 # OS
 .DS_Store
