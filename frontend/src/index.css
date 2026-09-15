@@ -1,48 +1,278 @@
 @import "tailwindcss";
+@import "./styles/tokens.css";
 
-/* Jetons de couleur.
-   Le mode sombre n'est pas un simple inversement : chaque valeur est choisie
-   pour son propre fond, pour que les contrastes tiennent dans les deux modes. */
-:root {
-  --plane:     #f9f9f7;   /* fond de page */
-  --surface:   #fcfcfb;   /* fond des cartes */
-  --ink:       #0b0b0b;   /* texte principal */
-  --ink-2:     #52514e;   /* texte secondaire */
-  --muted:     #898781;   /* libellés, unités */
-  --hairline:  rgba(11, 11, 11, 0.10);
+html { background: var(--page); color-scheme: dark; }
+body { color: var(--texte); }
+
+/* Tailwind v4 pose `cursor: default` sur les boutons dans son reset.
+   On retablit le curseur de pointage partout d'un coup, plutot que de
+   l'ajouter sur chaque bouton -- et sans toucher aux boutons inactifs,
+   ou le curseur doit justement signaler qu'il n'y a rien a cliquer. */
+button:not(:disabled),
+[role="radio"]:not(:disabled),
+label:has(input:not(:disabled)) {
+  cursor: pointer;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --plane:    #0d0d0d;
-    --surface:  #1a1a19;
-    --ink:      #ffffff;
-    --ink-2:    #c3c2b7;
-    --muted:    #898781;
-    --hairline: rgba(255, 255, 255, 0.10);
-  }
+/* Les libelles de l'interface ne sont pas du contenu a selectionner :
+   pas de curseur texte dessus. Les champs de saisie, eux, gardent le
+   leur -- ils contiennent bien du texte. */
+h1, h2, h3, p, span, label {
+  cursor: default;
 }
 
-/* Etats : toujours accompagnes d'un libelle, jamais la couleur seule. */
-:root {
-  --bon:      #0ca30c;
-  --attention:#fab219;
-  --critique: #d03b3b;
+/* ... sauf a l'interieur d'un element cliquable : le libelle d'un bouton
+   fait partie du bouton, il doit en porter le curseur. */
+button *,
+[role="radio"] *,
+label:has(input:not(:disabled)) * {
+  cursor: inherit;
 }
 
-@theme inline {
-  --color-plane:    var(--plane);
-  --color-surface:  var(--surface);
-  --color-ink:      var(--ink);
-  --color-ink-2:    var(--ink-2);
-  --color-muted:    var(--muted);
-  --color-hairline: var(--hairline);
-  --color-bon:      var(--bon);
-  --color-attention:var(--attention);
-  --color-critique: var(--critique);
+input, textarea {
+  cursor: text;
+  user-select: text;
 }
 
-html {
-  background: var(--plane);
-  color-scheme: light dark;
+/* ══════════════════════════════════════════════════════════════════
+   FOND
+   Des lueurs largement floutees qui derivent et se recouvrent. Pas de
+   filtre de contraste : il saturerait chaque tache vers le meme vert et
+   lui rendrait un bord net -- soit exactement le contraire de l'effet
+   recherche. Ici, ce sont les recouvrements qui creent les nuances.
+   ══════════════════════════════════════════════════════════════════ */
+.halos {
+  position: absolute;
+  inset: 0;
+  opacity: var(--halo-force);
+  /* isole le rendu : ce qui deborde n'est ni peint ni calcule */
+  contain: strict;
+}
+
+/* Chaque lueur est portee par deux pistes imbriquees : l'une balance
+   horizontalement, l'autre verticalement, sur des periodes premieres
+   entre elles. La trajectoire resultante est une courbe de Lissajous --
+   elle ne revient a son point de depart qu'apres le produit des deux
+   periodes, soit plusieurs minutes. A l'oeil, elle ne se repete jamais. */
+.piste-x,
+.piste-y {
+  position: absolute;
+  inset: 0;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+  will-change: translate;
+}
+
+.piste-x { animation-name: balance-x; }
+.piste-y { animation-name: balance-y; }
+
+/* Les amplitudes viennent de variables posees sur chaque piste : elles
+   sont tirees au sort, donc deux lueurs ne parcourent jamais la meme
+   distance. Un signe negatif inverse simplement le sens. */
+@keyframes balance-x {
+  from { translate: calc(var(--amplitude) * -1) 0; }
+  to   { translate: var(--amplitude) 0; }
+}
+
+@keyframes balance-y {
+  from { translate: 0 calc(var(--amplitude) * -1); }
+  to   { translate: 0 var(--amplitude); }
+}
+
+.halo {
+  position: absolute;
+  display: block;
+  border-radius: 50%;
+  filter: blur(var(--halo-flou));
+  will-change: scale;
+  animation-name: respire;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+@keyframes respire {
+  from { scale: var(--souffle-bas); }
+  to   { scale: var(--souffle-haut); }
+}
+
+/* Vignettage : sans lui les lueurs s'etalent jusqu'aux bords et le fond
+   devient un aplat uniforme. Il redonne des zones sombres, donc du relief. */
+.vignette {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background:
+    radial-gradient(125% 100% at 50% 45%, transparent 40%, rgba(2, 8, 5, 0.42) 80%, rgba(2, 8, 5, 0.72) 100%);
+}
+
+/* ------------------------------------------------------------------
+   Panneau de verre. Le flou d'arriere-plan prend appui sur les lueurs
+   du fond : sans elles, il n'aurait rien a flouter et le panneau
+   ressemblerait a un simple aplat translucide.
+   ------------------------------------------------------------------ */
+.panneau {
+  background: var(--surface);
+  border: 1px solid var(--bordure);
+  box-shadow: var(--ombre-carte);
+  backdrop-filter: blur(22px) saturate(150%);
+  -webkit-backdrop-filter: blur(22px) saturate(150%);
+}
+
+/* ------------------------------------------------------------------
+   Sphere de verre.
+   Le volume ne vient pas d'une image mais de la superposition de trois
+   choses : un degrade radial decentre (la lumiere vient du haut-gauche),
+   une arete claire en haut et une ombre interne en bas -- puis un reflet
+   speculaire pose par-dessus en ::before.
+   ------------------------------------------------------------------ */
+.sphere {
+  /* Pas de `position` ici : le composant pose `absolute` et une classe
+     utilitaire de meme specificite perdrait contre celle-ci selon l'ordre
+     des regles. Le contexte dont ::before et ::after ont besoin vient
+     donc du composant. */
+  border-radius: 50%;
+  isolation: isolate;
+  background:
+    radial-gradient(circle at 32% 26%,
+      rgba(255, 255, 255, 0.22) 0%,
+      rgba(255, 255, 255, 0.07) 38%,
+      rgba(255, 255, 255, 0.02) 62%,
+      rgba(0, 0, 0, 0.18) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  backdrop-filter: blur(14px) saturate(160%);
+  -webkit-backdrop-filter: blur(14px) saturate(160%);
+  box-shadow:
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.28),
+    inset 0 -22px 34px -22px rgba(0, 0, 0, 0.55),
+    0 12px 28px -14px rgba(0, 0, 0, 0.6);
+  transition: transform 320ms var(--ease-doux), box-shadow 320ms var(--ease-doux);
+}
+
+/* Le reflet : c'est lui qui fait basculer la lecture de "disque" a "bille". */
+.sphere::before {
+  content: "";
+  position: absolute;
+  top: 7%;
+  left: 19%;
+  width: 44%;
+  height: 27%;
+  border-radius: 50%;
+  background: linear-gradient(to bottom,
+    rgba(255, 255, 255, 0.42), rgba(255, 255, 255, 0));
+  filter: blur(2.5px);
+  pointer-events: none;
+}
+
+/* Lumiere remontant du bas : une bille posee recoit aussi le rebond. */
+.sphere::after {
+  content: "";
+  position: absolute;
+  bottom: 9%;
+  left: 27%;
+  width: 46%;
+  height: 16%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center,
+    rgba(255, 255, 255, 0.16), rgba(255, 255, 255, 0));
+  filter: blur(4px);
+  pointer-events: none;
+}
+
+/* Le contenu de la bille est du dessin, pas du texte a selectionner :
+   on le rend transparent au pointeur. Le survol atteint alors directement
+   la bille -- qui garde son soulevement -- et aucun curseur de texte
+   n'apparait au passage sur les chiffres. */
+.sphere svg {
+  pointer-events: none;
+}
+
+.sphere:hover {
+  transform: translateY(-3px);
+  box-shadow:
+    inset 0 1.5px 1px rgba(255, 255, 255, 0.34),
+    inset 0 -22px 34px -22px rgba(0, 0, 0, 0.5),
+    0 18px 34px -14px rgba(0, 0, 0, 0.65);
+}
+
+/* Apparition d'une serie. Relancee en remontant l'element (cle React),
+   ce qui evite d'avoir a piloter un etat de transition depuis un effet. */
+@keyframes apparition {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.apparition { animation: apparition 340ms var(--ease-doux) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .apparition { animation-duration: 1ms; }
+}
+
+/* Houle du liquide. Deux vagues de periodes differentes se dephasent
+   sans jamais retomber en phase : le mouvement ne se repete pas. */
+@keyframes houle {
+  from { translate: 0 0; }
+  to   { translate: -50px 0; }
+}
+
+.houle       { animation: houle 4.2s linear infinite; }
+.houle-lente { animation: houle 6.7s linear infinite reverse; }
+
+@media (prefers-reduced-motion: reduce) {
+  .houle, .houle-lente { animation: none; }
+}
+
+/* Invite a defiler : un aller-retour court, pas un rebond appuye --
+   l'indication doit se remarquer sans happer le regard. */
+@keyframes invite {
+  0%, 100% { translate: 0 0;    opacity: 0.55; }
+  50%      { translate: 0 5px;  opacity: 1; }
+}
+
+.invite-chevron { animation: invite 1.9s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .invite-chevron { animation: none; }
+}
+
+/* ------------------------------------------------------------------
+   Barre de defilement. Celle du systeme jure avec le reste : on la
+   reduit a un simple curseur, detache des bords par une bordure
+   transparente que `background-clip` rend invisible.
+   ------------------------------------------------------------------ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in oklab, var(--texte) 22%, transparent) transparent;
+}
+
+::-webkit-scrollbar { width: 11px; height: 11px; }
+::-webkit-scrollbar-track { background: transparent; }
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in oklab, var(--texte) 18%, transparent);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--texte) 32%, transparent);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* Grain : casse la platitude des aplats, presque invisible mais on le sent. */
+.grain {
+  position: absolute;
+  inset: 0;
+  display: block;
+  opacity: 0.04;
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .piste-x, .piste-y, .halo { animation: none; }
 }

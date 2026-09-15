@@ -1,0 +1,51 @@
+import { useEffect, useState } from 'react'
+import {
+  lireCapteurs, lireHistorique, type Capteur, type Fenetre, type Point,
+} from './api'
+
+/** Etat partage entre l'en-tete du panneau et le trace : le titre, la
+ *  valeur courante et les selecteurs vivent dans la barre de titre, le
+ *  graphique dans le corps. Un hook evite de faire remonter l'etat
+ *  jusqu'a App, et garde ce fichier hors des modules de composants
+ *  (le rechargement a chaud n'aime pas les melanger). */
+export function useCourbes() {
+  const [capteurs, setCapteurs] = useState<Capteur[]>([])
+  const [choisi, setChoisi] = useState('')
+  const [fenetre, setFenetre] = useState<Fenetre>('1j')
+  const [points, setPoints] = useState<Point[]>([])
+
+  // La liste vient du registre backend : aucune valeur en dur ici.
+  useEffect(() => {
+    let vivant = true
+    lireCapteurs()
+      .then((d) => {
+        if (!vivant) return
+        setCapteurs(d)
+        setChoisi((c) => c || d[0]?.id || '')
+      })
+      .catch(() => undefined)
+    return () => { vivant = false }
+  }, [])
+
+  useEffect(() => {
+    if (!choisi) return
+    let vivant = true
+    const charger = () =>
+      lireHistorique(choisi, fenetre)
+        .then((p) => { if (vivant) setPoints(p) })
+        .catch(() => { if (vivant) setPoints([]) })
+
+    charger()
+    // Le dernier intervalle agrege se remplit au fil des mesures :
+    // en le relisant souvent, la courbe avance sous les yeux.
+    const t = setInterval(charger, 10_000)
+    return () => { vivant = false; clearInterval(t) }
+  }, [choisi, fenetre])
+
+  return {
+    capteurs, choisi, setChoisi, fenetre, setFenetre, points,
+    capteur: capteurs.find((c) => c.id === choisi),
+  }
+}
+
+export type EtatCourbes = ReturnType<typeof useCourbes>

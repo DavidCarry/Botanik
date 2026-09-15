@@ -11,14 +11,36 @@ from pathlib import Path
 
 import psycopg
 import yaml
-from fastapi import FastAPI, HTTPException
+from fastapi import Cookie, FastAPI, HTTPException, Response
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
+import auth
+import systeme
 from config import DB_URL
 
 RACINE = Path(__file__).parent
 DIST = RACINE.parent / "frontend" / "dist"
 REGISTRE = RACINE / "capteurs.yaml"
+
+# Fenetres proposees par le dashboard, et le pas d'agregation associe.
+# Sans regroupement, un mois de mesures a la minute ferait 43 000 points
+# pour quelques centaines de pixels.
+FENETRES = {
+    "1j": ("1 day", "10 minutes"),
+    "1s": ("7 days", "2 hours"),
+    "1m": ("30 days", "8 hours"),
+}
+
+HISTORIQUE = """
+    SELECT date_bin(%s::interval, ts, TIMESTAMPTZ '2000-01-01') AS t,
+           avg(valeur) AS v
+    FROM mesures
+    WHERE capteur = %s AND ts >= now() - %s::interval
+    GROUP BY t
+    ORDER BY t
+"""
 
 # Derniere valeur connue de chaque capteur, en une seule requete.
 DERNIERES = """
@@ -28,6 +50,34 @@ DERNIERES = """
 """
 
 app = FastAPI(title="Botanik")
+
+
+def base():
+    """Connexion courte. A cette echelle, ouvrir a la demande coute moins
+    cher a maintenir qu'un pool, et evite les connexions mortes."""
+    try:
+        return psycopg.connect(DB_URL, connect_timeout=5, autocommit=True)
+    except psycopg.Error as e:
+        raise HTTPException(503, f"base de donnees injoignable : {e}") from e
+
+
+@app.on_event("startup")
+def demarrage():
+    """Le schema d'authentification se cree ici et non dans init.sql :
+    ce dernier n'est joue qu'a la creation du volume, donc jamais sur une
+    base deja en place."""
+    try:
+        with base() as conn:
+            neuf = auth.preparer(conn)
+        if neuf:
+            identifiant, mdp = neuf
+            print(
+                "  Compte cree - identifiant : "
+                + identifiant + "   mot de passe : " + mdp,
+                flush=True,
+            )
+    except HTTPException as e:
+        print(f"Authentification non initialisee : {e.detail}", flush=True)
 
 
 def capteurs_actifs():
@@ -64,9 +114,114 @@ def capteurs():
     ]
 
 
-# ---- le montage doit rester en dernier ----
+@app.get("/api/mesures")
+def mesures(capteur: str, fenetre: str = "1j"):
+    """Historique d'un capteur, agrege selon la fenetre demandee."""
+    if fenetre not in FENETRES:
+        raise HTTPException(400, f"fenetre inconnue : {fenetre}")
+    duree, pas = FENETRES[fenetre]
+
+    if not any(c["id"] == capteur for c in capteurs_actifs()):
+        raise HTTPException(404, f"capteur inconnu ou inactif : {capteur}")
+
+    try:
+        with psycopg.connect(DB_URL, connect_timeout=5) as conn:
+            with conn.cursor() as cur:
+                cur.execute(HISTORIQUE, (pas, capteur, duree))
+                points = [
+                    {"ts": t.isoformat(), "valeur": round(float(v), 2)}
+                    for t, v in cur.fetchall()
+                ]
+    except psycopg.Error as e:
+        raise HTTPException(503, f"base de donnees injoignable : {e}") from e
+
+    return {"capteur": capteur, "fenetre": fenetre, "points": points}
+
+
+@app.get("/api/systeme")
+def etat_systeme():
+    """Sante de la machine : un sujet distinct de celui de la serre."""
+    return systeme.etat()
+
+
+class Identifiants(BaseModel):
+    identifiant: str
+    mot_de_passe: str
+
+
+@app.post("/api/connexion")
+def connexion(corps: Identifiants, reponse: Response):
+    with base() as conn:
+        jeton = auth.ouvrir_session(conn, corps.identifiant, corps.mot_de_passe)
+    if not jeton:
+        raise HTTPException(401, "identifiant ou mot de passe incorrect")
+
+    # httponly : le jeton reste hors de portee du JavaScript de la page,
+    # ce qui le protege d'une injection de script.
+    reponse.set_cookie(
+        "botanik_session", jeton,
+        httponly=True, samesite="lax", max_age=7 * 24 * 3600,
+    )
+    return {"identifiant": corps.identifiant}
+
+
+@app.post("/api/deconnexion")
+def deconnexion(reponse: Response, botanik_session: str | None = Cookie(default=None)):
+    with base() as conn:
+        auth.fermer_session(conn, botanik_session)
+    reponse.delete_cookie("botanik_session")
+    return {"ok": True}
+
+
+@app.get("/api/moi")
+def moi(botanik_session: str | None = Cookie(default=None)):
+    """Qui est connecte. Le frontend s'en sert pour decider s'il affiche
+    le pilotage -- la verification reelle se fait a chaque commande."""
+    with base() as conn:
+        identifiant = auth.compte_de(conn, botanik_session)
+    return {"identifiant": identifiant}
+
+
+class Commande(BaseModel):
+    actionneur: str
+    valeur: float
+
+
+@app.post("/api/commandes")
+def commander(
+    corps: Commande, botanik_session: str | None = Cookie(default=None),
+):
+    """Enregistre une commande manuelle. Reservee aux comptes connectes :
+    masquer le bouton cote navigateur ne protege rien."""
+    with base() as conn:
+        identifiant = auth.compte_de(conn, botanik_session)
+        if not identifiant:
+            raise HTTPException(401, "connexion requise")
+        with conn.cursor() as cur:
+            cur.execute(
+                "INSERT INTO commandes (actionneur, valeur, source) "
+                "VALUES (%s, %s, 'manuel')",
+                (corps.actionneur, corps.valeur),
+            )
+    return {"ok": True, "par": identifiant}
+
+
+# ---- le service du frontend doit rester en dernier ----
 if DIST.is_dir():
-    app.mount("/", StaticFiles(directory=DIST, html=True), name="app")
+    app.mount("/assets", StaticFiles(directory=DIST / "assets"), name="assets")
+
+    @app.get("/{chemin:path}")
+    def frontend(chemin: str):
+        """Sert un fichier s'il existe, sinon index.html.
+
+        Le routage de l'application vit dans le navigateur : le serveur ne
+        connait ni /historique ni les routes a venir. Sans ce repli, un
+        rafraichissement sur l'une d'elles renverrait un 404.
+        """
+        fichier = DIST / chemin
+        if chemin and fichier.is_file():
+            return FileResponse(fichier)
+        return FileResponse(DIST / "index.html")
 else:
     # Pas bloquant : en developpement le front est servi par Vite sur :5173,
     # et l'API doit pouvoir tourner seule.

@@ -1,141 +1,86 @@
-import { useEffect, useState } from 'react'
-import type { ReactNode } from 'react'
-import { lireCapteurs, type Capteur } from './api'
-import { depuis, etatDe, formaterValeur } from './format'
-import Tuile from './composants/Tuile'
-import {
-  IconeEau, IconeHumidite, IconeLuminosite, IconeTemperature,
-} from './composants/icones'
-
-const RAFRAICHISSEMENT_MS = 5000
-
-// L'icone est de la presentation : elle vit ici, pas dans le registre backend.
-const ICONES: Record<string, ReactNode> = {
-  temperature_air: <IconeTemperature />,
-  temperature_sol: <IconeTemperature />,
-  humidite_sol_a: <IconeHumidite />,
-  humidite_sol_b: <IconeHumidite />,
-  humidite_air: <IconeHumidite />,
-  luminosite: <IconeLuminosite />,
-  niveau_eau: <IconeEau />,
-}
+import { useState } from 'react'
+import { LuCpu } from 'react-icons/lu'
+import Actionneurs from './composants/Actionneurs'
+import Connexion from './composants/Connexion'
+import Courbes, { EnTeteCourbes } from './composants/Courbes'
+import Fond from './composants/Fond'
+import InviteDefilement from './composants/InviteDefilement'
+import Mesures from './composants/Mesures'
+import Modale from './composants/Modale'
+import Panneau from './composants/Panneau'
+import Systeme from './composants/Systeme'
+import TopBar from './composants/TopBar'
+import { useAuth } from './useAuth'
+import { useCourbes } from './useCourbes'
 
 export default function App() {
-  const [capteurs, setCapteurs] = useState<Capteur[] | null>(null)
-  const [erreur, setErreur] = useState<string | null>(null)
+  const auth = useAuth()
+  const courbes = useCourbes()
+  const [connexionOuverte, setConnexionOuverte] = useState(false)
+  const [systemeOuvert, setSystemeOuvert] = useState(false)
 
-  useEffect(() => {
-    let vivant = true
-
-    const rafraichir = async () => {
-      try {
-        const data = await lireCapteurs()
-        if (!vivant) return
-        setCapteurs(data)
-        setErreur(null)
-      } catch (e) {
-        if (!vivant) return
-        setErreur(e instanceof Error ? e.message : 'erreur inconnue')
-      }
-    }
-
-    rafraichir()
-    const t = setInterval(rafraichir, RAFRAICHISSEMENT_MS)
-    return () => { vivant = false; clearInterval(t) }
-  }, [])
-
-  const derniere = capteurs
-    ?.map((c) => c.mesure?.ts)
-    .filter((ts): ts is string => Boolean(ts))
-    .sort()
-    .at(-1)
+  // Des capteurs recus valent preuve de liaison : inutile d'interroger
+  // une route de sante en plus.
+  const enLigne = courbes.capteurs.length > 0
 
   return (
-    <div className="min-h-dvh bg-plane text-ink">
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-8 sm:py-12">
+    <div className="min-h-dvh lg:h-dvh lg:overflow-hidden">
+      <Fond />
+      <TopBar
+        auth={auth}
+        enLigne={enLigne}
+        onConnexion={() => setConnexionOuverte(true)}
+        onSysteme={() => setSystemeOuvert(true)}
+      />
 
-        <header className="mb-7 flex flex-wrap items-end justify-between gap-4 sm:mb-10">
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight sm:text-[28px]">
-              Botanik
-            </h1>
-            <p className="mt-1 text-sm text-muted">
-              Supervision de la germination
-            </p>
+      {/* Tout tient dans un ecran a partir du grand format ; en dessous,
+          la page redevient une colonne qui defile. */}
+      <main
+        className="mx-auto grid max-w-[1600px] gap-5 px-4 pb-5 pt-[4.2rem]
+                   sm:gap-8 sm:px-8 sm:pb-7 sm:pt-[4.6rem]
+                   lg:h-dvh lg:grid-cols-[52fr_48fr]"
+      >
+        {/* Les mesures restent nues sur le fond : ce sont elles le sujet,
+            les panneaux ne sont que le support. */}
+        {/* En colonne, les mesures occupent l'ecran entier : on arrive
+            sur l'etat de la serre, le reste se merite d'un geste. */}
+        <section className="flex min-w-0 flex-col lg:min-h-0">
+          {/* En colonne, une hauteur explicite ; en grille, `flex-1`
+              prend le relais. Les deux ensemble se neutralisent :
+              `flex-1` pose flex-basis:0 et efface la hauteur. */}
+          <div className="h-[calc(100dvh-7.5rem)] lg:h-auto lg:min-h-0 lg:flex-1">
+            <Mesures />
           </div>
-          <Badge erreur={erreur} charge={capteurs !== null} derniere={derniere} />
-        </header>
-
-        <section>
-          <h2 className="sr-only">Mesures</h2>
-
-          {capteurs === null && !erreur && (
-            <p className="text-sm text-muted">Chargement…</p>
-          )}
-
-          {erreur && capteurs === null && (
-            <p className="rounded-xl border border-hairline bg-surface p-4 text-sm text-ink-2">
-              Impossible de joindre l'API. Vérifie que le backend tourne sur
-              le port 8000.
-            </p>
-          )}
-
-          {capteurs && (
-            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-              {capteurs.map((c) => {
-                const m = c.mesure
-                const statut = m
-                  ? etatDe(m.valeur, c.ideal, c.echelle)
-                  : { etat: 'attention' as const, texte: 'Aucune mesure reçue' }
-
-                return (
-                  <Tuile
-                    key={c.id}
-                    icone={ICONES[c.id] ?? <IconeHumidite />}
-                    libelle={c.libelle}
-                    valeur={m ? formaterValeur(m.valeur, c.unite) : '—'}
-                    unite={m ? c.unite : undefined}
-                    etat={statut.etat}
-                    etatTexte={statut.texte}
-                    plage={
-                      m
-                        ? { valeur: m.valeur, min: c.echelle.min, max: c.echelle.max,
-                            idealMin: c.ideal.min, idealMax: c.ideal.max }
-                        : undefined
-                    }
-                  />
-                )
-              })}
-            </div>
-          )}
+          <InviteDefilement />
         </section>
 
-      </div>
+        <section className="grid min-h-0 min-w-0 gap-9 sm:gap-11 lg:gap-6 lg:grid-rows-[1fr_auto]">
+          <Panneau nu actions={<EnTeteCourbes etat={courbes} />}>
+            <div className="h-[clamp(350px,52dvh,540px)] lg:h-full">
+              <Courbes etat={courbes} />
+            </div>
+          </Panneau>
+
+          <Panneau nu>
+            <Actionneurs connecte={Boolean(auth.compte)} />
+          </Panneau>
+        </section>
+      </main>
+
+      {connexionOuverte && (
+        <Connexion auth={auth} onFermer={() => setConnexionOuverte(false)} />
+      )}
+
+      {systemeOuvert && (
+        <Modale
+          titre="Machine"
+          sousTitre="Ressources de la carte"
+          icone={<LuCpu size={16} />}
+          onFermer={() => setSystemeOuvert(false)}
+        >
+          <Systeme />
+        </Modale>
+      )}
     </div>
-  )
-}
-
-function Badge({
-  erreur, charge, derniere,
-}: { erreur: string | null; charge: boolean; derniere?: string }) {
-  const horsLigne = Boolean(erreur)
-  const couleur = horsLigne ? 'bg-critique' : charge ? 'bg-bon' : 'bg-attention'
-  const texte = horsLigne
-    ? 'Hors ligne'
-    : charge
-      ? `En ligne${derniere ? ` · ${depuis(derniere)}` : ''}`
-      : 'Connexion…'
-
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-hairline
-                     bg-surface px-3 py-1.5 text-xs text-ink-2">
-      <span className="relative flex size-2">
-        {!horsLigne && (
-          <span className={`absolute inline-flex size-full animate-ping rounded-full ${couleur} opacity-60`} />
-        )}
-        <span className={`relative inline-flex size-2 rounded-full ${couleur}`} />
-      </span>
-      {texte}
-    </span>
   )
 }

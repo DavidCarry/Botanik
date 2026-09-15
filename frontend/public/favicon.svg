@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <!-- La contre-rotation garde la lumière en haut à gauche pendant que
+         la graine, elle, penche. -->
+    <linearGradient id="g" x1="5" y1="5" x2="27" y2="27"
+                    gradientUnits="userSpaceOnUse"
+                    gradientTransform="rotate(-30 16 16)">
+      <stop stop-color="#a3e635"/>
+      <stop offset=".55" stop-color="#22c55e"/>
+      <stop offset="1" stop-color="#15803d"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Silhouette et nervure réunies en un seul tracé : avec fill-rule
+       evenodd, la nervure devient un vide et laisse passer le fond.
+       Le logo tient donc sur un onglet clair comme sur un onglet sombre. -->
+  <g transform="rotate(30 16 16)">
+    <path fill="url(#g)" fill-rule="evenodd"
+          d="M16 5.5c9.5 6.6 9.5 15.8 0 22.4-9.5-6.6-9.5-15.8 0-22.4Z
+             M16 27.6c-5-5.8 5-10.8 0-21.9-1.3 11.1-8.6 16 0 21.9Z"/>
+  </g>
+</svg>
