@@ -20,4 +20,8 @@ DB_URL = os.getenv(
 # Periode de publication des mesures, en secondes
 INTERVALLE_S = float(os.getenv("INTERVALLE_S", "5"))
 
+# Racines des topics MQTT. Un niveau par sens de circulation :
+#   mesures/<capteur>      ce que la serre observe
+#   commandes/<actionneur> ce qu'on lui demande
 TOPIC_MESURES = "botanik/mesures"
+TOPIC_COMMANDES = "botanik/commandes"

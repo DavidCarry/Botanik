@@ -17,9 +17,10 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import auth
+import bus
 import registre
 import systeme
-from config import DB_URL
+from config import DB_URL, TOPIC_COMMANDES
 
 DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
@@ -89,7 +90,10 @@ async def cycle_de_vie(app: FastAPI):
             )
     except HTTPException as e:
         print(f"Authentification non initialisee : {e.detail}", flush=True)
+
+    bus.demarrer()
     yield
+    bus.arreter()
 
 
 app = FastAPI(title="Botanik", lifespan=cycle_de_vie)
@@ -187,19 +191,33 @@ class Commande(BaseModel):
 def commander(
     corps: Commande, botanik_session: str | None = Cookie(default=None),
 ):
-    """Enregistre une commande manuelle. Reservee aux comptes connectes :
-    masquer le bouton cote navigateur ne protege rien."""
+    """Emet une commande manuelle vers l'actionneur, puis la consigne.
+
+    Reservee aux comptes connectes : masquer le bouton cote navigateur ne
+    protege rien.
+
+    L'ordre compte. La commande part d'abord sur MQTT ; elle n'est ecrite
+    en base que si le broker l'a prise. `commandes` est ainsi le journal
+    de ce qui a REELLEMENT ete emis, et non de ce qu'on a souhaite -- une
+    distinction qui comptera le jour ou l'IA relira cet historique pour
+    apprendre l'effet de ses propres actions.
+    """
     with base() as conn:
         identifiant = auth.compte_de(conn, botanik_session)
         if not identifiant:
             raise HTTPException(401, "connexion requise")
+
+        topic = f"{TOPIC_COMMANDES}/{corps.actionneur}"
+        if not bus.publier(topic, {"valeur": corps.valeur, "source": "manuel"}):
+            raise HTTPException(503, "broker MQTT injoignable")
+
         with conn.cursor() as cur:
             cur.execute(
                 "INSERT INTO commandes (actionneur, valeur, source) "
                 "VALUES (%s, %s, 'manuel')",
                 (corps.actionneur, corps.valeur),
             )
-    return {"ok": True, "par": identifiant}
+    return {"ok": True, "par": identifiant, "topic": topic}
 
 
 # ---- le service du frontend doit rester en dernier ----

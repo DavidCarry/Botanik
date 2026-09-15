@@ -9,10 +9,13 @@ Projet IoT / ML 2026 — Raspberry Pi 5, Debian 13.
 ## Comment ça tient ensemble
 
 ```
+                    botanik/mesures/<capteur>
 capteurs ──> publisher ──MQTT──> collecteur ──> PostgreSQL
                                                     │
                        navigateur <── API ──────────┘
-                                     (FastAPI + React)
+                            │        (FastAPI + React)
+                            └──> API ──MQTT──> actionneurs
+                    botanik/commandes/<actionneur>
 ```
 
 Quatre processus, volontairement séparés :
@@ -112,8 +115,9 @@ déclenche pas une reconstruction du frontend.
 ## État
 
 Fait : chaîne capteurs → MQTT → base → API → dashboard, authentification,
-pilotage manuel, déploiement automatisé sur la Pi.
+émission MQTT des commandes, déploiement automatisé sur la Pi.
 
-Reste : le matériel (sondes et actionneurs non achetés — tout tourne en
-mode simulé), la publication MQTT des commandes vers les actionneurs, et
-le réseau de neurones.
+Reste : le service qui écoute `botanik/commandes/#` et actionne le
+matériel, le retour d'état sur `botanik/etat/<actionneur>`, le matériel
+lui-même (rien n'est acheté, tout tourne en mode simulé), et le réseau de
+neurones.
