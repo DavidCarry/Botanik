@@ -1,20 +1,15 @@
-import { useState } from 'react'
-import { LuDroplet, LuFan, LuLock, LuSun } from 'react-icons/lu'
+import { LuDroplet, LuFan, LuLock, LuSun, LuZap } from 'react-icons/lu'
 import type { IconType } from 'react-icons'
-import { commander } from '../api'
+import { useActionneurs } from '../useActionneurs'
 
-type Actionneur = {
-  id: string
-  libelle: string
-  detail: string
-  icone: IconType
+/** L'icone est de la presentation pure : elle n'a rien a faire dans le
+ *  registre backend. Un actionneur inconnu retombe sur un symbole
+ *  generique plutot que sur un trou. */
+const ICONES: Record<string, IconType> = {
+  pompe: LuDroplet,
+  lumiere: LuSun,
+  ventilation: LuFan,
 }
-
-const ACTIONNEURS: Actionneur[] = [
-  { id: 'pompe', libelle: 'Arrosage', detail: '20 mL par impulsion', icone: LuDroplet },
-  { id: 'lumiere', libelle: 'Éclairage', detail: 'LED horticole', icone: LuSun },
-  { id: 'ventilation', libelle: 'Ventilation', detail: 'Circulation d’air', icone: LuFan },
-]
 
 /** Pilotage manuel.
  *
@@ -25,27 +20,9 @@ const ACTIONNEURS: Actionneur[] = [
  *  Sans compte ouvert, les commandes restent visibles mais inertes --
  *  montrer ce qui existe vaut mieux que de le cacher, et le serveur
  *  refuse de toute facon toute commande non authentifiee.
- *
- *  La commande est enregistree en base ; le sens retour de MQTT vers le
- *  materiel reste a cabler. */
+ */
 export default function Actionneurs({ connecte }: { connecte: boolean }) {
-  const [actifs, setActifs] = useState<Record<string, boolean>>({})
-  const [erreur, setErreur] = useState<string | null>(null)
-
-  const basculer = async (id: string) => {
-    if (!connecte) return
-    const suivant = !actifs[id]
-    setActifs((a) => ({ ...a, [id]: suivant }))
-    try {
-      await commander(id, suivant ? 1 : 0)
-      setErreur(null)
-    } catch {
-      // On revient en arriere : l'interrupteur ne doit pas affirmer un
-      // etat que le serveur n'a pas accepte.
-      setActifs((a) => ({ ...a, [id]: !suivant }))
-      setErreur('Commande refusée')
-    }
-  }
+  const { liste, attendus, erreur, basculer } = useActionneurs()
 
   return (
     <div className="flex flex-col">
@@ -53,30 +30,39 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
         <span className="text-micro font-medium uppercase tracking-[0.14em] text-texte-faible">
           Pilotage
         </span>
-        {!connecte && (
+        {erreur ? (
+          <span role="alert" className="text-micro text-critique">{erreur}</span>
+        ) : !connecte && (
           <span className="flex items-center gap-1.5 text-micro text-texte-faible">
             <LuLock size={12} className="shrink-0" />
             Connexion requise
           </span>
         )}
-        {erreur && (
-          <span role="alert" className="text-micro text-critique">{erreur}</span>
-        )}
       </div>
 
       <div className="divide-y divide-bordure border-y border-bordure">
-        {ACTIONNEURS.map(({ id, libelle, detail, icone: Icone }) => {
-          const actif = actifs[id] ?? false
+        {liste.map(({ id, libelle, detail, valeur }) => {
+          const Icone = ICONES[id] ?? LuZap
+          const attendu = attendus[id]
+          // Pendant l'attente, l'interrupteur montre deja la position
+          // demandee -- mais en demi-teinte : c'est une intention, pas
+          // encore un fait.
+          const actif = (attendu?.valeur ?? valeur ?? 0) > 0
+          const muet = valeur === null && !attendu
+
           return (
             <button
               key={id}
               type="button"
               aria-pressed={actif}
-              disabled={!connecte}
-              onClick={() => basculer(id)}
+              aria-busy={Boolean(attendu)}
+              disabled={!connecte || muet}
+              onClick={() => basculer(id, actif ? 0 : 1)}
               className={[
                 'flex w-full items-center gap-3 px-1 py-3 text-left transition-colors duration-200',
-                connecte ? 'hover:bg-texte/[0.03]' : 'cursor-not-allowed opacity-40',
+                connecte && !muet
+                  ? 'hover:bg-texte/[0.03]'
+                  : 'cursor-not-allowed opacity-40',
               ].join(' ')}
             >
               <Icone
@@ -91,7 +77,7 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
                   {libelle}
                 </span>
                 <span className="block truncate text-micro text-texte-faible">
-                  {detail}
+                  {muet ? 'Sans réponse' : detail}
                 </span>
               </span>
 
@@ -99,8 +85,9 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
                   la couleur. */}
               <span
                 className={[
-                  'relative h-5 w-9 shrink-0 rounded-pilule transition-colors duration-300',
+                  'relative h-5 w-9 shrink-0 rounded-pilule transition-all duration-300',
                   actif ? 'bg-accent/55' : 'bg-texte/12',
+                  attendu ? 'opacity-50' : '',
                 ].join(' ')}
               >
                 <span

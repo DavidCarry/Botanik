@@ -9,14 +9,21 @@ Projet IoT / ML 2026 — Raspberry Pi 5, Debian 13.
 ## Comment ça tient ensemble
 
 ```
-                    botanik/mesures/<capteur>
+                 botanik/mesures/<capteur>
 capteurs ──> publisher ──MQTT──> collecteur ──> PostgreSQL
-                                                    │
-                       navigateur <── API ──────────┘
-                            │        (FastAPI + React)
-                            └──> API ──MQTT──> actionneurs
-                    botanik/commandes/<actionneur>
+                                                     │
+                        navigateur <── API ──────────┘
+                             │
+                             │   botanik/commandes/<actionneur>
+                             └──────MQTT──────> actionneurs ──> relais
+                                 <─────MQTT─────┘
+                                  botanik/etat/<actionneur>
 ```
+
+Trois topics, trois sens. Le dernier est celui qui rend l'ecran honnete :
+l'interrupteur affiche l'etat que l'actionneur a **annonce**, pas celui
+qu'on lui a demande. Une pompe en panne ne ressemble donc plus a une
+pompe qui tourne.
 
 Quatre processus, volontairement séparés :
 
@@ -24,6 +31,7 @@ Quatre processus, volontairement séparés :
 |---|---|---|
 | `publisher.py` | lit les capteurs, publie sur MQTT | oui |
 | `collecteur.py` | écoute MQTT, archive en base | oui |
+| `actionneurs.py` | écoute les commandes, actionne, annonce l'état | oui |
 | `main.py` | API HTTP + service du dashboard | oui |
 | broker + base | conteneurs Docker | non |
 
@@ -38,9 +46,12 @@ backend/
   main.py          API HTTP, et service du frontend compilé
   publisher.py     lecture des capteurs -> MQTT
   collecteur.py    MQTT -> PostgreSQL
-  service.py       ossature commune aux deux services MQTT
-  registre.py      lecture de capteurs.yaml
-  capteurs.yaml    LE registre : ce qui existe, ses plages, comment le lire
+  actionneurs.py   MQTT -> relais, et retour d'état
+  bus.py           liaison MQTT de l'API (émet, et écoute les états)
+  service.py       ossature commune aux services MQTT
+  registre.py      lecture des deux registres
+  capteurs.yaml    ce qui est mesuré : plages, échelles, comment le lire
+  actionneurs.yaml ce qui est piloté : broches, comment l'actionner
   auth.py          comptes et sessions
   systeme.py       état de la machine (CPU, mémoire, disque)
   drivers/         un module par type de sonde
@@ -53,12 +64,12 @@ infra/
   systemd/         unités de service + installateur
 ```
 
-`capteurs.yaml` est la source unique de vérité. Un capteur y déclare sa
-plage favorable, son échelle d'affichage, et **deux** façons d'être lu :
-le matériel réel, et une simulation plausible. La variable `MODE`
-(`faux` | `reel`) choisit laquelle s'applique — ce qui permet de
-développer l'interface sans une seule sonde branchée, et de basculer en
-démonstration si une sonde lâche.
+`capteurs.yaml` et `actionneurs.yaml` sont la source unique de vérité.
+Chaque entrée y déclare **deux** façons d'être manipulée : le matériel
+réel, et une simulation. La variable `MODE` (`faux` | `reel`) choisit
+laquelle s'applique — ce qui permet de développer toute la chaîne sans
+une seule sonde branchée, et de basculer en démonstration si un
+composant lâche.
 
 ## Démarrer
 
@@ -111,13 +122,21 @@ déclenche pas une reconstruction du frontend.
 - **Le schéma d'authentification se crée au démarrage**, pas dans
   `init.sql` : ce dernier n'est joué qu'à la création du volume, donc
   jamais sur une base déjà en place.
+- **L'état des actionneurs est retenu par le broker**, pas stocké en
+  base. C'est une valeur courante, pas un historique : les messages
+  `retain` la restituent en quelques millisecondes à toute API qui
+  redémarre. L'historique des ordres, lui, est dans la table `commandes`.
+- **La commande part sur MQTT avant d'être écrite en base.** `commandes`
+  est ainsi le journal de ce qui a réellement été émis, et non de ce
+  qu'on a souhaité.
 
 ## État
 
-Fait : chaîne capteurs → MQTT → base → API → dashboard, authentification,
-émission MQTT des commandes, déploiement automatisé sur la Pi.
+Fait : les deux boucles complètes — capteurs → écran, et écran →
+actionneurs → écran — authentification, déploiement automatisé sur la Pi.
 
-Reste : le service qui écoute `botanik/commandes/#` et actionne le
-matériel, le retour d'état sur `botanik/etat/<actionneur>`, le matériel
-lui-même (rien n'est acheté, tout tourne en mode simulé), et le réseau de
-neurones.
+Reste : le matériel (rien n'est acheté, tout tourne en `MODE=faux`) et le
+réseau de neurones. Ni l'un ni l'autre ne demande de toucher à
+l'architecture : un driver à écrire dans `drivers/` pour le premier, un
+publieur de plus sur `botanik/commandes/` — avec `source: "ia"` — pour le
+second.

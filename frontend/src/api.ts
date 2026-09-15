@@ -98,5 +98,18 @@ export const seDeconnecter = () => poster<{ ok: boolean }>('/api/deconnexion')
 
 // ---------- Actionneurs ----------
 
+export type Actionneur = {
+  id: string
+  libelle: string
+  detail: string
+  /** Etat annonce par l'actionneur lui-meme. Null : il ne s'est pas
+   *  manifeste -- son service est peut-etre arrete. Ne pas savoir n'est
+   *  pas la meme chose qu'etre a l'arret. */
+  valeur: number | null
+  ts: string | null
+}
+
+export const lireActionneurs = () => json<Actionneur[]>('/api/actionneurs')
+
 export const commander = (actionneur: string, valeur: number) =>
   poster<{ ok: boolean }>('/api/commandes', { actionneur, valeur })

@@ -182,6 +182,28 @@ def moi(botanik_session: str | None = Cookie(default=None)):
     return {"identifiant": identifiant}
 
 
+@app.get("/api/actionneurs")
+def actionneurs():
+    """Les actionneurs actifs, chacun avec l'etat qu'il a lui-meme annonce.
+
+    `valeur` a None signifie que l'actionneur ne s'est pas manifeste --
+    service arrete, ou broker injoignable. Le dashboard doit pouvoir
+    montrer cette difference : ne pas savoir n'est pas la meme chose
+    qu'etre a l'arret.
+    """
+    connus = bus.etats()
+    return [
+        {
+            "id": a["id"],
+            "libelle": a["libelle"],
+            "detail": a["detail"],
+            "valeur": connus.get(a["id"], {}).get("valeur"),
+            "ts": connus.get(a["id"], {}).get("ts"),
+        }
+        for a in registre.actionneurs_actifs()
+    ]
+
+
 class Commande(BaseModel):
     actionneur: str
     valeur: float

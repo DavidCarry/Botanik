@@ -23,5 +23,7 @@ INTERVALLE_S = float(os.getenv("INTERVALLE_S", "5"))
 # Racines des topics MQTT. Un niveau par sens de circulation :
 #   mesures/<capteur>      ce que la serre observe
 #   commandes/<actionneur> ce qu'on lui demande
+#   etat/<actionneur>      ce qu'elle fait vraiment
 TOPIC_MESURES = "botanik/mesures"
 TOPIC_COMMANDES = "botanik/commandes"
+TOPIC_ETAT = "botanik/etat"

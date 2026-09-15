@@ -1,25 +1,36 @@
-"""Lecture du registre des capteurs.
+"""Lecture des registres materiels.
 
-`capteurs.yaml` est la source de verite du projet : le publisher y prend
-ce qu'il doit lire, l'API ce qu'elle doit exposer. Un seul module le
-charge, pour que les deux voient exactement la meme chose -- sinon un
-capteur desactive pourrait disparaitre de l'ecran tout en continuant
-d'etre publie.
+`capteurs.yaml` et `actionneurs.yaml` sont la source de verite du projet :
+les services y prennent ce qu'ils doivent piloter, l'API ce qu'elle doit
+exposer. Un seul module les charge, pour que tous voient exactement la
+meme chose -- sinon un capteur desactive pourrait disparaitre de l'ecran
+tout en continuant d'etre publie.
 """
 
 from pathlib import Path
 
 import yaml
 
-FICHIER = Path(__file__).parent / "capteurs.yaml"
+ICI = Path(__file__).parent
+CAPTEURS = ICI / "capteurs.yaml"
+ACTIONNEURS = ICI / "actionneurs.yaml"
+
+
+def _actifs(fichier, cle):
+    """Les entrees declarees `actif: true`, dans l'ordre du fichier.
+
+    Relu a chaque appel : ces fichiers tiennent en quelques lignes, et
+    pouvoir activer un element sans redemarrer l'API vaut mieux qu'un
+    cache.
+    """
+    with open(fichier, encoding="utf-8") as f:
+        declares = yaml.safe_load(f)[cle]
+    return [e for e in declares if e.get("actif", False)]
 
 
 def capteurs_actifs():
-    """Les capteurs declares `actif: true`, dans l'ordre du fichier.
+    return _actifs(CAPTEURS, "capteurs")
 
-    Relu a chaque appel : le fichier tient en quelques lignes, et pouvoir
-    activer un capteur sans redemarrer l'API vaut mieux qu'un cache.
-    """
-    with open(FICHIER, encoding="utf-8") as f:
-        declares = yaml.safe_load(f)["capteurs"]
-    return [c for c in declares if c.get("actif", False)]
+
+def actionneurs_actifs():
+    return _actifs(ACTIONNEURS, "actionneurs")

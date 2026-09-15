@@ -1,8 +1,9 @@
-"""Driver de simulation : produit des valeurs plausibles sans materiel.
+"""Driver de simulation : se comporte comme du materiel qui n'existe pas.
 
-Sert tant que les sondes ne sont pas branchees, et reste disponible ensuite
-comme repli -- si un capteur lache pendant une demonstration, basculer
-MODE=faux laisse le reste de la chaine fonctionner.
+En lecture, produit des valeurs plausibles ; en ecriture, accepte l'ordre
+et le retient. Sert tant que rien n'est branche, et reste disponible
+ensuite comme repli -- si une sonde lache pendant une demonstration,
+basculer MODE=faux laisse le reste de la chaine fonctionner.
 """
 
 import math
@@ -42,3 +43,18 @@ def lire(capteur_id, params):
         raise ValueError(f"profil inconnu : {profil}")
 
     return round(valeur + random.gauss(0, bruit), 2)
+
+
+# Etat courant des sorties simulees, indexe par actionneur
+_sorties = {}
+
+
+def appliquer(actionneur_id, valeur, params):
+    """Accepte l'ordre et renvoie l'etat atteint.
+
+    Un driver reel renverrait ce qu'il a pu faire, pas ce qu'on lui a
+    demande -- c'est la difference entre un retour d'etat et un echo. Ici
+    les deux coincident, faute de materiel pour les faire diverger.
+    """
+    _sorties[actionneur_id] = float(valeur)
+    return _sorties[actionneur_id]

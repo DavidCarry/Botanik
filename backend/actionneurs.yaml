@@ -1,0 +1,35 @@
+# Registre des actionneurs de Botanik.
+#
+# Meme principe que capteurs.yaml : source unique de verite. Le service
+# actionneurs.py y prend ce qu'il doit piloter, l'API ce qu'elle doit
+# exposer, et le dashboard s'y adapte sans qu'on le touche.
+#
+# Chaque actionneur declare DEUX facons d'etre actionne :
+#   reel   : la broche GPIO, quand le relais sera cable
+#   simule : rien a piloter, l'ordre est simplement accepte
+# La variable d'environnement MODE (faux|reel) choisit laquelle s'applique.
+#
+# Les numeros de broche sont en numerotation BCM, et provisoires tant que
+# la carte de relais n'est pas montee.
+
+actionneurs:
+  - id: pompe
+    libelle: Arrosage
+    detail: 20 mL par impulsion
+    actif: true
+    reel: {driver: gpio, broche: 23}
+    simule: {}
+
+  - id: lumiere
+    libelle: Éclairage
+    detail: LED horticole
+    actif: true
+    reel: {driver: gpio, broche: 24}
+    simule: {}
+
+  - id: ventilation
+    libelle: Ventilation
+    detail: Circulation d'air
+    actif: true
+    reel: {driver: gpio, broche: 25}
+    simule: {}
