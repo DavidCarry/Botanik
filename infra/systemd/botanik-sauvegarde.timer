@@ -1,0 +1,13 @@
+[Unit]
+Description=Botanik - sauvegarde quotidienne de la base
+
+[Timer]
+# Tous les jours a 3h. `Persistent` rattrape l'echeance manquee si la
+# machine etait eteinte : une Pi debranchee une nuit ne saute pas sa
+# sauvegarde, elle la fait au redemarrage.
+OnCalendar=*-*-* 03:00:00
+Persistent=true
+RandomizedDelaySec=15min
+
+[Install]
+WantedBy=timers.target

@@ -10,6 +10,8 @@ services:
       - "1883:1883"
     volumes:
       - ./infra/mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      # Cree par infra/initialiser-secrets.sh, hors depot.
+      - ./infra/mosquitto/passwd:/mosquitto/config/passwd:ro
       - broker-data:/mosquitto/data
     restart: unless-stopped
 
@@ -24,7 +26,10 @@ services:
       POSTGRES_PASSWORD: botanik
       POSTGRES_DB: botanik
     ports:
-      - "5432:5432"
+      # Sur la boucle locale seulement : les services tournent sur la meme
+      # machine, et une base ouverte au reseau se lisait et s'effacait
+      # depuis n'importe quel poste.
+      - "127.0.0.1:5432:5432"
     volumes:
       - db-data:/var/lib/postgresql/data
       # Joue une seule fois, a la creation du volume

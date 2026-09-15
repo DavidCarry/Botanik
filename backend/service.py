@@ -10,7 +10,19 @@ import time
 
 import paho.mqtt.client as mqtt
 
-from config import MQTT_HOST, MQTT_PORT
+from config import MQTT_HOST, MQTT_MDP, MQTT_PORT, MQTT_UTILISATEUR
+
+
+def nouveau_client(userdata=None) -> mqtt.Client:
+    """Un client MQTT identifie aupres du broker.
+
+    Tous les clients du projet passent par ici -- les trois services et
+    l'API. Un seul endroit sait comment on se presente au broker.
+    """
+    c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, userdata=userdata)
+    if MQTT_UTILISATEUR:
+        c.username_pw_set(MQTT_UTILISATEUR, MQTT_MDP)
+    return c
 
 
 def executer(nom, *, periode, travail=None, userdata=None,
@@ -32,7 +44,7 @@ def executer(nom, *, periode, travail=None, userdata=None,
     signal.signal(signal.SIGINT, arreter)
     signal.signal(signal.SIGTERM, arreter)
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, userdata=userdata)
+    client = nouveau_client(userdata)
     if on_connect:
         client.on_connect = on_connect
     if on_message:

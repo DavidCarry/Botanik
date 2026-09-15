@@ -76,6 +76,7 @@ composant lâche.
 Prérequis : Docker, Python 3.13, Node 22.
 
 ```bash
+infra/initialiser-secrets.sh         # mot de passe MQTT, tiré au hasard
 docker compose up -d                 # broker MQTT + PostgreSQL
 
 python -m venv backend/.venv         # dépendances Python
@@ -98,6 +99,7 @@ rechargement à chaud ; les appels `/api` sont proxifiés vers `:8000`.
 | `./demarrer.sh` | lance tout |
 | `./demarrer.sh etat` | ce qui tourne |
 | `./demarrer.sh arreter` | coupe tout |
+| `./sauvegarder.sh` | archive la base dans `sauvegardes/` |
 
 ## Sur la Raspberry Pi
 
@@ -119,6 +121,10 @@ déclenche pas une reconstruction du frontend.
   la page.
 - **Agrégation côté SQL** (`date_bin`). Un mois de mesures à la minute
   ferait 43 000 points pour quelques centaines de pixels.
+- **127.0.0.1 plutôt que `localhost`** dans les URL de service. Ce nom
+  résout `::1` avant `127.0.0.1`, et Docker ne publie ces ports que sur
+  IPv4 : chaque connexion perdait deux secondes à échouer en IPv6 avant
+  de retomber sur IPv4.
 - **Le schéma d'authentification se crée au démarrage**, pas dans
   `init.sql` : ce dernier n'est joué qu'à la création du volume, donc
   jamais sur une base déjà en place.
@@ -130,10 +136,40 @@ déclenche pas une reconstruction du frontend.
   est ainsi le journal de ce qui a réellement été émis, et non de ce
   qu'on a souhaité.
 
+## Sécurité
+
+Ce qui est en place :
+
+- mots de passe hachés en **scrypt** avec sel aléatoire, comparaison à
+  temps constant ; sessions en jetons aléatoires révocables ;
+  cookie `httponly` + `samesite=lax` (qui couvre aussi le CSRF)
+- **toutes** les requêtes SQL sont paramétrées
+- **le broker MQTT refuse les anonymes.** Sans cela, n'importe qui sur le
+  réseau pouvait démarrer la pompe ou injecter de fausses mesures que le
+  collecteur aurait archivées — et dont le modèle aurait appris. Le mot
+  de passe est tiré au hasard par `infra/initialiser-secrets.sh`, vit
+  dans `.env`, et ne figure pas dans le dépôt
+- **PostgreSQL n'écoute que sur la boucle locale.** Les services tournent
+  sur la même machine ; une base ouverte au réseau se lisait et
+  s'effaçait depuis n'importe quel poste
+- **sauvegarde quotidienne** de la base, 14 jours d'historique
+
+Ce qui ne l'est pas, et pourquoi :
+
+- **pas de HTTPS.** Réseau local isolé, aucune exposition Internet. Un
+  certificat auto-signé afficherait un avertissement du navigateur à
+  chaque démonstration pour un gain nul dans ce contexte. À reprendre si
+  l'installation devait sortir du LAN.
+- **pas de limite sur les tentatives de connexion.** Un seul compte, un
+  réseau local, et le risque principal serait de se bloquer soi-même.
+- **le port MQTT reste ouvert au réseau**, mais authentifié : un client
+  externe doit pouvoir s'y connecter pour une démonstration.
+
 ## État
 
 Fait : les deux boucles complètes — capteurs → écran, et écran →
-actionneurs → écran — authentification, déploiement automatisé sur la Pi.
+actionneurs → écran — authentification, déploiement automatisé sur la Pi,
+sauvegarde quotidienne.
 
 Reste : le matériel (rien n'est acheté, tout tourne en `MODE=faux`) et le
 réseau de neurones. Ni l'un ni l'autre ne demande de toucher à

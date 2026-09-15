@@ -33,6 +33,7 @@ case "${1:-demarrer}" in
     arreter
     sleep 1
     mkdir -p "$LOGS"
+    "$RACINE/infra/initialiser-secrets.sh" > /dev/null
     cd "$RACINE/backend" || exit 1
 
     # Le collecteur d'abord : il doit ecouter avant que le publisher emette.

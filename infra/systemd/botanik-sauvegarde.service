@@ -1,0 +1,10 @@
+[Unit]
+Description=Botanik - sauvegarde de la base
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=__USER__
+WorkingDirectory=__RACINE__
+ExecStart=__RACINE__/sauvegarder.sh

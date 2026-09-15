@@ -39,6 +39,9 @@ if [ ! -d frontend/dist ] || echo "$MODIFIES" | grep -q '^frontend/'; then
   (cd frontend && npm run build 2>&1 | tail -4 | sed 's/^/  /')
 fi
 
+echo "== secrets =="
+./infra/initialiser-secrets.sh
+
 echo "== conteneurs =="
 # Idempotent : garantit qu'ils tournent, et les recree si docker-compose.yml
 # a change. Sans ca, une modif d'infra passait silencieusement a la trappe.

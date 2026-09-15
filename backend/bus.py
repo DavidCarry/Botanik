@@ -20,6 +20,7 @@ from datetime import datetime, timezone
 
 import paho.mqtt.client as mqtt
 
+import service
 from config import MQTT_HOST, MQTT_PORT, TOPIC_ETAT
 
 _client: mqtt.Client | None = None
@@ -53,7 +54,7 @@ def etats() -> dict[str, dict]:
 
 def demarrer():
     global _client
-    _client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    _client = service.nouveau_client()
     _client.on_connect = _on_connect
     _client.on_message = _on_message
     _client.connect_async(MQTT_HOST, MQTT_PORT)
