@@ -5,18 +5,23 @@ node_modules
 # Build
 dist
 dist-ssr
+*.tsbuildinfo
 
-# Logs
-logs
+# Journaux d'exécution
+logs/
 *.log
 npm-debug.log*
 
-# Fichiers locaux (.env.local, etc.)
+# Secrets et réglages de poste
+.env
+.env.*
 *.local
+*.pem
 
 # Éditeurs
 .vscode/*
 !.vscode/extensions.json
+.idea/
 
 # Python
 __pycache__/
@@ -24,6 +29,4 @@ __pycache__/
 
 # OS
 .DS_Store
-
-# Journaux d execution
-logs/
+Thumbs.db

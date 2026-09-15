@@ -1,4 +1,5 @@
 import type { Fenetre } from '../api'
+import { LIBELLE_PILULE } from '../libelles'
 import type { EtatCourbes } from '../useCourbes'
 import Graphique from './Graphique'
 import Pilules from './Pilules'
@@ -8,16 +9,6 @@ const FENETRES: { valeur: Fenetre; libelle: string }[] = [
   { valeur: '1s', libelle: '1 S' },
   { valeur: '1m', libelle: '1 M' },
 ]
-
-const COURT: Record<string, string> = {
-  temperature_air: 'Temp.',
-  temperature_sol: 'Temp. sol',
-  humidite_sol_a: 'Humidité',
-  humidite_sol_b: 'Humidité 2',
-  humidite_air: 'Hum. air',
-  luminosite: 'Lumière',
-  niveau_eau: 'Eau',
-}
 
 /** Selecteurs seuls : la valeur du moment est deja lisible dans les
  *  billes, la repeter ici ferait doublon. */
@@ -29,7 +20,7 @@ export function EnTeteCourbes({ etat }: { etat: EtatCourbes }) {
           etiquette="Mesure affichée"
           options={etat.capteurs.map((c) => ({
             valeur: c.id,
-            libelle: COURT[c.id] ?? c.libelle,
+            libelle: LIBELLE_PILULE[c.id] ?? c.libelle,
           }))}
           choisi={etat.choisi}
           onChange={etat.setChoisi}

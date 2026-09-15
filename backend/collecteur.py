@@ -6,20 +6,16 @@ capteur qui deraille.
 """
 
 import json
-import signal
-import time
 from datetime import datetime, timezone
 
-import paho.mqtt.client as mqtt
 import psycopg
 
-from config import DB_URL, MQTT_HOST, MQTT_PORT, TOPIC_MESURES
+import service
+from config import DB_URL, TOPIC_MESURES
 
 INSERTION = (
     "INSERT INTO mesures (ts, capteur, valeur, unite) VALUES (%s, %s, %s, %s)"
 )
-
-_tourne = True
 
 
 def _horodatage(brut):
@@ -61,31 +57,16 @@ def on_message(client, conn, msg):
         conn.rollback()
 
 
-def _arreter(signum, frame):
-    global _tourne
-    _tourne = False
-
-
 def main():
-    signal.signal(signal.SIGINT, _arreter)
-    signal.signal(signal.SIGTERM, _arreter)
-
     conn = psycopg.connect(DB_URL, autocommit=True)
     print("Connecte a la base", flush=True)
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, userdata=conn)
-    client.on_connect = on_connect
-    client.on_message = on_message
-    client.connect(MQTT_HOST, MQTT_PORT)
-    client.loop_start()
-
-    while _tourne:
-        time.sleep(0.5)
-
-    client.loop_stop()
-    client.disconnect()
+    # Rien a faire periodiquement : tout se joue dans on_message.
+    service.executer(
+        "Collecteur", periode=0.5, userdata=conn,
+        on_connect=on_connect, on_message=on_message,
+    )
     conn.close()
-    print("Collecteur arrete", flush=True)
 
 
 if __name__ == "__main__":

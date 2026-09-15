@@ -52,8 +52,6 @@ type Geometrie = {
   ligne: string
   aire: string
   coords: [number, number][]
-  bandeY: number
-  bandeH: number
   bas: number
   haut: number
   yIdealMin: number
@@ -85,13 +83,10 @@ function geometrie(
   const fin = coords[coords.length - 1]
   const aire = `${ligne} L ${fin[0]} ${y1} L ${coords[0][0]} ${y1} Z`
 
-  const yIdealMax = py(ideal.max)
-  const yIdealMin = py(ideal.min)
-
   return {
     ligne, aire, coords,
-    bandeY: yIdealMax, bandeH: yIdealMin - yIdealMax,
-    bas, haut, yIdealMin, yIdealMax,
+    bas, haut,
+    yIdealMin: py(ideal.min), yIdealMax: py(ideal.max),
   }
 }
 
@@ -108,7 +103,6 @@ export default function Graphique({ points, unite, ideal }: Props) {
 
   const rLigne = useRef<SVGPathElement>(null)
   const rAire = useRef<SVGPathElement>(null)
-  const rBande = useRef<SVGRectElement>(null)
   const rSeuilHaut = useRef<SVGLineElement>(null)
   const rSeuilBas = useRef<SVGLineElement>(null)
   const rPoint = useRef<SVGCircleElement>(null)
@@ -149,12 +143,10 @@ export default function Graphique({ points, unite, ideal }: Props) {
       const g = geometrie(valeurs, l, h, ideal)
       rLigne.current?.setAttribute('d', g.ligne)
       rAire.current?.setAttribute('d', g.aire)
-      rBande.current?.setAttribute('y', String(g.bandeY))
-      rBande.current?.setAttribute('height', String(Math.max(g.bandeH, 1)))
-      rSeuilHaut.current?.setAttribute('y1', String(g.bandeY))
-      rSeuilHaut.current?.setAttribute('y2', String(g.bandeY))
-      rSeuilBas.current?.setAttribute('y1', String(g.bandeY + g.bandeH))
-      rSeuilBas.current?.setAttribute('y2', String(g.bandeY + g.bandeH))
+      rSeuilHaut.current?.setAttribute('y1', String(g.yIdealMax))
+      rSeuilHaut.current?.setAttribute('y2', String(g.yIdealMax))
+      rSeuilBas.current?.setAttribute('y1', String(g.yIdealMin))
+      rSeuilBas.current?.setAttribute('y2', String(g.yIdealMin))
 
       const fin = g.coords[g.coords.length - 1]
       rPoint.current?.setAttribute('cx', String(fin[0]))
@@ -239,21 +231,14 @@ export default function Graphique({ points, unite, ideal }: Props) {
               </filter>
             </defs>
 
-            {/* Plage favorable : deux seuils seulement. La bande pleine
-                colorait tout l'arriere-plan et concurrencait la courbe. */}
-            <rect
-              ref={rBande}
-              x={MARGE.gauche} y={g.bandeY}
-              width={l - MARGE.gauche - MARGE.droite}
-              height={Math.max(g.bandeH, 1)}
-              fill="none"
-            />
+            {/* Plage favorable : deux seuils en pointille. Une bande
+                pleine colorait tout l'arriere-plan et concurrencait la
+                courbe. */}
             <line ref={rSeuilHaut}
-              x1={MARGE.gauche} x2={l - MARGE.droite} y1={g.bandeY} y2={g.bandeY}
+              x1={MARGE.gauche} x2={l - MARGE.droite} y1={g.yIdealMax} y2={g.yIdealMax}
               stroke="var(--accent)" strokeOpacity="0.35" strokeWidth="1" strokeDasharray="3 4" />
             <line ref={rSeuilBas}
-              x1={MARGE.gauche} x2={l - MARGE.droite}
-              y1={g.bandeY + g.bandeH} y2={g.bandeY + g.bandeH}
+              x1={MARGE.gauche} x2={l - MARGE.droite} y1={g.yIdealMin} y2={g.yIdealMin}
               stroke="var(--accent)" strokeOpacity="0.35" strokeWidth="1" strokeDasharray="3 4" />
 
             <path ref={rAire} d={g.aire} fill="url(#sous-courbe)" />

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { LuClock, LuCpu, LuHardDrive, LuMemoryStick, LuThermometer } from 'react-icons/lu'
 import { lireSysteme, type EtatSysteme } from '../api'
-import Barre from './Barre'
+import Jauge from './Jauge'
 
 const duree = (s: number) => {
   const j = Math.floor(s / 86400)
@@ -78,7 +78,7 @@ export default function Systeme() {
               <span className="text-micro font-medium text-texte">{libelle}</span>
               <span className="ml-auto text-micro tabular-nums text-texte-doux">{valeur}</span>
             </div>
-            <Barre part={part} />
+            <Jauge part={part} />
             <p className="mt-1 text-[0.6rem] tabular-nums text-texte-faible">{detail}</p>
           </div>
         ))}

@@ -3,10 +3,10 @@ import { LuLogIn, LuLogOut } from 'react-icons/lu'
 import type { Auth } from '../useAuth'
 import Logo from './Logo'
 
-/** Barre fixe. Le flou d'arriere-plan prend appui sur les lueurs du fond
+/** Bandeau fixe. Le flou d'arriere-plan prend appui sur les lueurs du fond
  *  et sur ce qui defile dessous : c'est ce qui la fait lire comme une
  *  plaque de verre posee sur la page, et non comme un bandeau opaque. */
-export default function TopBar({
+export default function Bandeau({
   auth, onConnexion, onSysteme, enLigne,
 }: {
   auth: Auth

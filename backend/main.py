@@ -7,22 +7,21 @@ fait sur "/" et intercepte donc tout. Les routes /api doivent imperativement
 etre declarees AVANT, sinon elles ne sont jamais atteintes.
 """
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import psycopg
-import yaml
 from fastapi import Cookie, FastAPI, HTTPException, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 import auth
+import registre
 import systeme
 from config import DB_URL
 
-RACINE = Path(__file__).parent
-DIST = RACINE.parent / "frontend" / "dist"
-REGISTRE = RACINE / "capteurs.yaml"
+DIST = Path(__file__).parent.parent / "frontend" / "dist"
 
 # Fenetres proposees par le dashboard, et le pas d'agregation associe.
 # Sans regroupement, un mois de mesures a la minute ferait 43 000 points
@@ -49,9 +48,6 @@ DERNIERES = """
     ORDER BY capteur, ts DESC
 """
 
-app = FastAPI(title="Botanik")
-
-
 def base():
     """Connexion courte. A cette echelle, ouvrir a la demande coute moins
     cher a maintenir qu'un pool, et evite les connexions mortes."""
@@ -61,11 +57,26 @@ def base():
         raise HTTPException(503, f"base de donnees injoignable : {e}") from e
 
 
-@app.on_event("startup")
-def demarrage():
-    """Le schema d'authentification se cree ici et non dans init.sql :
-    ce dernier n'est joue qu'a la creation du volume, donc jamais sur une
-    base deja en place."""
+def interroger(requete, params=()):
+    """Execute une lecture et renvoie les lignes.
+
+    Une base injoignable devient un 503 et non un 500 : c'est une panne
+    d'infrastructure, pas une faute du client -- et le dashboard doit
+    pouvoir faire la difference.
+    """
+    try:
+        with base() as conn, conn.cursor() as cur:
+            cur.execute(requete, params)
+            return cur.fetchall()
+    except psycopg.Error as e:
+        raise HTTPException(503, f"base de donnees injoignable : {e}") from e
+
+
+@asynccontextmanager
+async def cycle_de_vie(app: FastAPI):
+    """Le schema d'authentification se cree au demarrage et non dans
+    init.sql : ce dernier n'est joue qu'a la creation du volume, donc
+    jamais sur une base deja en place."""
     try:
         with base() as conn:
             neuf = auth.preparer(conn)
@@ -78,27 +89,19 @@ def demarrage():
             )
     except HTTPException as e:
         print(f"Authentification non initialisee : {e.detail}", flush=True)
+    yield
 
 
-def capteurs_actifs():
-    with open(REGISTRE, encoding="utf-8") as f:
-        declares = yaml.safe_load(f)["capteurs"]
-    return [c for c in declares if c.get("actif", False)]
+app = FastAPI(title="Botanik", lifespan=cycle_de_vie)
 
 
 @app.get("/api/capteurs")
 def capteurs():
     """Les capteurs actifs, chacun avec sa derniere mesure si elle existe."""
-    try:
-        with psycopg.connect(DB_URL, connect_timeout=5) as conn:
-            with conn.cursor() as cur:
-                cur.execute(DERNIERES)
-                dernieres = {
-                    capteur: {"valeur": valeur, "unite": unite, "ts": ts.isoformat()}
-                    for capteur, valeur, unite, ts in cur.fetchall()
-                }
-    except psycopg.Error as e:
-        raise HTTPException(503, f"base de donnees injoignable : {e}") from e
+    dernieres = {
+        capteur: {"valeur": valeur, "unite": unite, "ts": ts.isoformat()}
+        for capteur, valeur, unite, ts in interroger(DERNIERES)
+    }
 
     return [
         {
@@ -110,7 +113,7 @@ def capteurs():
             # None tant qu'aucune mesure n'est arrivee pour ce capteur
             "mesure": dernieres.get(c["id"]),
         }
-        for c in capteurs_actifs()
+        for c in registre.capteurs_actifs()
     ]
 
 
@@ -121,20 +124,13 @@ def mesures(capteur: str, fenetre: str = "1j"):
         raise HTTPException(400, f"fenetre inconnue : {fenetre}")
     duree, pas = FENETRES[fenetre]
 
-    if not any(c["id"] == capteur for c in capteurs_actifs()):
+    if not any(c["id"] == capteur for c in registre.capteurs_actifs()):
         raise HTTPException(404, f"capteur inconnu ou inactif : {capteur}")
 
-    try:
-        with psycopg.connect(DB_URL, connect_timeout=5) as conn:
-            with conn.cursor() as cur:
-                cur.execute(HISTORIQUE, (pas, capteur, duree))
-                points = [
-                    {"ts": t.isoformat(), "valeur": round(float(v), 2)}
-                    for t, v in cur.fetchall()
-                ]
-    except psycopg.Error as e:
-        raise HTTPException(503, f"base de donnees injoignable : {e}") from e
-
+    points = [
+        {"ts": t.isoformat(), "valeur": round(float(v), 2)}
+        for t, v in interroger(HISTORIQUE, (pas, capteur, duree))
+    ]
     return {"capteur": capteur, "fenetre": fenetre, "points": points}
 
 

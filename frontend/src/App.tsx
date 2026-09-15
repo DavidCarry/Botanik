@@ -1,15 +1,15 @@
 import { useState } from 'react'
 import { LuCpu } from 'react-icons/lu'
 import Actionneurs from './composants/Actionneurs'
+import Bandeau from './composants/Bandeau'
+import Bloc from './composants/Bloc'
 import Connexion from './composants/Connexion'
 import Courbes, { EnTeteCourbes } from './composants/Courbes'
 import Fond from './composants/Fond'
 import InviteDefilement from './composants/InviteDefilement'
 import Mesures from './composants/Mesures'
 import Modale from './composants/Modale'
-import Panneau from './composants/Panneau'
 import Systeme from './composants/Systeme'
-import TopBar from './composants/TopBar'
 import { useAuth } from './useAuth'
 import { useCourbes } from './useCourbes'
 
@@ -26,7 +26,7 @@ export default function App() {
   return (
     <div className="min-h-dvh lg:h-dvh lg:overflow-hidden">
       <Fond />
-      <TopBar
+      <Bandeau
         auth={auth}
         enLigne={enLigne}
         onConnexion={() => setConnexionOuverte(true)}
@@ -55,15 +55,15 @@ export default function App() {
         </section>
 
         <section className="grid min-h-0 min-w-0 gap-9 sm:gap-11 lg:gap-6 lg:grid-rows-[1fr_auto]">
-          <Panneau nu actions={<EnTeteCourbes etat={courbes} />}>
+          <Bloc actions={<EnTeteCourbes etat={courbes} />}>
             <div className="h-[clamp(350px,52dvh,540px)] lg:h-full">
               <Courbes etat={courbes} />
             </div>
-          </Panneau>
+          </Bloc>
 
-          <Panneau nu>
+          <Bloc>
             <Actionneurs connecte={Boolean(auth.compte)} />
-          </Panneau>
+          </Bloc>
         </section>
       </main>
 

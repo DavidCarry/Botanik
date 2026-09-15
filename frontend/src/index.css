@@ -209,20 +209,6 @@ input, textarea {
   .apparition { animation-duration: 1ms; }
 }
 
-/* Houle du liquide. Deux vagues de periodes differentes se dephasent
-   sans jamais retomber en phase : le mouvement ne se repete pas. */
-@keyframes houle {
-  from { translate: 0 0; }
-  to   { translate: -50px 0; }
-}
-
-.houle       { animation: houle 4.2s linear infinite; }
-.houle-lente { animation: houle 6.7s linear infinite reverse; }
-
-@media (prefers-reduced-motion: reduce) {
-  .houle, .houle-lente { animation: none; }
-}
-
 /* Invite a defiler : un aller-retour court, pas un rebond appuye --
    l'indication doit se remarquer sans happer le regard. */
 @keyframes invite {

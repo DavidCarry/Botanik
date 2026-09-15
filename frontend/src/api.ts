@@ -1,3 +1,32 @@
+/** Appels a l'API.
+ *
+ *  Chemins relatifs : en developpement Vite proxifie vers :8000, en
+ *  production c'est le meme serveur qui repond. Aucune URL a configurer,
+ *  et rien a changer entre le PC et la Raspberry Pi.
+ */
+
+/** Toutes les routes repondent du JSON et signalent l'echec par le code
+ *  HTTP : un seul endroit pour lire l'un et verifier l'autre. */
+async function json<T>(chemin: string, options?: RequestInit): Promise<T> {
+  const r = await fetch(chemin, options)
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  return r.json() as Promise<T>
+}
+
+function poster<T>(chemin: string, corps?: unknown): Promise<T> {
+  return json<T>(chemin, {
+    method: 'POST',
+    ...(corps === undefined
+      ? {}
+      : {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(corps),
+        }),
+  })
+}
+
+// ---------- Capteurs ----------
+
 export type Mesure = { valeur: number; unite: string; ts: string }
 
 export type Capteur = {
@@ -9,26 +38,22 @@ export type Capteur = {
   mesure: Mesure | null
 }
 
-// Chemin relatif : en developpement Vite proxifie vers :8000, en production
-// c'est le meme serveur qui repond. Aucune URL a configurer.
-export async function lireCapteurs(): Promise<Capteur[]> {
-  const r = await fetch('/api/capteurs')
-  if (!r.ok) throw new Error(`HTTP ${r.status}`)
-  return r.json()
-}
-
 export type Point = { ts: string; valeur: number }
 export type Fenetre = '1j' | '1s' | '1m'
+
+export const lireCapteurs = () => json<Capteur[]>('/api/capteurs')
 
 export async function lireHistorique(
   capteur: string,
   fenetre: Fenetre,
 ): Promise<Point[]> {
-  const r = await fetch(`/api/mesures?capteur=${capteur}&fenetre=${fenetre}`)
-  if (!r.ok) throw new Error(`HTTP ${r.status}`)
-  const d = await r.json()
+  const d = await json<{ points: Point[] }>(
+    `/api/mesures?capteur=${capteur}&fenetre=${fenetre}`,
+  )
   return d.points
 }
+
+// ---------- Machine ----------
 
 export type EtatSysteme = {
   horloge: string
@@ -41,37 +66,37 @@ export type EtatSysteme = {
   en_ligne_s: number
 }
 
-export async function lireSysteme(): Promise<EtatSysteme> {
-  const r = await fetch('/api/systeme')
-  if (!r.ok) throw new Error(`HTTP ${r.status}`)
-  return r.json()
-}
+export const lireSysteme = () => json<EtatSysteme>('/api/systeme')
 
+// ---------- Compte ----------
+
+/** Null plutot qu'une erreur : ne pas etre connecte est un etat normal,
+ *  pas une panne. */
 export async function lireCompte(): Promise<string | null> {
-  const r = await fetch('/api/moi')
-  if (!r.ok) return null
-  return (await r.json()).identifiant
+  try {
+    return (await json<{ identifiant: string | null }>('/api/moi')).identifiant
+  } catch {
+    return null
+  }
 }
 
 export async function seConnecter(identifiant: string, motDePasse: string) {
-  const r = await fetch('/api/connexion', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identifiant, mot_de_passe: motDePasse }),
-  })
-  if (!r.ok) throw new Error('Identifiant ou mot de passe incorrect')
-  return (await r.json()).identifiant as string
+  try {
+    const d = await poster<{ identifiant: string }>('/api/connexion', {
+      identifiant,
+      mot_de_passe: motDePasse,
+    })
+    return d.identifiant
+  } catch {
+    // Le serveur ne dit pas lequel des deux est faux, et c'est voulu :
+    // distinguer les deux cas renseignerait sur les comptes existants.
+    throw new Error('Identifiant ou mot de passe incorrect')
+  }
 }
 
-export async function seDeconnecter() {
-  await fetch('/api/deconnexion', { method: 'POST' })
-}
+export const seDeconnecter = () => poster<{ ok: boolean }>('/api/deconnexion')
 
-export async function commander(actionneur: string, valeur: number) {
-  const r = await fetch('/api/commandes', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ actionneur, valeur }),
-  })
-  if (!r.ok) throw new Error(`HTTP ${r.status}`)
-}
+// ---------- Actionneurs ----------
+
+export const commander = (actionneur: string, valeur: number) =>
+  poster<{ ok: boolean }>('/api/commandes', { actionneur, valeur })

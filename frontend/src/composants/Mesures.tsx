@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { lireCapteurs, type Capteur } from '../api'
 import { formaterValeur } from '../format'
+import { LIBELLE_BILLE } from '../libelles'
 import SphereLiquide from './SphereLiquide'
 
 const RAFRAICHISSEMENT_MS = 5000
@@ -19,18 +20,6 @@ const GRAPPE = [
   { taille: 40.1, cx: 63.06, cy: 66.00, retard: -2.6 },
   { taille: 36.1, cx: 26.95, cy: 78.04, retard: -3.3 },
 ]
-
-/** Dans une bille, un libelle entier ne tient pas. Les noms complets
- *  restent ceux du registre ; seul l'affichage est raccourci. */
-const COURT: Record<string, string> = {
-  temperature_air: 'Température',
-  temperature_sol: 'Temp. sol',
-  humidite_sol_a: 'Humidité',
-  humidite_sol_b: 'Humidité 2',
-  humidite_air: 'Humidité air',
-  luminosite: 'Lumière',
-  niveau_eau: 'Eau',
-}
 
 const part = (v: number, min: number, max: number) =>
   Math.max(0, Math.min(1, (v - min) / (max - min)))
@@ -72,7 +61,7 @@ export default function Mesures() {
           return (
             <SphereLiquide
               key={c?.id ?? i}
-              libelle={c ? (COURT[c.id] ?? c.libelle) : '—'}
+              libelle={c ? (LIBELLE_BILLE[c.id] ?? c.libelle) : '—'}
               valeur={m ? formaterValeur(m.valeur, c!.unite) : '—'}
               unite={m ? c!.unite : undefined}
               niveau={niveau}
