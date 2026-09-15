@@ -53,11 +53,23 @@ export async function lireHistorique(
   return d.points
 }
 
+// ---------- Santé de la chaîne ----------
+
+export type Sante = {
+  /** Age de la derniere mesure archivee, en secondes. Null : la base est
+   *  vide, ou injoignable. */
+  archivage_s: number | null
+  archivage_ok: boolean
+  /** Age de la derniere sauvegarde, en heures. Null : aucune. */
+  sauvegarde_h: number | null
+}
+
+export const lireSante = () => json<Sante>('/api/sante')
+
 // ---------- Machine ----------
 
 export type EtatSysteme = {
   horloge: string
-  date: string
   temperature_cpu: number | null
   charge_cpu: number
   coeurs: number

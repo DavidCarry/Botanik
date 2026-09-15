@@ -6,14 +6,27 @@ import Logo from './Logo'
 /** Bandeau fixe. Le flou d'arriere-plan prend appui sur les lueurs du fond
  *  et sur ce qui defile dessous : c'est ce qui la fait lire comme une
  *  plaque de verre posee sur la page, et non comme un bandeau opaque. */
+/** Trois etats, et non deux : « l'API repond » ne veut pas dire « tout
+ *  va bien ». Depuis que les bulles recoivent les mesures par le flux, un
+ *  collecteur arrete laisse l'ecran vivant alors que plus rien n'est
+ *  enregistre -- c'est l'etat degrade. */
+export type EtatLiaison = 'en_ligne' | 'degrade' | 'hors_ligne'
+
+const LIAISON: Record<EtatLiaison, { couleur: string; libelle: string }> = {
+  en_ligne: { couleur: 'var(--bon)', libelle: 'En ligne' },
+  degrade: { couleur: 'var(--attention)', libelle: 'Archivage arrêté' },
+  hors_ligne: { couleur: 'var(--critique)', libelle: 'Hors ligne' },
+}
+
 export default function Bandeau({
-  auth, onConnexion, onSysteme, enLigne,
+  auth, onConnexion, onSysteme, liaison,
 }: {
   auth: Auth
   onConnexion: () => void
   onSysteme: () => void
-  enLigne: boolean
+  liaison: EtatLiaison
 }) {
+  const { couleur, libelle } = LIAISON[liaison]
   const [heure, setHeure] = useState(() =>
     new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
 
@@ -68,19 +81,19 @@ export default function Bandeau({
                 ressemble a une alarme, alors qu'elle ne fait que
                 constater une absence. */}
             <span className="relative grid size-2 shrink-0 place-items-center">
-              {enLigne && (
+              {liaison === 'en_ligne' && (
                 <span
                   className="col-start-1 row-start-1 size-2 animate-ping rounded-pilule opacity-75"
-                  style={{ background: 'var(--bon)' }}
+                  style={{ background: couleur }}
                 />
               )}
               <span
                 className="col-start-1 row-start-1 size-1.5 rounded-pilule"
-                style={{ background: enLigne ? 'var(--bon)' : 'var(--critique)' }}
+                style={{ background: couleur }}
               />
             </span>
             <span className="hidden text-micro text-texte-doux sm:inline">
-              {enLigne ? 'En ligne' : 'Hors ligne'}
+              {libelle}
             </span>
             <span className="ml-1 text-micro tabular-nums text-texte-faible">{heure}</span>
           </button>

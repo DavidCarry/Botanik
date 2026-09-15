@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { LuCpu } from 'react-icons/lu'
 import Actionneurs from './composants/Actionneurs'
-import Bandeau from './composants/Bandeau'
+import Bandeau, { type EtatLiaison } from './composants/Bandeau'
 import Bloc from './composants/Bloc'
 import Connexion from './composants/Connexion'
 import Courbes, { EnTeteCourbes } from './composants/Courbes'
@@ -12,6 +12,7 @@ import Modale from './composants/Modale'
 import Systeme from './composants/Systeme'
 import { useAuth } from './useAuth'
 import { useCourbes } from './useCourbes'
+import { useSante } from './useSante'
 
 export default function App() {
   const auth = useAuth()
@@ -19,16 +20,22 @@ export default function App() {
   const [connexionOuverte, setConnexionOuverte] = useState(false)
   const [systemeOuvert, setSystemeOuvert] = useState(false)
 
-  // Des capteurs recus valent preuve de liaison : inutile d'interroger
-  // une route de sante en plus.
-  const enLigne = courbes.capteurs.length > 0
+  const { sante, joignable } = useSante()
+
+  // Tant qu'on n'a pas de reponse, on ne crie pas : la premiere lecture
+  // est en vol, et un echec basculera l'etat en moins d'une seconde.
+  const liaison: EtatLiaison = !joignable
+    ? 'hors_ligne'
+    : sante && !sante.archivage_ok
+      ? 'degrade'
+      : 'en_ligne'
 
   return (
     <div className="min-h-dvh lg:h-dvh lg:overflow-hidden">
       <Fond />
       <Bandeau
         auth={auth}
-        enLigne={enLigne}
+        liaison={liaison}
         onConnexion={() => setConnexionOuverte(true)}
         onSysteme={() => setSystemeOuvert(true)}
       />
@@ -78,7 +85,7 @@ export default function App() {
           icone={<LuCpu size={16} />}
           onFermer={() => setSystemeOuvert(false)}
         >
-          <Systeme />
+          <Systeme sante={sante} />
         </Modale>
       )}
     </div>

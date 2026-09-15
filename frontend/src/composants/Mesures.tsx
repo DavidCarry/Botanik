@@ -22,7 +22,7 @@ const part = (v: number, min: number, max: number) =>
   Math.max(0, Math.min(1, (v - min) / (max - min)))
 
 export default function Mesures() {
-  const capteurs = useMesures()
+  const { capteurs, muets } = useMesures()
 
   const cases = capteurs?.length ? capteurs.slice(0, 4) : [null, null, null, null]
 
@@ -39,6 +39,7 @@ export default function Mesures() {
           const m = c?.mesure
           const niveau = c && m ? part(m.valeur, c.echelle.min, c.echelle.max) : 0
           const dedans = Boolean(c && m && m.valeur >= c.ideal.min && m.valeur <= c.ideal.max)
+          const muet = Boolean(c && muets.has(c.id))
 
           return (
             <SphereLiquide
@@ -52,6 +53,7 @@ export default function Mesures() {
                     haut: part(c.ideal.max, c.echelle.min, c.echelle.max) }
                 : { bas: 0, haut: 0 }}
               dansLaPlage={dedans}
+              muet={muet}
               taille={taille}
               x={cx - taille / 2}
               y={cy - taille / 2}

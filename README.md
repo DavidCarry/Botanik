@@ -148,6 +148,37 @@ déclenche pas une reconstruction du frontend.
   est ainsi le journal de ce qui a réellement été émis, et non de ce
   qu'on a souhaité.
 
+## Pannes silencieuses
+
+Une panne qui se voit se répare. Le projet doit tourner plusieurs
+semaines sans surveillance, et c'est la base qui portera l'historique de
+germination et le jeu de données du modèle : une interruption passée
+inaperçue pendant trois jours serait irrattrapable.
+
+| Composant | Symptôme à l'écran |
+|---|---|
+| Actionneur | l'interrupteur refuse de bouger, « n'a pas répondu » |
+| PostgreSQL | bulles vides, courbe vide |
+| API | la page ne charge plus |
+| **Collecteur** | l'indicateur passe à **« Archivage arrêté »** |
+| **Un capteur isolé** | **sa bulle s'éteint**, la dernière valeur reste lisible |
+| **Sauvegarde** | son âge s'affiche dans le panneau Machine |
+
+Les trois derniers ne se voyaient pas. Le premier est devenu invisible en
+passant les bulles au flux MQTT : elles continuaient de défiler alors que
+plus rien n'était enregistré.
+
+Deux mécanismes, parce que ce sont deux natures de panne :
+
+- **La chaîne entière** se juge côté serveur (`/api/sante`) : âge de la
+  dernière mesure *archivée*, comparé à l'horloge de la machine qui
+  écrit. Un téléphone mal réglé donnerait sinon de fausses alertes.
+- **Un capteur isolé** se juge côté navigateur, en comparant les capteurs
+  *entre eux* : celui qui accuse plus d'une minute de retard sur le plus
+  récent s'est tu. Aucune horloge n'intervient. Et si tous se taisent,
+  aucun n'est en retard sur les autres — c'est alors la chaîne qui est en
+  cause, et c'est l'autre indicateur qui parle.
+
 ## Sécurité
 
 Ce qui est en place :

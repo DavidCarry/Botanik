@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { LuClock, LuCpu, LuHardDrive, LuMemoryStick, LuThermometer } from 'react-icons/lu'
-import { lireSysteme, type EtatSysteme } from '../api'
+import { LuArchive, LuClock, LuCpu, LuHardDrive, LuMemoryStick, LuThermometer } from 'react-icons/lu'
+import { lireSysteme, type EtatSysteme, type Sante } from '../api'
 import Jauge from './Jauge'
 
 const duree = (s: number) => {
@@ -15,7 +15,10 @@ const duree = (s: number) => {
 /** Sante de la machine. Volontairement separee des mesures de la serre :
  *  on ne surveille pas une carte comme on surveille une germination, et
  *  melanger les deux brouillerait la lecture. */
-export default function Systeme() {
+/** Au-dela, la sauvegarde quotidienne a saute un tour. */
+const SAUVEGARDE_TOLEREE_H = 36
+
+export default function Systeme({ sante }: { sante: Sante | null }) {
   const [etat, setEtat] = useState<EtatSysteme | null>(null)
 
   useEffect(() => {
@@ -68,6 +71,31 @@ export default function Systeme() {
             : <span className="text-texte-faible">n/d</span>}
         </span>
         <span className="text-texte-faible">en ligne {duree(etat.en_ligne_s)}</span>
+        {/* Une sauvegarde qui echoue ne se voit nulle part ailleurs :
+            le minuteur la relance chaque nuit, en silence. */}
+        {sante && !sante.archivage_ok && sante.archivage_s !== null && (
+          <span className="text-attention">
+            archivage arrêté depuis {duree(sante.archivage_s)}
+          </span>
+        )}
+        {sante && (
+          <span className="flex items-center gap-1.5">
+            <LuArchive size={13} className="text-texte-faible" />
+            {sante.sauvegarde_h === null ? (
+              <span className="text-attention">aucune sauvegarde</span>
+            ) : (
+              <span
+                className={
+                  sante.sauvegarde_h > SAUVEGARDE_TOLEREE_H
+                    ? 'text-attention'
+                    : 'text-texte-doux'
+                }
+              >
+                sauvegarde il y a {duree(Math.round(sante.sauvegarde_h * 3600))}
+              </span>
+            )}
+          </span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col justify-center gap-3.5">

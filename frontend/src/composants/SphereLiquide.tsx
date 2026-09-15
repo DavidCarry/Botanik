@@ -7,6 +7,8 @@ type Props = {
   /** bornes de la plage favorable, 0 a 1 */
   ideal: { bas: number; haut: number }
   dansLaPlage: boolean
+  /** plus aucune mesure recue : la valeur affichee est figee */
+  muet?: boolean
   /** diametre et coin superieur gauche, en % du carre de reference */
   taille: number
   x: number
@@ -30,7 +32,7 @@ const VAGUE_HAUTE = vague(2.6)
 const VAGUE_BASSE = vague(1.8)
 
 export default function SphereLiquide({
-  libelle, valeur, unite, niveau, ideal, dansLaPlage, taille, x, y, retard,
+  libelle, valeur, unite, niveau, ideal, dansLaPlage, muet, taille, x, y, retard,
 }: Props) {
   const id = libelle.replace(/[^a-z]/gi, '') || 'x'
   const rempli = Math.max(0, Math.min(1, niveau))
@@ -87,7 +89,11 @@ export default function SphereLiquide({
 
   return (
     <div
-      className="sphere absolute overflow-hidden"
+      // Une bille muette s'eteint plutot que de disparaitre : la derniere
+      // valeur connue reste lisible, mais on voit qu'elle n'est plus
+      // rafraichie. Le titre dit pourquoi a qui s'y attarde.
+      className={`sphere absolute overflow-hidden${muet ? ' opacity-40' : ''}`}
+      title={muet ? `${libelle} : aucune mesure depuis plus d’une minute` : undefined}
       style={{
         width: `${taille}%`, height: `${taille}%`,
         left: `${x}%`, top: `${y}%`,

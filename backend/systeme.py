@@ -32,7 +32,6 @@ def etat():
 
     return {
         "horloge": time.strftime("%H:%M:%S"),
-        "date": time.strftime("%Y-%m-%d"),
         "temperature_cpu": temperature_cpu(),
         "charge_cpu": round(psutil.cpu_percent(interval=None), 1),
         "coeurs": psutil.cpu_count(logical=True),

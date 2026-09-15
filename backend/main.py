@@ -9,7 +9,9 @@ etre declarees AVANT, sinon elles ne sont jamais atteintes.
 
 import asyncio
 import json
+import time
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 
 import psycopg
@@ -22,9 +24,16 @@ import auth
 import bus
 import registre
 import systeme
-from config import DB_URL, TOPIC_COMMANDES
+from config import DB_URL, INTERVALLE_S, TOPIC_COMMANDES
 
-DIST = Path(__file__).parent.parent / "frontend" / "dist"
+RACINE = Path(__file__).parent.parent
+DIST = RACINE / "frontend" / "dist"
+SAUVEGARDES = RACINE / "sauvegardes"
+
+# Au-dela, l'archivage est considere comme interrompu. Trois cycles de
+# publication laissent passer un retard ponctuel sans crier au loup ; le
+# plancher couvre le cas d'un intervalle tres court.
+RETARD_TOLERE_S = max(30, 3 * INTERVALLE_S)
 
 # Fenetres proposees par le dashboard, et le pas d'agregation associe.
 # Sans regroupement, un mois de mesures a la minute ferait 43 000 points
@@ -179,6 +188,41 @@ async def flux():
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+@app.get("/api/sante")
+def sante():
+    """Sante de la chaine d'archivage.
+
+    Depuis que les bulles recoivent les mesures par le flux MQTT, un
+    collecteur arrete ne se voit plus a l'ecran : les valeurs continuent
+    de defiler alors que plus rien n'est enregistre. Or c'est cette base
+    qui porte l'historique de germination et le jeu de donnees du modele.
+    Une panne silencieuse de plusieurs jours y serait irrattrapable.
+
+    Les deux ages sont calcules ici, et non dans le navigateur : ils se
+    comparent a l'horloge de la machine qui ecrit, pas a celle de qui
+    regarde -- un telephone mal regle donnerait sinon de fausses alertes.
+    """
+    lignes = interroger("SELECT max(ts) FROM mesures")
+    derniere = lignes[0][0] if lignes else None
+    archivage_s = (
+        round((datetime.now(timezone.utc) - derniere).total_seconds())
+        if derniere else None
+    )
+
+    # Age de la sauvegarde la plus recente, en heures.
+    archives = sorted(SAUVEGARDES.glob("botanik-*.sql.gz")) if SAUVEGARDES.is_dir() else []
+    sauvegarde_h = (
+        round((time.time() - max(a.stat().st_mtime for a in archives)) / 3600, 1)
+        if archives else None
+    )
+
+    return {
+        "archivage_s": archivage_s,
+        "archivage_ok": archivage_s is not None and archivage_s <= RETARD_TOLERE_S,
+        "sauvegarde_h": sauvegarde_h,
+    }
 
 
 @app.get("/api/systeme")
