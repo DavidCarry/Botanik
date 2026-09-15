@@ -20,6 +20,11 @@ capteurs ──> publisher ──MQTT──> collecteur ──> PostgreSQL
                                   botanik/etat/<actionneur>
 ```
 
+Le navigateur reçoit les mesures **poussées** par l'API, qui relaie ce
+qu'elle lit sur `botanik/mesures/#` — un flux `text/event-stream` sur
+`/api/flux`. Les courbes, elles, continuent d'interroger la base : un
+historique agrégé se calcule, une valeur du moment n'a qu'à arriver vite.
+
 Trois topics, trois sens. Le dernier est celui qui rend l'ecran honnete :
 l'interrupteur affiche l'etat que l'actionneur a **annonce**, pas celui
 qu'on lui a demande. Une pompe en panne ne ressemble donc plus a une
@@ -121,6 +126,13 @@ déclenche pas une reconstruction du frontend.
   la page.
 - **Agrégation côté SQL** (`date_bin`). Un mois de mesures à la minute
   ferait 43 000 points pour quelques centaines de pixels.
+- **Poussée pour l'instantané, interrogation pour l'historique.** Les
+  bulles reçoivent chaque mesure à l'instant où elle est publiée ;
+  interroger l'API ajoutait jusqu'à cinq secondes de retard pour une
+  valeur qui n'a rien à calculer. SSE plutôt que WebSocket : les mesures
+  ne circulent que dans un sens, et `EventSource` se reconnecte seul.
+  Plutôt qu'un client MQTT dans le navigateur, aussi : il aurait fallu
+  livrer le mot de passe du broker à la page.
 - **127.0.0.1 plutôt que `localhost`** dans les URL de service. Ce nom
   résout `::1` avant `127.0.0.1`, et Docker ne publie ces ports que sur
   IPv4 : chaque connexion perdait deux secondes à échouer en IPv6 avant

@@ -7,12 +7,14 @@ fait sur "/" et intercepte donc tout. Les routes /api doivent imperativement
 etre declarees AVANT, sinon elles ne sont jamais atteintes.
 """
 
+import asyncio
+import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 import psycopg
 from fastapi import Cookie, FastAPI, HTTPException, Response
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -136,6 +138,47 @@ def mesures(capteur: str, fenetre: str = "1j"):
         for t, v in interroger(HISTORIQUE, (pas, capteur, duree))
     ]
     return {"capteur": capteur, "fenetre": fenetre, "points": points}
+
+
+# Sans nouvelle pendant ce delai, on envoie un commentaire SSE. Il ne sert
+# a rien cote navigateur, mais il fait echouer l'ecriture si la connexion
+# est morte -- seule facon de s'en apercevoir et de liberer la file.
+BATTEMENT_S = 20
+
+
+@app.get("/api/flux")
+async def flux():
+    """Flux des mesures, poussees a l'instant ou elles sont publiees.
+
+    Pourquoi une poussee ici alors que les courbes s'interrogent : ce ne
+    sont pas les memes besoins. Une courbe demande un historique agrege,
+    calcule par la base a chaque appel ; une valeur du moment n'a rien a
+    calculer, elle doit juste arriver vite. Interroger pour l'obtenir
+    ajoutait jusqu'a cinq secondes de retard pour rien.
+
+    Le flux ne porte que les mesures qui arrivent : l'etat initial de
+    l'ecran vient de /api/capteurs, qui lit la derniere ligne en base.
+    """
+    async def evenements():
+        file = bus.abonner()
+        try:
+            while True:
+                try:
+                    mesure = await asyncio.wait_for(file.get(), BATTEMENT_S)
+                except asyncio.TimeoutError:
+                    yield ": battement\n\n"
+                    continue
+                yield f"data: {json.dumps(mesure)}\n\n"
+        finally:
+            # Atteint aussi quand le navigateur se ferme : Starlette
+            # annule le generateur, et la file doit partir avec lui.
+            bus.desabonner(file)
+
+    return StreamingResponse(
+        evenements(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.get("/api/systeme")

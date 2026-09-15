@@ -1,10 +1,7 @@
-import { useEffect, useState } from 'react'
-import { lireCapteurs, type Capteur } from '../api'
 import { formaterValeur } from '../format'
 import { LIBELLE_BILLE } from '../libelles'
+import { useMesures } from '../useMesures'
 import SphereLiquide from './SphereLiquide'
-
-const RAFRAICHISSEMENT_MS = 5000
 
 /** Quatre billes en contact, sans le moindre recouvrement.
  *
@@ -25,22 +22,7 @@ const part = (v: number, min: number, max: number) =>
   Math.max(0, Math.min(1, (v - min) / (max - min)))
 
 export default function Mesures() {
-  const [capteurs, setCapteurs] = useState<Capteur[] | null>(null)
-
-  useEffect(() => {
-    let vivant = true
-    const rafraichir = async () => {
-      try {
-        const data = await lireCapteurs()
-        if (vivant) setCapteurs(data)
-      } catch {
-        if (vivant) setCapteurs([])
-      }
-    }
-    rafraichir()
-    const t = setInterval(rafraichir, RAFRAICHISSEMENT_MS)
-    return () => { vivant = false; clearInterval(t) }
-  }, [])
+  const capteurs = useMesures()
 
   const cases = capteurs?.length ? capteurs.slice(0, 4) : [null, null, null, null]
 
