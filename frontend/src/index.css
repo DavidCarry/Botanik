@@ -80,11 +80,31 @@ input, textarea {
   to   { translate: 0 var(--amplitude); }
 }
 
+/* La lueur est un degrade, et non un disque floute.
+
+   Les deux donnent la meme image -- un disque de couleur unie passe au
+   flou EST un degrade radial -- mais pas au meme prix. Un calque floute
+   doit etre recalcule des qu'il change de taille, et celui-ci respire a
+   chaque image : le navigateur refaisait donc huit flous par image.
+   Le degrade, lui, est peint d'un trait par le GPU, et le redimensionner
+   ne coute rien. Mesure a l'appui : les images par seconde doublent.
+
+   `--teinte` est posee par le composant ; les etapes en `color-mix`
+   reproduisent la decroissance douce que donnait le flou. */
 .halo {
   position: absolute;
   display: block;
-  border-radius: 50%;
-  filter: blur(var(--halo-flou));
+  background: radial-gradient(
+    farthest-side,
+    var(--teinte) 0%,
+    color-mix(in oklab, var(--teinte) 92%, transparent) 16%,
+    color-mix(in oklab, var(--teinte) 75%, transparent) 30%,
+    color-mix(in oklab, var(--teinte) 52%, transparent) 45%,
+    color-mix(in oklab, var(--teinte) 30%, transparent) 60%,
+    color-mix(in oklab, var(--teinte) 14%, transparent) 75%,
+    color-mix(in oklab, var(--teinte) 5%, transparent) 88%,
+    transparent 100%
+  );
   will-change: scale;
   animation-name: respire;
   animation-timing-function: ease-in-out;

@@ -49,10 +49,8 @@
 
   /* ---- REGLAGES DU FOND -------------------------------------------
      Deux curseurs :
-       --halo-flou   plus haut = lueurs plus diffuses et plus douces
        --halo-force  intensite generale (0 a 1)
      ------------------------------------------------------------------ */
-  --halo-flou:  78px;
   --halo-force: 1;
 
   /* Lueurs : teintes ecartees sur l'axe jaune-vert -> vert -> menthe,

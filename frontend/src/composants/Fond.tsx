@@ -27,6 +27,12 @@ const HALOS: Halo[] = [
   { teinte: 'var(--halo-7)', classes: 'right-[2%] bottom-[4%] h-[33vh] w-[23vw]' },
 ]
 
+/** Le flou debordait largement de la boite ; un degrade s'arrete a son
+ *  bord. Ce facteur rend a la lueur la taille apparente qu'elle avait.
+ *  Il passe par l'echelle, et non par les dimensions : une mise a
+ *  l'echelle est centree, donc aucune lueur ne se deplace. */
+const ETALEMENT = 1.9
+
 const entre = (min: number, max: number) => min + Math.random() * (max - min)
 const signe = () => (Math.random() < 0.5 ? -1 : 1)
 
@@ -41,8 +47,8 @@ const TRAJETS = HALOS.map(() => ({
   ax: signe() * entre(9, 19),
   ay: signe() * entre(7, 14),
   // respiration
-  bas: entre(0.78, 0.92),
-  haut: entre(1.14, 1.32),
+  bas: ETALEMENT * entre(0.78, 0.92),
+  haut: ETALEMENT * entre(1.14, 1.32),
   // point de depart dans le cycle
   dx: -Math.random() * 90,
   dy: -Math.random() * 90,
@@ -76,7 +82,7 @@ export default function Fond() {
                 <span
                   className={`halo ${h.classes}`}
                   style={{
-                    background: h.teinte,
+                    '--teinte': h.teinte,
                     '--souffle-bas': t.bas.toFixed(3),
                     '--souffle-haut': t.haut.toFixed(3),
                     animationDuration: `${t.pr.toFixed(2)}s`,
