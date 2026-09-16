@@ -1,4 +1,6 @@
-import { LuDroplet, LuFan, LuLock, LuSun, LuZap } from 'react-icons/lu'
+import {
+  LuBellRing, LuDroplet, LuFan, LuLightbulb, LuLock, LuMonitor, LuSun, LuZap,
+} from 'react-icons/lu'
 import type { IconType } from 'react-icons'
 import { useActionneurs } from '../useActionneurs'
 
@@ -9,6 +11,9 @@ const ICONES: Record<string, IconType> = {
   pompe: LuDroplet,
   lumiere: LuSun,
   ventilation: LuFan,
+  bipeur: LuBellRing,
+  leds: LuLightbulb,
+  ecran: LuMonitor,
 }
 
 /** Pilotage manuel.
@@ -41,7 +46,7 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
       </div>
 
       <div className="divide-y divide-bordure border-y border-bordure">
-        {liste.map(({ id, libelle, detail, valeur }) => {
+        {liste.map(({ id, libelle, detail, valeur, pilote }) => {
           const Icone = ICONES[id] ?? LuZap
           const attendu = attendus[id]
           // Pendant l'attente, l'interrupteur montre deja la position
@@ -73,8 +78,18 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
               />
 
               <span className="min-w-0 flex-1">
-                <span className="block truncate text-menu font-medium text-texte">
-                  {libelle}
+                <span className="flex items-center gap-1.5">
+                  <span className="truncate text-menu font-medium text-texte">
+                    {libelle}
+                  </span>
+                  {/* Dire qui commande : sans cela, on ne saurait pas
+                      pourquoi un interrupteur revient tout seul a sa
+                      position. */}
+                  {pilote === 'ia' && (
+                    <span className="shrink-0 rounded-pilule bg-accent-voile px-1.5 py-px text-[0.55rem] font-medium tracking-[0.08em] text-accent-vif">
+                      IA
+                    </span>
+                  )}
                 </span>
                 <span className="block truncate text-micro text-texte-faible">
                   {muet ? 'Sans réponse' : detail}

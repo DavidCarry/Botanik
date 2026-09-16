@@ -1,13 +1,20 @@
-import { LuBrain } from 'react-icons/lu'
+import { LuBrain, LuCircleSlash } from 'react-icons/lu'
+import { LIBELLE_GRANDEUR, UNITE_GRANDEUR } from '../libelles'
 import { useModele } from '../useModele'
 
 /** Ce que le reseau a appris.
  *
- *  Les seuils affiches ne sont pas stockes quelque part : ils sont RELUS
- *  dans le reseau a chaque appel, en le sondant aux conditions du moment.
- *  C'est pour cela qu'ils se deplacent quand il fait chaud ou clair --
- *  deux constantes dans un fichier ne sauraient pas le faire.
+ *  Les seuils affiches ne sont pas stockes : ils sont RELUS dans le
+ *  reseau a chaque appel, en le sondant aux conditions du moment. C'est
+ *  pour cela qu'ils se deplacent quand il fait chaud ou clair -- deux
+ *  constantes dans un fichier ne sauraient pas le faire.
+ *
+ *  La temperature y figure bien qu'aucun actionneur n'agisse sur elle :
+ *  le reseau a appris a la juger, donc son seuil se lit au meme titre.
  */
+const nombre = (v: number | null) =>
+  v === null ? '—' : v >= 1000 ? Math.round(v).toLocaleString('fr-FR') : v
+
 export default function Modele() {
   const m = useModele()
 
@@ -22,9 +29,10 @@ export default function Modele() {
     )
   }
 
-  const s = m.seuils
+  const grandeurs = m.grandeurs ?? []
+
   return (
-    <div className="flex h-full flex-col gap-3">
+    <div className="flex h-full flex-col gap-2.5">
       <div className="flex items-center gap-2">
         <LuBrain size={15} className="shrink-0 text-accent-vif" />
         <span className="text-micro font-medium text-texte">
@@ -40,39 +48,70 @@ export default function Modele() {
         </span>
       </div>
 
-      {/* Les deux seuils, tels qu'ils s'appliquent maintenant. */}
-      <div className="grid flex-1 place-items-center">
-        {s && s.bas !== null && s.haut !== null ? (
-          <div className="text-center">
-            <p className="text-micro text-texte-faible">
-              Humidité du sol — plage décidée
-            </p>
-            <p className="mt-1 flex items-baseline justify-center gap-2">
-              <span className="text-[1.6rem] font-semibold tabular-nums text-texte">
-                {s.bas}
-              </span>
-              <span className="text-menu text-texte-faible">à</span>
-              <span className="text-[1.6rem] font-semibold tabular-nums text-texte">
-                {s.haut}
-              </span>
-              <span className="text-menu font-medium text-texte-doux">%</span>
-            </p>
-            {m.conditions && (
-              <p className="mt-1.5 text-[0.6rem] text-texte-faible">
-                pour {m.conditions.temperature_air.toFixed(1)} °C et{' '}
-                {Math.round(m.conditions.luminosite).toLocaleString('fr-FR')} lux
-              </p>
-            )}
-          </div>
-        ) : (
-          <p className="text-micro text-attention">
-            Le modèle ne bascule jamais — à réentraîner
-          </p>
-        )}
-      </div>
+      {/* Un seuil par grandeur. Ceux qui ne pilotent rien sont marques :
+          les afficher sans le dire laisserait croire a une action. */}
+      <ul className="min-h-0 flex-1 divide-y divide-bordure overflow-y-auto">
+        {grandeurs.map((g) => {
+          const s = m.seuils?.[g]
+          const inerte = g === 'temperature_air'
 
-      <p className="text-[0.6rem] text-texte-faible">
-        version {m.version} · exactitude mesurée sur un jeu de test
+          // Le budget de lumiere n'a pas de bascule lisible avant la fin
+          // de journee : a midi, on ne peut pas avoir recu douze heures,
+          // donc le reseau juge « insuffisant » sur toute l'etendue
+          // possible. Montrer « — » laisserait croire a une panne ; on
+          // affiche l'avancement, qui est l'information utile.
+          const budget =
+            g === 'eclairement_jour' && (!s || (s.bas === null && s.haut === null))
+          if (budget) {
+            return (
+              <li key={g} className="flex items-center gap-2 py-1.5">
+                <span className="min-w-0 flex-1 truncate text-micro text-texte-doux">
+                  {LIBELLE_GRANDEUR[g] ?? g}
+                </span>
+                <span className="shrink-0 text-micro tabular-nums text-texte">
+                  {m.contexte?.eclairement_jour?.toFixed(1) ?? '—'}
+                  <span className="mx-1 text-texte-faible">sur</span>
+                  {m.cible_lumiere_h}
+                  <span className="ml-1 text-[0.6rem] font-medium text-texte-faible">
+                    h
+                  </span>
+                </span>
+              </li>
+            )
+          }
+
+          return (
+            <li key={g} className="flex items-center gap-2 py-1.5">
+              <span className="min-w-0 flex-1 truncate text-micro text-texte-doux">
+                {LIBELLE_GRANDEUR[g] ?? g}
+              </span>
+              {inerte && (
+                <LuCircleSlash
+                  size={11}
+                  className="shrink-0 text-texte-faible"
+                  aria-label="jugée, mais aucun actionneur ne peut agir dessus"
+                />
+              )}
+              <span className="shrink-0 text-micro tabular-nums text-texte">
+                {nombre(s?.bas ?? null)}
+                <span className="mx-1 text-texte-faible">–</span>
+                {nombre(s?.haut ?? null)}
+                <span className="ml-1 text-[0.6rem] font-medium text-texte-faible">
+                  {UNITE_GRANDEUR[g] ?? ''}
+                </span>
+              </span>
+            </li>
+          )
+        })}
+      </ul>
+
+      <p className="text-[0.6rem] leading-relaxed text-texte-faible">
+        seuils relus dans le réseau pour{' '}
+        {m.contexte?.temperature_air?.toFixed(1)} °C et{' '}
+        {m.contexte?.luminosite !== undefined
+          ? Math.round(m.contexte.luminosite).toLocaleString('fr-FR')
+          : '—'}{' '}
+        lux · version {m.version}
       </p>
     </div>
   )

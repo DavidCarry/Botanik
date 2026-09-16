@@ -30,10 +30,12 @@ export function useModele() {
  *  quand elle existe, sinon celle ecrite dans le registre.
  *
  *  Le repli n'est pas theorique : avant le premier entrainement, et si la
- *  base ne repond pas, l'ecran doit continuer a montrer quelque chose. */
+ *  base ne repond pas, l'ecran doit continuer a montrer quelque chose.
+ *  Il vaut aussi borne par borne -- un reseau peut avoir appris un seuil
+ *  bas sans jamais basculer de l'autre cote. */
 export function plage(capteur: Capteur, modele: Modele | null) {
-  const s = modele?.seuils
-  if (!modele?.entraine || capteur.id !== modele.capteur || !s) return capteur.ideal
+  const s = modele?.entraine ? modele.seuils?.[capteur.id] : undefined
+  if (!s) return capteur.ideal
   return {
     min: s.bas ?? capteur.ideal.min,
     max: s.haut ?? capteur.ideal.max,

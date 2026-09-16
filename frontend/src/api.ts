@@ -68,20 +68,26 @@ export const lireEvenements = (limite = 40) =>
 
 // ---------- Modèle ----------
 
+export type Seuil = { bas: number | null; haut: number | null }
+
 export type Modele = {
   entraine: boolean
   version?: string
   architecture?: number[]
   parametres?: number
   entrees?: string[]
-  actions?: string[]
+  sorties?: string[]
+  /** Les grandeurs que le réseau juge, dans l'ordre. */
+  grandeurs?: string[]
   exactitude_test?: number
-  /** Le capteur dont le modèle fixe les seuils. */
-  capteur?: string
-  /** Relus dans le réseau aux conditions du moment, donc mobiles.
-   *  Null si le modèle ne bascule jamais — signe d'un modèle douteux. */
-  seuils?: { bas: number | null; haut: number | null } | null
-  conditions?: { temperature_air: number; luminosite: number }
+  exactitude_complete?: number
+  /** Un seuil par grandeur, relus dans le réseau aux conditions du
+   *  moment, donc mobiles. Une borne à null signifie que le réseau ne
+   *  bascule jamais de ce côté — à voir, pas à masquer. */
+  seuils?: Record<string, Seuil>
+  /** Les conditions qui ont servi au balayage. */
+  contexte?: Record<string, number>
+  cible_lumiere_h?: number
 }
 
 export const lireModele = () => json<Modele>('/api/modele')
@@ -147,6 +153,8 @@ export type Actionneur = {
   id: string
   libelle: string
   detail: string
+  /** Qui le commande : le modèle, ou l'utilisateur seul. */
+  pilote: 'ia' | 'manuel'
   /** Etat annonce par l'actionneur lui-meme. Null : il ne s'est pas
    *  manifeste -- son service est peut-etre arrete. Ne pas savoir n'est
    *  pas la meme chose qu'etre a l'arret. */

@@ -25,9 +25,9 @@ import numpy as np
 import auth
 import bus
 import donnees
+import eclairement
 import poids as magasin
 import registre
-import reseau
 import seuils
 import systeme
 from config import DB_URL, INTERVALLE_S, TOPIC_COMMANDES
@@ -248,20 +248,29 @@ def modele():
     """Le reseau entraine, et les seuils qu'il applique en ce moment.
 
     Les seuils ne sont pas stockes : ils sont RELUS dans le reseau a
-    chaque appel, en balayant l'axe de l'humidite aux conditions du
-    moment. C'est pour cela qu'ils se deplacent quand il fait chaud ou
-    clair -- deux constantes dans un fichier ne sauraient pas le faire.
+    chaque appel, en balayant chaque grandeur aux conditions du moment.
+    C'est pour cela qu'ils se deplacent quand il fait chaud ou clair --
+    deux constantes dans un fichier ne sauraient pas le faire.
+
+    La temperature y figure comme les autres, bien qu'aucun actionneur
+    n'agisse sur elle : le reseau a appris a la JUGER, donc son seuil se
+    lit au meme titre. C'est la difference entre un reseau qui commande
+    et un reseau qui apprecie une situation.
     """
     p, meta, version = modele_courant()
     if p is None:
         return {"entraine": False}
 
-    # Conditions actuelles, prises sur la derniere mesure archivee.
-    dernieres = {capteur: valeur for capteur, valeur, _, _ in interroger(DERNIERES)}
-    temperature = dernieres.get("temperature_air")
-    luminosite = dernieres.get("luminosite")
-    if temperature is None or luminosite is None:
-        return {"entraine": True, "version": version, "seuils": None}
+    # Le contexte du balayage, ce sont les conditions du moment : c'est ce
+    # qui rend les seuils mobiles plutot que figes.
+    contexte = {capteur: valeur for capteur, valeur, _, _ in interroger(DERNIERES)}
+    maintenant = datetime.now()
+    contexte["heure"] = maintenant.hour + maintenant.minute / 60
+    try:
+        with base() as conn:
+            contexte["eclairement_jour"] = eclairement.heures_du_jour(conn)
+    except HTTPException:
+        contexte["eclairement_jour"] = 0.0
 
     b = np.array(meta["bornes"])
     return {
@@ -270,11 +279,13 @@ def modele():
         "architecture": meta["architecture"],
         "parametres": int(sum(np.asarray(v).size for v in p.values())),
         "entrees": meta["entrees"],
-        "actions": meta["actions"],
+        "sorties": meta["sorties"],
+        "grandeurs": meta["grandeurs"],
         "exactitude_test": meta["metriques"]["exactitude_test"],
-        "capteur": donnees.ENTREES[0],
-        "seuils": seuils.frontieres(p, b, temperature, luminosite),
-        "conditions": {"temperature_air": temperature, "luminosite": luminosite},
+        "exactitude_complete": meta["metriques"].get("exactitude_complete"),
+        "seuils": seuils.frontieres(p, b, contexte),
+        "contexte": {cle: round(float(v), 2) for cle, v in contexte.items()},
+        "cible_lumiere_h": donnees.CIBLE_LUMIERE_H,
     }
 
 
@@ -372,6 +383,9 @@ def actionneurs():
             "id": a["id"],
             "libelle": a["libelle"],
             "detail": a["detail"],
+            # "ia" ou "manuel" : l'ecran doit distinguer ce qui obeit au
+            # modele de ce qui n'obeit qu'a l'utilisateur.
+            "pilote": a.get("pilote", "manuel"),
             "valeur": connus.get(a["id"], {}).get("valeur"),
             "ts": connus.get(a["id"], {}).get("ts"),
         }

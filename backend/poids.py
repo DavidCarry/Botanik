@@ -16,7 +16,9 @@ import json
 import numpy as np
 from psycopg.types.json import Jsonb
 
-NOM = "seuils-humidite"
+# Le modele ne produit plus des seuils d'humidite mais des jugements sur
+# toutes les grandeurs : son nom le dit.
+NOM = "jugements-serre"
 
 
 def _vers_octets(poids: dict) -> bytes:

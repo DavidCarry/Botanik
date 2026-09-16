@@ -9,6 +9,10 @@
 #   simule : rien a piloter, l'ordre est simplement accepte
 # La variable d'environnement MODE (faux|reel) choisit laquelle s'applique.
 #
+# `pilote` dit qui commande : "ia" pour ceux que le modele decide,
+# "manuel" pour ceux qui n'obeissent qu'a l'interface. L'API s'en sert
+# pour montrer a l'ecran ce qui est automatique et ce qui ne l'est pas.
+#
 # Les numeros de broche sont en numerotation BCM, et provisoires tant que
 # la carte de relais n'est pas montee.
 
@@ -17,19 +21,49 @@ actionneurs:
     libelle: Arrosage
     detail: 20 mL par impulsion
     actif: true
+    pilote: ia
     reel: {driver: gpio, broche: 23}
-    simule: {}
-
-  - id: lumiere
-    libelle: Éclairage
-    detail: LED horticole
-    actif: true
-    reel: {driver: gpio, broche: 24}
     simule: {}
 
   - id: ventilation
     libelle: Ventilation
-    detail: Circulation d'air
+    detail: Assèche l'air ambiant
     actif: true
+    pilote: ia
     reel: {driver: gpio, broche: 25}
+    simule: {}
+
+  - id: lumiere
+    libelle: Éclairage
+    detail: LED horticole, budget quotidien
+    actif: true
+    pilote: ia
+    reel: {driver: gpio, broche: 24}
+    simule: {}
+
+  - id: bipeur
+    libelle: Alerte sonore
+    detail: Réserve d'eau à remplir
+    actif: true
+    pilote: ia
+    reel: {driver: gpio, broche: 18}
+    simule: {}
+
+  # ---- pilotables depuis l'interface, pas encore par le modele ----
+
+  - id: leds
+    libelle: Bandeau lumineux
+    detail: Trois LED d'état
+    actif: true
+    pilote: manuel
+    reel: {driver: gpio, broche: 12}
+    simule: {}
+
+  - id: ecran
+    libelle: Écran
+    detail: Afficheur de la serre
+    actif: true
+    pilote: manuel
+    # Type d'afficheur a confirmer (LCD I2C ? OLED ?) : le driver en depend.
+    reel: {driver: ecran, adresse: 0x27}
     simule: {}

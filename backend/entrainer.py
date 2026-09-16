@@ -17,49 +17,59 @@ import donnees
 import poids as magasin
 import reseau
 import seuils
+from decision import GRANDEURS
 from config import DB_URL
 
-HYPERPARAMETRES = {"n_caches": 8, "taux": 0.5, "epoques": 4000, "graine": 0}
+HYPERPARAMETRES = {"n_caches": 14, "taux": 1.5, "epoques": 8000, "graine": 0}
 
-
-def matrice_confusion(vrai, prevu, n):
-    m = np.zeros((n, n), dtype=int)
-    for v, p in zip(vrai, prevu):
-        m[v, p] += 1
-    return m
+# Conditions sous lesquelles on montre les seuils appris, pour verifier
+# d'un coup d'oeil qu'ils se deplacent comme ils le doivent.
+SITUATIONS = [
+    ("nuit fraiche", {"temperature_air": 14, "luminosite": 0, "heure": 3,
+                      "eclairement_jour": 0, "niveau_eau": 80}),
+    ("matinee douce", {"temperature_air": 20, "luminosite": 4000, "heure": 9,
+                       "eclairement_jour": 2, "niveau_eau": 80}),
+    ("plein soleil", {"temperature_air": 30, "luminosite": 10000, "heure": 14,
+                      "eclairement_jour": 7, "niveau_eau": 80}),
+]
 
 
 def main():
     essai = "--essai" in sys.argv
 
-    X, y = donnees.generer(6000, graine=0)
-    Xa, ya, Xt, yt = donnees.separer(X, y, part_test=0.2, graine=0)
+    X, Y = donnees.generer(8000, graine=0)
+    Xa, Ya, Xt, Yt = donnees.separer(X, Y, part_test=0.2, graine=0)
     b = donnees.bornes()
     Na, Nt = donnees.normaliser(Xa, b), donnees.normaliser(Xt, b)
 
-    print(f"apprentissage {len(Xa)} exemples, test {len(Xt)}")
-    p, histo = reseau.entrainer(Na, ya, **HYPERPARAMETRES, trace_tous=500)
+    print(f"apprentissage {len(Xa)} exemples, test {len(Xt)}, "
+          f"{len(donnees.ENTREES)} entrees -> {len(donnees.SORTIES)} jugements")
+    p, histo = reseau.entrainer(Na, Ya, **HYPERPARAMETRES, trace_tous=1000)
 
     print("\nepoque    perte   exactitude")
     for e in histo:
         print(f"{e['epoque']:6}   {e['perte']:.4f}   {e['exactitude']:.4f}")
 
-    # Le chiffre qui compte : des exemples jamais vus pendant la descente.
-    exactitude_test = reseau.exactitude(p, Nt, yt)
-    print(f"\nexactitude sur le jeu de TEST : {exactitude_test:.4f}")
+    # Les chiffres qui comptent : des exemples jamais vus pendant la descente.
+    par_sortie = reseau.exactitude(p, Nt, Yt)
+    tout_juste = reseau.exactitude_complete(p, Nt, Yt)
+    print(f"\nsur le jeu de TEST : {par_sortie:.4f} par jugement, "
+          f"{tout_juste:.4f} sur les dix a la fois")
 
-    m = matrice_confusion(yt, reseau.predire(p, Nt), len(donnees.ACTIONS))
-    print("\nmatrice de confusion (lignes = attendu, colonnes = predit)")
-    print("            " + "".join(f"{a:>10}" for a in donnees.ACTIONS))
-    for i, a in enumerate(donnees.ACTIONS):
-        print(f"{a:>10}  " + "".join(f"{v:>10}" for v in m[i]))
+    print("\ndetail par jugement (test)")
+    prevu = reseau.predire(p, Nt)
+    detail = {}
+    for i, nom in enumerate(donnees.SORTIES):
+        juste = float((prevu[:, i] == (Yt[:, i] >= 0.5)).mean())
+        detail[nom] = round(juste, 4)
+        print(f"  {nom:26} {juste:.4f}   (positif {Yt[:, i].mean() * 100:4.1f} %)")
 
     print("\nseuils appris, selon les conditions")
-    for nom, t, l in [("nuit fraiche", 15, 0), ("journee douce", 21, 4000),
-                      ("plein soleil", 30, 9000)]:
-        f = seuils.frontieres(p, b, t, l)
-        print(f"  {nom:15} {t:2.0f} C {l:5.0f} lux  ->  "
-              f"arroser sous {f['bas']} %, ventiler au-dessus de {f['haut']} %")
+    for nom, contexte in SITUATIONS:
+        f = seuils.frontieres(p, b, contexte)
+        print(f"  {nom}")
+        for grandeur, s in f.items():
+            print(f"    {grandeur:20} bas {str(s['bas']):>8}   haut {str(s['haut']):>8}")
 
     if essai:
         print("\n--essai : rien n'a ete enregistre")
@@ -67,14 +77,17 @@ def main():
 
     meta = {
         "architecture": [len(donnees.ENTREES), HYPERPARAMETRES["n_caches"],
-                         len(donnees.ACTIONS)],
+                         len(donnees.SORTIES)],
         "entrees": donnees.ENTREES,
-        "actions": donnees.ACTIONS,
+        "sorties": donnees.SORTIES,
+        "grandeurs": list(GRANDEURS),
         "bornes": b.tolist(),
         "hyperparametres": HYPERPARAMETRES,
         "exemples": {"apprentissage": len(Xa), "test": len(Xt)},
-        "metriques": {"exactitude_test": round(exactitude_test, 4),
-                      "perte_finale": histo[-1]["perte"]},
+        "metriques": {"exactitude_test": round(par_sortie, 4),
+                      "exactitude_complete": round(tout_juste, 4),
+                      "perte_finale": histo[-1]["perte"],
+                      "par_jugement": detail},
         "historique": histo,
     }
     version = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
