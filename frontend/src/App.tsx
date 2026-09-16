@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { LuCpu } from 'react-icons/lu'
 import Actionneurs from './composants/Actionneurs'
-import Bandeau, { type EtatLiaison, type Vue } from './composants/Bandeau'
+import Bandeau, { type EtatLiaison } from './composants/Bandeau'
 import Bloc from './composants/Bloc'
 import Connexion from './composants/Connexion'
 import Courbes, { EnTeteCourbes } from './composants/Courbes'
 import Evenements from './composants/Evenements'
 import Fond from './composants/Fond'
 import InviteDefilement from './composants/InviteDefilement'
+import InviteVue from './composants/InviteVue'
 import Mesures from './composants/Mesures'
 import Modale from './composants/Modale'
 import Modele from './composants/Modele'
@@ -15,6 +16,7 @@ import Systeme from './composants/Systeme'
 import { useAuth } from './useAuth'
 import { useCourbes } from './useCourbes'
 import { useSante } from './useSante'
+import { VUES, type Vue } from './vues'
 
 // Marges laterales et retrait sous la barre, identiques pour les deux
 // vues : elles doivent se superposer exactement pendant le glissement,
@@ -31,6 +33,9 @@ export default function App() {
 
   // Tant qu'on n'a pas de reponse, on ne crie pas : la premiere lecture
   // est en vol, et un echec basculera l'etat en moins d'une seconde.
+  const rang = VUES.findIndex((v) => v.valeur === vue)
+  const suivante = VUES[rang + 1]
+
   const liaison: EtatLiaison = !joignable
     ? 'hors_ligne'
     : sante && !sante.archivage_ok
@@ -98,6 +103,11 @@ export default function App() {
           </section>
         </div>
       </div>
+
+      <InviteVue
+        visible={Boolean(suivante)}
+        onSuivant={() => suivante && setVue(suivante.valeur)}
+      />
 
       {connexionOuverte && (
         <Connexion auth={auth} onFermer={() => setConnexionOuverte(false)} />

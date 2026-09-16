@@ -242,6 +242,19 @@ input, textarea {
   .invite-chevron { animation: none; }
 }
 
+/* Invite a changer de vue : le meme aller-retour que l'invite de
+   defilement, couche sur le cote. */
+@keyframes invite-lateral {
+  0%, 100% { translate: 0 0;   opacity: 0.5; }
+  50%      { translate: 5px 0; opacity: 1; }
+}
+
+.invite-laterale { animation: invite-lateral 1.9s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .invite-laterale { animation: none; }
+}
+
 /* ------------------------------------------------------------------
    Barre de defilement. Celle du systeme jure avec le reste : on la
    reduit a un simple curseur, detache des bords par une bordure

@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
-import { LuLogIn, LuLogOut } from 'react-icons/lu'
+import { Fragment, useEffect, useState } from 'react'
+import { LuChevronLeft, LuChevronRight, LuLogIn, LuLogOut } from 'react-icons/lu'
+import type { IconType } from 'react-icons'
 import type { Auth } from '../useAuth'
+import { VUES, type Vue } from '../vues'
 import Logo from './Logo'
-import Pilules from './Pilules'
 
 /** Bandeau fixe. Le flou d'arriere-plan prend appui sur les lueurs du fond
  *  et sur ce qui defile dessous : c'est ce qui la fait lire comme une
@@ -13,14 +14,89 @@ import Pilules from './Pilules'
  *  enregistre -- c'est l'etat degrade. */
 export type EtatLiaison = 'en_ligne' | 'degrade' | 'hors_ligne'
 
-/** Les deux vues. En dessous du grand format elles s'empilent et
- *  defilent : la navigation n'a alors plus d'objet et disparait. */
-export type Vue = 'mesures' | 'tableau'
+const PASTILLE =
+  'grid size-8 place-items-center rounded-pilule border transition-all duration-300'
 
-const VUES: { valeur: Vue; libelle: string }[] = [
-  { valeur: 'mesures', libelle: 'Mesures' },
-  { valeur: 'tableau', libelle: 'Tableau de bord' },
-]
+/** Fil d'etapes : une pastille par vue, reliees par un trait.
+ *
+ *  Le trait se colore a mesure qu'on avance -- il indique la position
+ *  dans la suite, ce qu'une rangee de boutons ne dit pas. Les chevrons
+ *  de part et d'autre s'eteignent aux extremites plutot que de
+ *  disparaitre : un bouton qui s'efface deplace tout le reste.
+ */
+function Navigation({ vue, onVue }: { vue: Vue; onVue: (v: Vue) => void }) {
+  const rang = VUES.findIndex((v) => v.valeur === vue)
+
+  const fleche = (delta: number, Icone: IconType, etiquette: string) => {
+    const cible = VUES[rang + delta]
+    return (
+      <button
+        type="button"
+        onClick={() => cible && onVue(cible.valeur)}
+        disabled={!cible}
+        aria-label={etiquette}
+        className={[
+          'grid size-7 shrink-0 place-items-center rounded-pilule',
+          'transition-colors duration-200',
+          cible
+            ? 'text-texte-faible hover:bg-surface-haute hover:text-texte'
+            : 'cursor-not-allowed text-texte-faible/25',
+        ].join(' ')}
+      >
+        <Icone size={16} />
+      </button>
+    )
+  }
+
+  return (
+    <nav
+      aria-label="Vue affichée"
+      className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 items-center gap-1.5 lg:flex"
+    >
+      <span className="pointer-events-auto contents">
+        {fleche(-1, LuChevronLeft, 'Vue précédente')}
+
+        <ol className="flex items-center">
+          {VUES.map((v, i) => {
+            const Icone = v.icone
+            const atteint = i <= rang
+            return (
+              <Fragment key={v.valeur}>
+                {i > 0 && (
+                  <span
+                    aria-hidden
+                    className={`h-px w-7 transition-colors duration-300 ${
+                      atteint ? 'bg-accent/60' : 'bg-bordure'
+                    }`}
+                  />
+                )}
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => onVue(v.valeur)}
+                    aria-current={v.valeur === vue ? 'page' : undefined}
+                    title={v.libelle}
+                    className={[
+                      PASTILLE,
+                      v.valeur === vue
+                        ? 'border-accent/60 bg-accent-voile text-accent-vif'
+                        : 'border-bordure text-texte-faible hover:border-bordure-forte hover:text-texte-doux',
+                    ].join(' ')}
+                  >
+                    <Icone size={15} />
+                    <span className="sr-only">{v.libelle}</span>
+                  </button>
+                </li>
+              </Fragment>
+            )
+          })}
+        </ol>
+
+        {fleche(1, LuChevronRight, 'Vue suivante')}
+      </span>
+    </nav>
+  )
+}
 
 const LIAISON: Record<EtatLiaison, { couleur: string; libelle: string }> = {
   en_ligne: { couleur: 'var(--bon)', libelle: 'En ligne' },
@@ -78,10 +154,7 @@ export default function Bandeau({
           </span>
         </span>
 
-        <div className="ml-5 hidden lg:block">
-          <Pilules etiquette="Vue affichée" options={VUES}
-                   choisi={vue} onChange={onVue} />
-        </div>
+        <Navigation vue={vue} onVue={onVue} />
 
         <span className="ml-auto flex items-center gap-2 sm:gap-3">
           {/* Etat de la liaison : une pastille et un mot, jamais la
