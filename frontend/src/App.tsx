@@ -14,7 +14,6 @@ import InviteDefilement from './composants/InviteDefilement'
 import Mesures from './composants/Mesures'
 import Modale from './composants/Modale'
 import Modele from './composants/Modele'
-import Serre from './composants/Serre'
 import Systeme from './composants/Systeme'
 import { useAuth } from './useAuth'
 import { useAlertes } from './useAlertes'
@@ -25,7 +24,10 @@ import { VUES, type Vue } from './vues'
 // Marges identiques pour les deux vues : elles doivent se superposer
 // exactement pendant le glissement, sinon le contenu semble sauter au
 // changement de page.
-const CADRE = 'w-full shrink-0 px-4 pb-5 sm:px-8 sm:pb-7 md:h-full md:py-4 lg:py-5'
+// Les marges laterales s'elargissent des la tablette pour degager les
+// fleches de changement de vue, posees aux bords de la page. Au-dela, le
+// cadre ne change plus : tablette et bureau montrent la meme chose.
+const CADRE = 'w-full shrink-0 px-4 pb-5 sm:px-8 sm:pb-7 md:h-full md:px-[4.75rem] md:py-4'
 
 export default function App() {
   const auth = useAuth()
@@ -83,48 +85,31 @@ export default function App() {
               n'a de sens qu'en regard d'un sol trop sec. */}
           <section className={CADRE}>
             <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
-                            md:grid-cols-[62fr_38fr] md:gap-x-6 lg:gap-x-10">
+                            md:grid-cols-[62fr_38fr] md:gap-x-8">
               <Bloc titre="Mesures" className="md:min-h-0">
                 <div className="h-[calc(100dvh-9.5rem)] md:h-full">
                   <Mesures />
                 </div>
               </Bloc>
 
-              <Bloc className="md:min-h-0">
+              {/* Le pilotage, et sous lui ce que la camera voit : on
+                  commande un actionneur en regardant ce qu'il fait.
+                  La camera n'a pas de titre -- son encadre la nomme. */}
+              <div className="flex flex-col gap-6 md:min-h-0">
                 <Actionneurs connecte={Boolean(auth.compte)} />
-              </Bloc>
+                <Camera onAgrandir={() => setCameraOuverte(true)} />
+              </div>
             </div>
             <InviteDefilement />
           </section>
 
-          {/* Vue 2 : la serre elle-meme -- sa maquette et ce que la
-              camera en voit. */}
-          <section className={CADRE}>
-            <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
-                            md:grid-rows-[1fr_auto] md:gap-y-4 lg:gap-y-5">
-              <Bloc titre="Maquette">
-                <div className="h-[clamp(260px,42dvh,520px)] md:h-full">
-                  <Serre />
-                </div>
-              </Bloc>
-
-              {/* La camera se pose en vignette, alignee a droite sous la
-                  maquette. Sans titre : son encadre la nomme deja, et un
-                  intitule au-dessus d'un carre de 190 px desequilibrerait
-                  la colonne. */}
-              <div className="flex justify-end">
-                <Camera onAgrandir={() => setCameraOuverte(true)} />
-              </div>
-            </div>
-          </section>
-
-          {/* Vue 3 : l'analyse. La courbe tient la colonne de gauche, le
+          {/* Vue 2 : l'analyse. La courbe tient la colonne de gauche, le
               journal et le modele se partagent la droite. Le pilotage
               n'est plus ici : il vit aupres des mesures, ou il se lit en
               regard de ce qui l'a declenche. */}
           <section className={CADRE}>
             <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
-                            md:grid-cols-[58fr_42fr] md:grid-rows-2 md:gap-x-6 md:gap-y-4 lg:gap-x-8 lg:gap-y-5">
+                            md:grid-cols-[58fr_42fr] md:grid-rows-2 md:gap-x-8 md:gap-y-5">
               <Bloc actions={<EnTeteCourbes etat={courbes} />} className="md:row-span-2">
                 <div className="h-[clamp(350px,52dvh,540px)] md:h-full">
                   <Courbes etat={courbes} />

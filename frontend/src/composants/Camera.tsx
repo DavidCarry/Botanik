@@ -68,18 +68,18 @@ function Habillage({ compact }: { compact: boolean }) {
   )
 }
 
-/** La vignette. Carree : une image de surveillance se reconnait a son
- *  cadrage autant qu'a son habillage, et un carre se pose sans deranger
- *  la mise en page. Le cadrage large est recadre par `object-cover`. */
+/** La vue, posee sous la liste de pilotage. Elle prend toute la largeur
+ *  de sa colonne, au format d'un moniteur -- c'est ce cadrage qui la
+ *  fait lire comme une camera et non comme une illustration. */
 export default function Camera({ onAgrandir }: { onAgrandir: () => void }) {
   return (
     <button
       type="button"
       onClick={onAgrandir}
       aria-label="Agrandir la vue de la caméra"
-      className="group relative aspect-square w-40 shrink-0 overflow-hidden rounded-carte
+      className="group relative aspect-video w-full overflow-hidden rounded-carte
                  border border-bordure bg-black transition-colors duration-200
-                 hover:border-bordure-forte sm:w-44 lg:w-48"
+                 hover:border-bordure-forte"
     >
       <img
         src={SOURCE}
@@ -99,7 +99,13 @@ export default function Camera({ onAgrandir }: { onAgrandir: () => void }) {
   )
 }
 
-/** La meme vue, en grand. */
+/** La meme vue, en grand.
+ *
+ *  Le cadre occupe la place disponible et l'image le REMPLIT : elle est
+ *  rognee sur un bord plutot que posee au milieu de bandes noires. Les
+ *  proportions sont conservees -- on perd un peu de champ, jamais la
+ *  geometrie.
+ */
 export function CameraPleine({ onFermer }: { onFermer: () => void }) {
   // Echap ferme : une vue qu'on ne peut quitter qu'a la souris est un
   // piege au clavier.
@@ -116,7 +122,8 @@ export function CameraPleine({ onFermer }: { onFermer: () => void }) {
       role="presentation"
     >
       <div
-        className="apparition relative max-h-full w-full max-w-5xl overflow-hidden rounded-bloc border border-bordure bg-black"
+        className="apparition relative h-[86dvh] w-full max-w-6xl overflow-hidden
+                   rounded-bloc border border-bordure bg-black"
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
@@ -125,7 +132,7 @@ export function CameraPleine({ onFermer }: { onFermer: () => void }) {
         <img
           src={SOURCE}
           alt="Le châssis de la serre, photographié en salle"
-          className="max-h-[82dvh] w-full object-contain opacity-90"
+          className="size-full object-cover opacity-90"
         />
         <Habillage compact={false} />
 
