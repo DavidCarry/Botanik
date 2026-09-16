@@ -140,8 +140,8 @@ export default function Bandeau({
 
   return (
     <div className="fixed inset-x-0 top-0 z-30 px-4 sm:px-7
-                    lg:inset-x-auto lg:inset-y-0 lg:left-0 lg:w-[5.5rem]
-                    lg:px-0 lg:py-4 lg:pl-4">
+                    lg:inset-x-auto lg:inset-y-0 lg:left-0 lg:w-[4.75rem]
+                    lg:px-0 lg:py-4">
       {/* Voile de flou degressif. Le masque eteint progressivement le
           `backdrop-filter` vers le bas : la barre ne se termine plus par
           une arete nette, elle se dissout dans la page. */}
@@ -157,7 +157,7 @@ export default function Bandeau({
                    items-center gap-3 rounded-b-bloc rounded-t-none
                    px-3.5 py-2.5 sm:px-5 sm:py-3
                    lg:h-full lg:w-full lg:max-w-none lg:flex-col lg:gap-4
-                   lg:rounded-bloc lg:px-0 lg:py-5">
+                   lg:rounded-l-none lg:rounded-r-bloc lg:px-0 lg:py-5">
         {/* La marque n'est pas du contenu a selectionner : curseur de
             pointage plutot que curseur de texte. */}
         <Logo taille={26} />

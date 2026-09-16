@@ -69,7 +69,7 @@ export default function App() {
           Le retrait suit la barre : sous elle tant qu'elle est en haut,
           a cote d'elle une fois devenue colonne. */}
       <div className="pt-[4.2rem] sm:pt-[4.6rem] md:h-dvh md:overflow-hidden
-                      lg:pl-[5.5rem] lg:pt-0">
+                      lg:pl-[4.75rem] lg:pt-0">
         <div
           className="mx-auto flex max-w-[1600px] flex-col gap-9 sm:gap-11
                      md:h-full md:max-w-none md:flex-row md:gap-0
