@@ -32,6 +32,13 @@ const ROND =
   'grid size-8 shrink-0 place-items-center rounded-pilule border ' +
   'transition-all duration-200'
 
+/** Une seule taille d'icone dans toute la barre : a 14 d'un cote et 15
+ *  de l'autre, les ronds se ressemblaient sans se repondre. */
+const ICONE = 15
+
+/** Et un seul rythme d'espacement entre les ronds. */
+const ENTRE_RONDS = 'flex items-center gap-2.5'
+
 const ROND_NEUTRE =
   'border-bordure bg-surface-creuse text-texte-faible ' +
   'hover:border-bordure-forte hover:text-texte'
@@ -69,7 +76,7 @@ function Navigation({ vue, onVue }: { vue: Vue; onVue: (v: Vue) => void }) {
                       : ROND_NEUTRE,
                   ].join(' ')}
                 >
-                  <Icone size={15} />
+                  <Icone size={ICONE} />
                   <span className="sr-only">{v.libelle}</span>
                 </button>
               </li>
@@ -134,14 +141,14 @@ export default function Bandeau({
           <span className="block text-menu font-semibold tracking-tight text-texte">
             Botanik
           </span>
-          <span className="hidden text-[0.62rem] text-texte-faible sm:block">
+          <span className="hidden text-micro leading-tight text-texte-faible sm:block">
             Serre connectée
           </span>
         </span>
 
         <Navigation vue={vue} onVue={onVue} />
 
-        <span className="ml-auto flex items-center gap-2 sm:gap-2.5">
+        <span className={`ml-auto ${ENTRE_RONDS}`}>
           {/* L'heure sort des boutons : elle ne se clique pas, elle n'a
               donc rien a faire dans une forme cliquable. */}
           <span className="cursor-default select-none text-micro tabular-nums text-texte-faible">
@@ -155,7 +162,7 @@ export default function Bandeau({
             className={[
               ROND,
               alertes > 0
-                ? 'border-critique/45 bg-critique/12 text-critique hover:bg-critique/20'
+                ? 'border-critique/45 bg-critique-voile text-critique hover:bg-critique/20'
                 : ROND_NEUTRE,
             ].join(' ')}
           >
@@ -168,7 +175,7 @@ export default function Bandeau({
                 {alertes}
               </span>
             ) : (
-              <LuTriangleAlert size={14} />
+              <LuTriangleAlert size={ICONE} />
             )}
           </button>
 
@@ -180,7 +187,7 @@ export default function Bandeau({
             className={`${ROND} border-bordure bg-surface-creuse hover:border-bordure-forte`}
             style={{ color: etat.couleur }}
           >
-            <IconeLiaison size={14} />
+            <IconeLiaison size={ICONE} />
           </button>
 
           {/* Connecte : l'initiale du compte. Sinon : une silhouette.
@@ -203,7 +210,7 @@ export default function Bandeau({
                 {auth.compte[0]}
               </span>
             ) : (
-              <LuUserRound size={14} />
+              <LuUserRound size={ICONE} />
             )}
           </button>
         </span>
