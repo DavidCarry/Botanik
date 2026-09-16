@@ -1,5 +1,5 @@
 import {
-  LuBellRing, LuDroplet, LuFan, LuHand, LuLightbulb, LuLock, LuMonitor, LuSun, LuZap,
+  LuBellRing, LuDroplet, LuFan, LuLightbulb, LuLock, LuMonitor, LuSun, LuZap,
 } from 'react-icons/lu'
 import type { IconType } from 'react-icons'
 import { useActionneurs } from '../useActionneurs'
@@ -22,16 +22,50 @@ const ICONES: Record<string, IconType> = {
  *  le reste de cette colonne repose directement sur le fond, des cartes
  *  encadrees y feraient une piece rapportee.
  *
- *  Sans compte ouvert, les commandes restent visibles mais inertes --
- *  montrer ce qui existe vaut mieux que de le cacher, et le serveur
- *  refuse de toute facon toute commande non authentifiee.
- *
- *  Reprendre la main pose un verrou : le modele s'abstient quelques
- *  minutes. Le decompte est affiche, faute de quoi on ne comprendrait
- *  pas pourquoi l'interrupteur cesse soudain de bouger tout seul.
+ *  Sans compte ouvert, l'etat reste PLEINEMENT lisible -- c'est une
+ *  information, pas une commande. Seuls les interrupteurs disparaissent,
+ *  remplaces par le mot qui dit l'etat. Griser la ligne entiere
+ *  reviendrait a cacher ce qu'on est venu voir.
  */
-const minutes = (s: number) =>
-  s >= 60 ? `${Math.ceil(s / 60)} min` : `${s} s`
+function Etat({ actif, muet }: { actif: boolean; muet: boolean }) {
+  if (muet) {
+    return (
+      <span className="shrink-0 rounded-pilule bg-texte/[0.06] px-2 py-0.5 text-[0.6rem] font-medium text-texte-faible">
+        Inconnu
+      </span>
+    )
+  }
+  return (
+    <span
+      className={`shrink-0 rounded-pilule px-2 py-0.5 text-[0.6rem] font-medium ${
+        actif ? 'bg-accent-voile text-accent-vif' : 'bg-texte/[0.06] text-texte-faible'
+      }`}
+    >
+      {actif ? 'Actif' : 'Arrêté'}
+    </span>
+  )
+}
+
+/** L'etat se lit a la position du curseur, pas seulement a la couleur. */
+function Interrupteur({ actif, attendu }: { actif: boolean; attendu: boolean }) {
+  return (
+    <span
+      className={[
+        'relative h-5 w-9 shrink-0 rounded-pilule transition-all duration-300',
+        actif ? 'bg-accent/55' : 'bg-texte/12',
+        attendu ? 'opacity-50' : '',
+      ].join(' ')}
+    >
+      <span
+        className={[
+          'absolute top-0.5 size-4 rounded-pilule bg-texte transition-all duration-300',
+          actif ? 'left-[1.125rem]' : 'left-0.5',
+        ].join(' ')}
+      />
+    </span>
+  )
+}
+
 export default function Actionneurs({ connecte }: { connecte: boolean }) {
   const { liste, attendus, erreur, basculer } = useActionneurs()
 
@@ -52,7 +86,7 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
       </div>
 
       <div className="divide-y divide-bordure border-y border-bordure">
-        {liste.map(({ id, libelle, detail, valeur, pilote, verrou_s }) => {
+        {liste.map(({ id, libelle, detail, valeur }) => {
           const Icone = ICONES[id] ?? LuZap
           const attendu = attendus[id]
           // Pendant l'attente, l'interrupteur montre deja la position
@@ -61,21 +95,8 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
           const actif = (attendu?.valeur ?? valeur ?? 0) > 0
           const muet = valeur === null && !attendu
 
-          return (
-            <button
-              key={id}
-              type="button"
-              aria-pressed={actif}
-              aria-busy={Boolean(attendu)}
-              disabled={!connecte || muet}
-              onClick={() => basculer(id, actif ? 0 : 1)}
-              className={[
-                'flex w-full items-center gap-3 px-1 py-3 text-left transition-colors duration-200',
-                connecte && !muet
-                  ? 'hover:bg-texte/[0.03]'
-                  : 'cursor-not-allowed opacity-40',
-              ].join(' ')}
-            >
+          const contenu = (
+            <>
               <Icone
                 size={17}
                 className={`shrink-0 transition-colors duration-300 ${
@@ -83,50 +104,41 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
                 }`}
               />
 
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-1.5">
-                  <span className="truncate text-menu font-medium text-texte">
-                    {libelle}
-                  </span>
-                  {/* Dire qui commande : sans cela, on ne saurait pas
-                      pourquoi un interrupteur revient tout seul a sa
-                      position. */}
-                  {pilote === 'ia' && verrou_s === 0 && (
-                    <span className="shrink-0 rounded-pilule bg-accent-voile px-1.5 py-px text-[0.55rem] font-medium tracking-[0.08em] text-accent-vif">
-                      IA
-                    </span>
-                  )}
-                  {/* Le verrou remplace la marque du modele : c'est bien
-                      la main qui commande, pas lui. */}
-                  {verrou_s > 0 && (
-                    <span className="flex shrink-0 items-center gap-1 rounded-pilule bg-texte/[0.07] px-1.5 py-px text-[0.55rem] font-medium tracking-[0.08em] text-texte-doux">
-                      <LuHand size={9} />
-                      {minutes(verrou_s)}
-                    </span>
-                  )}
+              <span className="min-w-0 flex-1 text-left">
+                <span className="block truncate text-menu font-medium text-texte">
+                  {libelle}
                 </span>
                 <span className="block truncate text-micro text-texte-faible">
                   {muet ? 'Sans réponse' : detail}
                 </span>
               </span>
 
-              {/* L'etat se lit a la position du curseur, pas seulement a
-                  la couleur. */}
-              <span
-                className={[
-                  'relative h-5 w-9 shrink-0 rounded-pilule transition-all duration-300',
-                  actif ? 'bg-accent/55' : 'bg-texte/12',
-                  attendu ? 'opacity-50' : '',
-                ].join(' ')}
-              >
-                <span
-                  className={[
-                    'absolute top-0.5 size-4 rounded-pilule bg-texte transition-all duration-300',
-                    actif ? 'left-[1.125rem]' : 'left-0.5',
-                  ].join(' ')}
-                />
-              </span>
+              {connecte
+                ? <Interrupteur actif={actif} attendu={Boolean(attendu)} />
+                : <Etat actif={actif} muet={muet} />}
+            </>
+          )
+
+          const classes = 'flex w-full items-center gap-3 px-1 py-3'
+
+          // Sans compte, la ligne n'est plus un bouton : rien a cliquer,
+          // donc rien a annoncer comme cliquable.
+          return connecte ? (
+            <button
+              key={id}
+              type="button"
+              aria-pressed={actif}
+              aria-busy={Boolean(attendu)}
+              disabled={muet}
+              onClick={() => basculer(id, actif ? 0 : 1)}
+              className={`${classes} transition-colors duration-200 ${
+                muet ? 'cursor-not-allowed opacity-40' : 'hover:bg-texte/[0.03]'
+              }`}
+            >
+              {contenu}
             </button>
+          ) : (
+            <div key={id} className={classes}>{contenu}</div>
           )
         })}
       </div>
