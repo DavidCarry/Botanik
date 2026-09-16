@@ -77,14 +77,23 @@ export default function App() {
             '--glissement': `${-rang * 100}%`,
           } as React.CSSProperties}
         >
-          {/* Vue 1 : les mesures seules. C'est l'etat de la serre qu'on
-              vient voir en premier ; le reste se merite d'un geste. */}
-          <section className={`${CADRE} md:flex md:flex-col`}>
-            <Bloc titre="Mesures" className="md:min-h-0 md:flex-1">
-              <div className="h-[calc(100dvh-9.5rem)] md:h-full">
-                <Mesures />
-              </div>
-            </Bloc>
+          {/* Vue 1 : l'etat des lieux. Ce que les sondes mesurent, et ce
+              que les actionneurs en font -- les deux cote a cote, parce
+              qu'on ne lit pas l'un sans l'autre : une pompe qui tourne
+              n'a de sens qu'en regard d'un sol trop sec. */}
+          <section className={CADRE}>
+            <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
+                            md:grid-cols-[62fr_38fr] md:gap-x-6 lg:gap-x-10">
+              <Bloc titre="Mesures" className="md:min-h-0">
+                <div className="h-[calc(100dvh-9.5rem)] md:h-full">
+                  <Mesures />
+                </div>
+              </Bloc>
+
+              <Bloc className="md:min-h-0">
+                <Actionneurs connecte={Boolean(auth.compte)} />
+              </Bloc>
+            </div>
             <InviteDefilement />
           </section>
 
@@ -109,18 +118,17 @@ export default function App() {
             </div>
           </section>
 
-          {/* Vue 3 : le tableau de bord, quatre blocs. */}
+          {/* Vue 3 : l'analyse. La courbe tient la colonne de gauche, le
+              journal et le modele se partagent la droite. Le pilotage
+              n'est plus ici : il vit aupres des mesures, ou il se lit en
+              regard de ce qui l'a declenche. */}
           <section className={CADRE}>
             <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
                             md:grid-cols-[58fr_42fr] md:grid-rows-2 md:gap-x-6 md:gap-y-4 lg:gap-x-8 lg:gap-y-5">
-              <Bloc actions={<EnTeteCourbes etat={courbes} />}>
+              <Bloc actions={<EnTeteCourbes etat={courbes} />} className="md:row-span-2">
                 <div className="h-[clamp(350px,52dvh,540px)] md:h-full">
                   <Courbes etat={courbes} />
                 </div>
-              </Bloc>
-
-              <Bloc>
-                <Actionneurs connecte={Boolean(auth.compte)} />
               </Bloc>
 
               <Bloc titre="Journal">

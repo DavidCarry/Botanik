@@ -182,6 +182,9 @@ export type Actionneur = {
   detail: string
   /** Qui le commande : le modèle, ou l'utilisateur seul. */
   pilote: 'ia' | 'manuel'
+  /** Secondes pendant lesquelles le modèle s'abstient, après une reprise
+   *  en main. Zéro : il commande à nouveau. */
+  verrou_s: number
   /** Etat annonce par l'actionneur lui-meme. Null : il ne s'est pas
    *  manifeste -- son service est peut-etre arrete. Ne pas savoir n'est
    *  pas la meme chose qu'etre a l'arret. */

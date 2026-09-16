@@ -1,7 +1,7 @@
 """Liaison MQTT de l'API.
 
-Elle emet les commandes, ecoute en retour l'etat reel des actionneurs, et
-relaie les mesures aux navigateurs ouverts.
+Elle emet les commandes, ecoute en retour l'etat reel des actionneurs,
+et relaie les deux aux navigateurs ouverts.
 Un client unique, ouvert au demarrage et maintenu en vie, evite de
 rouvrir une connexion au broker a chaque clic.
 
@@ -87,10 +87,14 @@ def _on_message(client, userdata, msg):
     except json.JSONDecodeError:
         return
 
+    # Le `genre` distingue les deux a l'arrivee. Sans lui, le navigateur
+    # devrait deviner a quoi se rapporte un identifiant -- et « lumiere »
+    # est a la fois un actionneur et une grandeur mesuree.
     if msg.topic.startswith(TOPIC_ETAT):
         _etats[identifiant] = charge
+        _diffuser({"genre": "etat", "actionneur": identifiant, **charge})
     else:
-        _diffuser({"capteur": identifiant, **charge})
+        _diffuser({"genre": "mesure", "capteur": identifiant, **charge})
 
 
 def abonner() -> asyncio.Queue:

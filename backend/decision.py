@@ -29,6 +29,18 @@ GRANDEURS = [
     "eclairement_jour",
 ]
 
+# Duree pendant laquelle le modele s'efface apres une commande manuelle.
+#
+# Reprendre la main doit avoir un effet durable : sans ce delai, le
+# modele remettrait l'actionneur dans SON etat a la decision suivante --
+# trente secondes plus tard -- et l'interrupteur reviendrait tout seul
+# sous le doigt de l'utilisateur.
+#
+# Le garde-fou de securite, lui, n'est jamais verrouille : si la reserve
+# se vide pendant un arrosage manuel, la pompe doit s'arreter malgre
+# tout. Une pompe grillee ne se discute pas.
+VERROU_MANUEL_S = 300
+
 # Sous ce niveau, la pompe est bloquee quoi qu'il arrive. Ce n'est pas le
 # seuil d'alerte -- celui-la, le reseau l'apprend -- mais un plancher
 # materiel : une pompe qui tourne a sec s'abime en quelques secondes.

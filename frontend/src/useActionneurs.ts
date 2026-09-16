@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { commander, lireActionneurs, type Actionneur } from './api'
+import { useFlux, type Pousse } from './useFlux'
 
-const RAFRAICHISSEMENT_MS = 2000
+// Les verrous s'ecoulent a la seconde et ne sont pousses par personne :
+// il faut bien les relire. Le reste arrive par le flux.
+const RAFRAICHISSEMENT_MS = 5000
 
 /** Au-dela, on cesse d'attendre la confirmation d'un actionneur. */
 const PATIENCE_MS = 5000
@@ -10,10 +13,11 @@ type Attendu = { valeur: number; depuis: number }
 
 /** Pilotage des actionneurs.
  *
- *  L'interrupteur n'affiche plus ce qu'il croit : il affiche ce que
- *  l'actionneur a annonce sur `botanik/etat/<id>`. Un clic n'est donc
- *  qu'une demande -- tant que le materiel n'a pas repondu, la position
- *  affichee reste marquee comme une intention.
+ *  L'interrupteur n'affiche pas ce qu'il croit : il affiche ce que
+ *  l'actionneur a annonce sur `botanik/etat/<id>`, pousse par le serveur
+ *  a l'instant ou il l'annonce. Un clic n'est donc qu'une demande --
+ *  tant que le materiel n'a pas repondu, la position affichee reste
+ *  marquee comme une intention.
  *
  *  Sans ce detour, une pompe en panne donnerait exactement la meme image
  *  a l'ecran qu'une pompe qui tourne.
@@ -27,6 +31,27 @@ export function useActionneurs() {
    *  hors du battement, d'ou ce relais. */
   const relire = useRef<() => Promise<void>>(async () => {})
 
+  // Les changements d'etat arrivent par le flux, sans attendre le
+  // prochain battement : l'interrupteur bouge a l'instant ou le modele
+  // agit, pas jusqu'a cinq secondes plus tard.
+  const surPoussee = useCallback((p: Pousse) => {
+    if (p.genre !== 'etat') return
+    setListe((l) =>
+      l.map((a) => (a.id === p.actionneur ? { ...a, valeur: p.valeur, ts: p.ts } : a)),
+    )
+    // L'attente prend fin des que l'actionneur confirme la valeur
+    // demandee -- inutile d'attendre le prochain battement.
+    setAttendus((a) => {
+      const attendu = a[p.actionneur]
+      if (!attendu || attendu.valeur !== p.valeur) return a
+      const reste = { ...a }
+      delete reste[p.actionneur]
+      return reste
+    })
+  }, [])
+
+  useFlux(surPoussee)
+
   useEffect(() => {
     let vivant = true
 
@@ -35,7 +60,6 @@ export function useActionneurs() {
       try {
         recu = await lireActionneurs()
       } catch {
-        if (vivant) setListe([])
         return
       }
       if (!vivant) return
@@ -81,8 +105,8 @@ export function useActionneurs() {
       setErreur('Commande refusée')
       return
     }
-    // Le service a pu repondre avant le prochain battement : on regarde
-    // tout de suite plutot que d'attendre deux secondes pour rien.
+    // Relire tout de suite : le verrou vient de naitre, et lui seul ne
+    // passe pas par le flux.
     await relire.current()
   }, [])
 

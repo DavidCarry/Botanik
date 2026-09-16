@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { lireCapteurs, type Capteur } from './api'
+import { useFlux, type Pousse } from './useFlux'
 
 /** Filet de securite, pas le mecanisme principal.
  *
@@ -8,8 +9,6 @@ import { lireCapteurs, type Capteur } from './api'
  *  jamais, le flux ne portant que des valeurs. Une relecture espacee
  *  remet tout d'aplomb sans rien couter. */
 const RESYNCHRONISATION_MS = 60_000
-
-type Poussee = { capteur: string; valeur: number; unite: string; ts: string }
 
 /** Retard d'un capteur sur le plus recent au-dela duquel on le declare
  *  muet. Volontairement large -- douze cycles a la cadence par defaut :
@@ -43,8 +42,8 @@ function muets(capteurs: Capteur[]): Set<string> {
  *
  *  Deux sources, et c'est voulu : `/api/capteurs` donne l'etat initial --
  *  la derniere ligne en base, disponible des le premier affichage -- puis
- *  `/api/flux` pousse chaque nouvelle mesure a l'instant ou elle est
- *  publiee sur MQTT.
+ *  le flux pousse chaque nouvelle mesure a l'instant ou elle est publiee
+ *  sur MQTT.
  *
  *  Interroger periodiquement, comme le font les courbes, ajoutait jusqu'a
  *  cinq secondes de retard pour une valeur qui n'a rien a calculer.
@@ -52,6 +51,19 @@ function muets(capteurs: Capteur[]): Set<string> {
  */
 export function useMesures() {
   const [capteurs, setCapteurs] = useState<Capteur[] | null>(null)
+
+  const surPoussee = useCallback((p: Pousse) => {
+    if (p.genre !== 'mesure') return
+    setCapteurs((liste) =>
+      liste?.map((c) =>
+        c.id === p.capteur
+          ? { ...c, mesure: { valeur: p.valeur, unite: p.unite, ts: p.ts } }
+          : c,
+      ) ?? liste,
+    )
+  }, [])
+
+  useFlux(surPoussee)
 
   useEffect(() => {
     let vivant = true
@@ -65,20 +77,7 @@ export function useMesures() {
 
     relire()
     const t = setInterval(relire, RESYNCHRONISATION_MS)
-
-    const flux = new EventSource('/api/flux')
-    flux.onmessage = (e) => {
-      const p: Poussee = JSON.parse(e.data)
-      setCapteurs((liste) =>
-        liste?.map((c) =>
-          c.id === p.capteur
-            ? { ...c, mesure: { valeur: p.valeur, unite: p.unite, ts: p.ts } }
-            : c,
-        ) ?? liste,
-      )
-    }
-
-    return () => { vivant = false; clearInterval(t); flux.close() }
+    return () => { vivant = false; clearInterval(t) }
   }, [])
 
   return { capteurs, muets: muets(capteurs ?? []) }

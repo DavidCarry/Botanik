@@ -1,5 +1,5 @@
 import {
-  LuBellRing, LuDroplet, LuFan, LuLightbulb, LuLock, LuMonitor, LuSun, LuZap,
+  LuBellRing, LuDroplet, LuFan, LuHand, LuLightbulb, LuLock, LuMonitor, LuSun, LuZap,
 } from 'react-icons/lu'
 import type { IconType } from 'react-icons'
 import { useActionneurs } from '../useActionneurs'
@@ -25,7 +25,13 @@ const ICONES: Record<string, IconType> = {
  *  Sans compte ouvert, les commandes restent visibles mais inertes --
  *  montrer ce qui existe vaut mieux que de le cacher, et le serveur
  *  refuse de toute facon toute commande non authentifiee.
+ *
+ *  Reprendre la main pose un verrou : le modele s'abstient quelques
+ *  minutes. Le decompte est affiche, faute de quoi on ne comprendrait
+ *  pas pourquoi l'interrupteur cesse soudain de bouger tout seul.
  */
+const minutes = (s: number) =>
+  s >= 60 ? `${Math.ceil(s / 60)} min` : `${s} s`
 export default function Actionneurs({ connecte }: { connecte: boolean }) {
   const { liste, attendus, erreur, basculer } = useActionneurs()
 
@@ -46,7 +52,7 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
       </div>
 
       <div className="divide-y divide-bordure border-y border-bordure">
-        {liste.map(({ id, libelle, detail, valeur, pilote }) => {
+        {liste.map(({ id, libelle, detail, valeur, pilote, verrou_s }) => {
           const Icone = ICONES[id] ?? LuZap
           const attendu = attendus[id]
           // Pendant l'attente, l'interrupteur montre deja la position
@@ -85,9 +91,17 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
                   {/* Dire qui commande : sans cela, on ne saurait pas
                       pourquoi un interrupteur revient tout seul a sa
                       position. */}
-                  {pilote === 'ia' && (
+                  {pilote === 'ia' && verrou_s === 0 && (
                     <span className="shrink-0 rounded-pilule bg-accent-voile px-1.5 py-px text-[0.55rem] font-medium tracking-[0.08em] text-accent-vif">
                       IA
+                    </span>
+                  )}
+                  {/* Le verrou remplace la marque du modele : c'est bien
+                      la main qui commande, pas lui. */}
+                  {verrou_s > 0 && (
+                    <span className="flex shrink-0 items-center gap-1 rounded-pilule bg-texte/[0.07] px-1.5 py-px text-[0.55rem] font-medium tracking-[0.08em] text-texte-doux">
+                      <LuHand size={9} />
+                      {minutes(verrou_s)}
                     </span>
                   )}
                 </span>

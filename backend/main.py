@@ -32,6 +32,7 @@ import registre
 import schema
 import seuils
 import systeme
+import verrous
 from config import DB_URL, INTERVALLE_S, TOPIC_COMMANDES
 
 RACINE = Path(__file__).parent.parent
@@ -430,8 +431,19 @@ def actionneurs():
     service arrete, ou broker injoignable. Le dashboard doit pouvoir
     montrer cette difference : ne pas savoir n'est pas la meme chose
     qu'etre a l'arret.
+
+    `verrou_s` dit combien de temps le modele s'abstient encore apres
+    une reprise en main. Il est calcule ici et dans le cerveau par le
+    MEME module, a partir du meme journal : l'ecran ne peut donc pas
+    annoncer un verrou que le modele ignorerait.
     """
     connus = bus.etats()
+    try:
+        with base() as conn:
+            fins = verrous.actifs(conn)
+    except HTTPException:
+        fins = {}
+
     return [
         {
             "id": a["id"],
@@ -442,6 +454,9 @@ def actionneurs():
             "pilote": a.get("pilote", "manuel"),
             "valeur": connus.get(a["id"], {}).get("valeur"),
             "ts": connus.get(a["id"], {}).get("ts"),
+            # Secondes pendant lesquelles le modele s'abstient, apres
+            # une reprise en main. Zero : il commande a nouveau.
+            "verrou_s": verrous.restant(fins.get(a["id"])),
         }
         for a in registre.actionneurs_actifs()
     ]

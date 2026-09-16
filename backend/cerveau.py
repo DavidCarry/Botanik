@@ -18,7 +18,7 @@ reseau n'a aucune notion de duree.
 
 import json
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import numpy as np
 import psycopg
@@ -30,6 +30,7 @@ import poids as magasin
 import registre
 import reseau
 import service
+import verrous
 from config import (
     DB_URL, TOPIC_ALERTES, TOPIC_COMMANDES, TOPIC_ETAT, TOPIC_MESURES,
 )
@@ -70,6 +71,8 @@ class Cerveau:
         self.bornes = None
         self.version = None
         self.voulu: dict[str, decision.Commande] = {}
+        # Actionneurs repris en main, et l'instant ou chacun se libere.
+        self.verrous: dict[str, datetime] = {}
         # Dernier cote publie pour chaque grandeur, afin de n'emettre que
         # les changements. Vide au depart : la premiere decision publie
         # donc l'etat de toutes, ce qui donne au journal une base saine.
@@ -119,6 +122,17 @@ class Cerveau:
             return
         if msg.topic.startswith(TOPIC_ETAT):
             self.etats[identifiant] = float(charge.get("valeur", 0))
+        elif msg.topic.startswith(TOPIC_COMMANDES):
+            # Le verrou se pose des que la commande passe, sans attendre
+            # la prochaine decision : entre les deux, ce fil maintient
+            # l'etat voulu CHAQUE SECONDE et effacerait la reprise en
+            # main avant meme qu'on ait lache l'interrupteur.
+            if charge.get("source") == "manuel":
+                self.verrous[identifiant] = (
+                    datetime.now(timezone.utc)
+                    + timedelta(seconds=decision.VERROU_MANUEL_S)
+                )
+                print(f"main reprise sur {identifiant}", flush=True)
         else:
             self.mesures[identifiant] = (float(charge["valeur"]), time.monotonic())
 
@@ -139,12 +153,24 @@ class Cerveau:
                 return None
             contexte[capteur] = connue[0]
 
+        # Une seule connexion pour les deux lectures : l'eclairement du
+        # jour et les verrous posees par la main.
         try:
             with psycopg.connect(DB_URL, connect_timeout=5) as conn:
                 contexte["eclairement_jour"] = eclairement.heures_du_jour(conn)
+                journal = verrous.actifs(conn)
         except psycopg.Error as e:
-            self._plaindre(f"eclairement du jour indisponible : {e}")
+            self._plaindre(f"lecture de la base impossible : {e}")
             return None
+
+        # Le journal fait foi, mais une commande a peine emise peut ne
+        # pas encore y figurer : on garde le plus tardif des deux, et on
+        # oublie ce qui a expire.
+        maintenant = datetime.now(timezone.utc)
+        for actionneur, fin in journal.items():
+            if fin > self.verrous.get(actionneur, maintenant):
+                self.verrous[actionneur] = fin
+        self.verrous = {a: f for a, f in self.verrous.items() if f > maintenant}
 
         local = datetime.now()
         contexte["heure"] = local.hour + local.minute / 60
@@ -160,7 +186,13 @@ class Cerveau:
         L'etat vient de l'actionneur lui-meme, pas d'un souvenir local :
         si son service redemarre et repart a zero, la divergence est vue
         au tour suivant et corrigee.
+
+        Un actionneur repris en main est laisse tranquille, SAUF par la
+        securite : si la reserve se vide pendant un arrosage manuel, la
+        pompe s'arrete quand meme.
         """
+        if source != "securite" and actionneur in self.verrous:
+            return
         if self.etats.get(actionneur) == valeur:
             return
         charge = {"valeur": valeur, "source": source,
@@ -289,7 +321,8 @@ def main():
             return
         client.subscribe(f"{TOPIC_MESURES}/#", qos=0)
         client.subscribe(f"{TOPIC_ETAT}/#", qos=1)
-        print("Abonne aux mesures et aux etats", flush=True)
+        client.subscribe(f"{TOPIC_COMMANDES}/#", qos=1)
+        print("Abonne aux mesures, aux etats et aux commandes", flush=True)
 
     print(f"Cerveau : {len(pilotes)} actionneurs pilotes "
           f"({', '.join(pilotes)}), decision toutes les {DECISION_S}s",
