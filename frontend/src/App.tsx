@@ -71,7 +71,7 @@ export default function App() {
           Le retrait degage la barre, qui flotte au-dessus. */}
       <div className="pt-[4.2rem] sm:pt-[4.6rem] md:h-dvh md:overflow-hidden">
         <div
-          className="mx-auto flex max-w-[1600px] flex-col gap-9 sm:gap-11
+          className="mx-auto flex max-w-page flex-col gap-9 sm:gap-11
                      md:h-full md:max-w-none md:flex-row md:gap-0
                      md:[translate:var(--glissement)_0]
                      md:transition-[translate] md:duration-500 md:ease-[var(--ease-doux)]"
@@ -84,23 +84,38 @@ export default function App() {
               qu'on ne lit pas l'un sans l'autre : une pompe qui tourne
               n'a de sens qu'en regard d'un sol trop sec. */}
           <section className={CADRE}>
-            <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
+            <div className="mx-auto grid h-full max-w-page gap-9 sm:gap-11
                             md:grid-cols-[62fr_38fr] md:gap-x-8">
               <Bloc titre="Mesures" className="md:min-h-0">
-                <div className="h-[calc(100dvh-9.5rem)] md:h-full">
+                <div className="h-[calc(100dvh-11.5rem)] md:h-full">
                   <Mesures />
                 </div>
               </Bloc>
 
+              {/* L'invite se place SOUS LES BULLES, la ou s'arrete le
+                  premier ecran -- et non tout en bas de la vue, ou plus
+                  personne n'a besoin qu'on lui dise de defiler.
+                  Masquee des la tablette, elle ne prend pas de cellule
+                  dans la grille a deux colonnes. */}
+              <InviteDefilement />
+
               {/* Le pilotage, et sous lui ce que la camera voit : on
                   commande un actionneur en regardant ce qu'il fait.
-                  La camera n'a pas de titre -- son encadre la nomme. */}
-              <div className="flex flex-col gap-6 md:min-h-0">
+
+                  La camera occupe une part FIXE de la colonne : sinon une
+                  liste d'actionneurs un peu longue la reduisait a un
+                  bandeau. C'est la liste qui defile quand la place
+                  manque. Jamais plus haute que large non plus -- d'ou le
+                  plafond, mesure sur la largeur de la colonne (`@container`)
+                  et augmente de la hauteur de l'en-tete. */}
+              <div className="@container flex flex-col gap-6 md:min-h-0">
                 <Actionneurs connecte={Boolean(auth.compte)} />
-                <Camera onAgrandir={() => setCameraOuverte(true)} />
+                <Bloc titre="Caméra"
+                      className="md:h-[42%] md:max-h-[calc(100cqw+1.8rem)] md:shrink-0">
+                  <Camera onAgrandir={() => setCameraOuverte(true)} />
+                </Bloc>
               </div>
             </div>
-            <InviteDefilement />
           </section>
 
           {/* Vue 2 : l'analyse. La courbe tient la colonne de gauche, le
@@ -108,9 +123,10 @@ export default function App() {
               n'est plus ici : il vit aupres des mesures, ou il se lit en
               regard de ce qui l'a declenche. */}
           <section className={CADRE}>
-            <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
+            <div className="mx-auto grid h-full max-w-page gap-9 sm:gap-11
                             md:grid-cols-[58fr_42fr] md:grid-rows-2 md:gap-x-8 md:gap-y-5">
-              <Bloc actions={<EnTeteCourbes etat={courbes} />} className="md:row-span-2">
+              <Bloc titre="Courbes" actions={<EnTeteCourbes etat={courbes} />}
+                    className="md:row-span-2">
                 <div className="h-[clamp(350px,52dvh,540px)] md:h-full">
                   <Courbes etat={courbes} />
                 </div>

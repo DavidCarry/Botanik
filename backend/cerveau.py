@@ -23,6 +23,7 @@ from datetime import datetime, timedelta, timezone
 import numpy as np
 import psycopg
 
+import bdd
 import decision
 import donnees
 import eclairement
@@ -32,7 +33,7 @@ import reseau
 import service
 import verrous
 from config import (
-    DB_URL, TOPIC_ALERTES, TOPIC_COMMANDES, TOPIC_ETAT, TOPIC_MESURES,
+    TOPIC_ALERTES, TOPIC_COMMANDES, TOPIC_ETAT, TOPIC_MESURES,
 )
 
 # Cadence de decision. L'humidite d'un sol ne change pas en cinq secondes ;
@@ -71,6 +72,9 @@ class Cerveau:
         self.bornes = None
         self.version = None
         self.voulu: dict[str, decision.Commande] = {}
+        # Jugements du tour precedent : l'hysteresis a besoin de savoir
+        # d'ou l'on vient pour decider si l'on bascule.
+        self.jugements: dict[str, decision.Jugement] = {}
         # Actionneurs repris en main, et l'instant ou chacun se libere.
         self.verrous: dict[str, datetime] = {}
         # Dernier cote publie pour chaque grandeur, afin de n'emettre que
@@ -88,7 +92,7 @@ class Cerveau:
 
     def relire_modele(self):
         try:
-            with psycopg.connect(DB_URL, connect_timeout=5) as conn:
+            with bdd.connexion() as conn:
                 charge = magasin.charger(conn)
         except psycopg.Error as e:
             self._plaindre(f"base injoignable pour relire le modele : {e}")
@@ -156,7 +160,7 @@ class Cerveau:
         # Une seule connexion pour les deux lectures : l'eclairement du
         # jour et les verrous posees par la main.
         try:
-            with psycopg.connect(DB_URL, connect_timeout=5) as conn:
+            with bdd.connexion() as conn:
                 contexte["eclairement_jour"] = eclairement.heures_du_jour(conn)
                 journal = verrous.actifs(conn)
         except psycopg.Error as e:
@@ -240,14 +244,13 @@ class Cerveau:
             return
         X, contexte = situation
 
-        juges = reseau.predire(self.poids, donnees.normaliser(X, self.bornes))[0]
-        jugements = {
-            grandeur: decision.Jugement(
-                bool(juges[donnees.SORTIES.index(f"{grandeur}_bas")]),
-                bool(juges[donnees.SORTIES.index(f"{grandeur}_haut")]),
-            )
-            for grandeur in decision.GRANDEURS
-        }
+        # On lit les PROBABILITES et non les jugements deja tranches :
+        # l'hysteresis a besoin de la nuance pour ne pas basculer sur un
+        # dixieme de point.
+        p = reseau.avant(self.poids, donnees.normaliser(X, self.bornes))[0][0]
+        probabilites = {sortie: float(p[i]) for i, sortie in enumerate(donnees.SORTIES)}
+        jugements = decision.juger(probabilites, self.jugements)
+        self.jugements = jugements
 
         self.voulu = decision.decider(jugements, contexte)
         self.annoncer_alertes(client, jugements, contexte)
@@ -308,6 +311,7 @@ class Cerveau:
         actif = self.etats.get("bipeur", 0.0) > 0
         self.ordonner(client, "bipeur", 0.0 if actif else 1.0, "ia")
         self.bascule_bip = maintenant + (SILENCE_BIP_S if actif else BIP_S)
+
 
 
 def main():

@@ -18,26 +18,13 @@ from drivers import DRIVERS
 
 
 def charger_capteurs():
-    """Resout le registre selon MODE : a chaque capteur actif, le driver
-    qui le lira et les parametres a lui passer."""
-    retenus = []
-    for c in registre.capteurs_actifs():
-        if MODE == "faux":
-            driver, params = "simule", c["simule"]
-        else:
-            bloc = dict(c["reel"])
-            driver, params = bloc.pop("driver"), bloc
-
-        if driver not in DRIVERS:
-            print(f"{c['id']} ignore : driver '{driver}' non implemente",
-                  flush=True)
-            continue
-
-        retenus.append(
-            {"id": c["id"], "unite": c["unite"], "driver": driver,
-             "params": params}
-        )
-    return retenus
+    """Les capteurs actifs, chacun avec son driver et son unite."""
+    actifs = registre.capteurs_actifs()
+    resolus = registre.resoudre(actifs, DRIVERS)
+    return [
+        {"id": c["id"], "unite": c["unite"], **resolus[c["id"]]}
+        for c in actifs if c["id"] in resolus
+    ]
 
 
 def lire_capteurs(capteurs):

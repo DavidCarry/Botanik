@@ -53,11 +53,14 @@ export default function Evenements() {
   }
 
   return (
-    <ul className="h-full space-y-px overflow-y-auto pr-1">
+    // Meme trame que le pilotage et les seuils du modele : des lignes
+    // separees d'un filet, sans carte ni fond. Un survol arrondi au
+    // milieu d'une liste filetee cassait cet alignement.
+    <ul className="h-full divide-y divide-bordure overflow-y-auto">
       {liste.map((e, i) => (
         <li
           key={`${e.ts}-${e.sujet}-${i}`}
-          className="flex items-center gap-2.5 rounded-carte px-1.5 py-1.5 transition-colors hover:bg-texte/[0.03]"
+          className="flex items-center gap-2.5 px-1 py-2 transition-colors hover:bg-survol"
         >
           {e.genre === 'alerte' ? (
             <>
@@ -75,7 +78,7 @@ export default function Evenements() {
                   {e.ouverture ? 'détecté' : 'levé'}
                 </span>
               </span>
-              <span className="shrink-0 text-[0.6rem] font-medium text-texte-faible">
+              <span className="shrink-0 text-nano font-medium text-texte-faible">
                 alerte
               </span>
             </>
@@ -102,7 +105,7 @@ export default function Evenements() {
                 <LuCircleDot
                   size={9}
                   className={`mx-1.5 inline shrink-0 align-[-0.05em] ${
-                    e.valeur > 0 ? 'text-accent' : 'text-texte-faible/50'
+                    e.valeur > 0 ? 'text-accent-vif' : 'text-texte-faible/50'
                   }`}
                 />
                 <span className="text-texte-doux">
@@ -110,7 +113,7 @@ export default function Evenements() {
                 </span>
               </span>
               <span
-                className={`shrink-0 text-[0.6rem] font-medium ${
+                className={`shrink-0 text-nano font-medium ${
                   ORIGINES[e.source]?.classe ?? 'text-texte-faible'
                 }`}
               >
@@ -119,7 +122,7 @@ export default function Evenements() {
             </>
           )}
 
-          <span className="w-20 shrink-0 text-right text-[0.6rem] tabular-nums text-texte-faible">
+          <span className="w-20 shrink-0 text-right text-nano tabular-nums text-texte-faible">
             {depuis(e.ts)}
           </span>
         </li>

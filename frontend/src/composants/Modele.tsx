@@ -38,7 +38,7 @@ export default function Modele() {
         <span className="text-micro font-medium text-texte">
           {m.architecture?.join(' — ')}
         </span>
-        <span className="text-[0.6rem] text-texte-faible">
+        <span className="text-nano text-texte-faible">
           {m.parametres} paramètres
         </span>
         <span className="ml-auto text-micro font-medium tabular-nums text-accent-vif">
@@ -72,7 +72,7 @@ export default function Modele() {
                   {m.contexte?.eclairement_jour?.toFixed(1) ?? '—'}
                   <span className="mx-1 text-texte-faible">sur</span>
                   {m.cible_lumiere_h}
-                  <span className="ml-1 text-[0.6rem] font-medium text-texte-faible">
+                  <span className="ml-1 text-nano font-medium text-texte-faible">
                     h
                   </span>
                 </span>
@@ -96,7 +96,7 @@ export default function Modele() {
                 {nombre(s?.bas ?? null)}
                 <span className="mx-1 text-texte-faible">–</span>
                 {nombre(s?.haut ?? null)}
-                <span className="ml-1 text-[0.6rem] font-medium text-texte-faible">
+                <span className="ml-1 text-nano font-medium text-texte-faible">
                   {UNITE_GRANDEUR[g] ?? ''}
                 </span>
               </span>
@@ -105,7 +105,7 @@ export default function Modele() {
         })}
       </ul>
 
-      <p className="text-[0.6rem] leading-relaxed text-texte-faible">
+      <p className="text-nano leading-relaxed text-texte-faible">
         seuils relus dans le réseau pour{' '}
         {m.contexte?.temperature_air?.toFixed(1)} °C et{' '}
         {m.contexte?.luminosite !== undefined

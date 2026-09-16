@@ -23,7 +23,7 @@ export default function InviteDefilement() {
         visible ? 'opacity-100' : 'opacity-0',
       ].join(' ')}
     >
-      <span className="text-[0.6rem] uppercase tracking-[0.16em] text-texte-faible">
+      <span className="text-nano uppercase tracking-etiquette text-texte-faible">
         Faire défiler
       </span>
       <LuChevronDown size={18} className="invite-chevron text-texte-faible" />

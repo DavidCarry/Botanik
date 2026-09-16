@@ -10,8 +10,9 @@
 # La variable d'environnement MODE (faux|reel) choisit laquelle s'applique.
 #
 # `pilote` dit qui commande : "ia" pour ceux que le modele decide,
-# "manuel" pour ceux qui n'obeissent qu'a l'interface. L'API s'en sert
-# pour montrer a l'ecran ce qui est automatique et ce qui ne l'est pas.
+# "manuel" pour ceux qui n'obeissent qu'a l'interface. C'est le cerveau
+# qui le lit, pour savoir de quoi il a la charge -- ajouter un actionneur
+# en "ia" suffit a le lui confier.
 #
 # Les numeros de broche sont en numerotation BCM, et provisoires tant que
 # la carte de relais n'est pas montee.

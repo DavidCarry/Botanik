@@ -60,10 +60,3 @@ def charger(conn) -> tuple[dict, dict, str] | None:
         return None
     brut, meta, version = ligne
     return _depuis_octets(bytes(brut)), meta, version
-
-
-def exporter(poids: dict, metadonnees: dict, chemin) -> None:
-    """Sortie sur fichier, pour inspecter un modele hors de la base."""
-    np.savez(chemin, **poids)
-    with open(str(chemin) + ".json", "w", encoding="utf-8") as f:
-        json.dump(metadonnees, f, indent=2, ensure_ascii=False)

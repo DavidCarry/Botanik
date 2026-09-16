@@ -102,8 +102,6 @@ export type Modele = {
   version?: string
   architecture?: number[]
   parametres?: number
-  entrees?: string[]
-  sorties?: string[]
   /** Les grandeurs que le réseau juge, dans l'ordre. */
   grandeurs?: string[]
   exactitude_test?: number
@@ -180,10 +178,8 @@ export type Actionneur = {
   id: string
   libelle: string
   detail: string
-  /** Qui le commande : le modèle, ou l'utilisateur seul. */
-  pilote: 'ia' | 'manuel'
   /** Secondes pendant lesquelles le modèle s'abstient, après une reprise
-   *  en main. Zéro : il commande à nouveau. */
+   *  en main. Zéro : il commande à nouveau. Pas encore affiché. */
   verrou_s: number
   /** Etat annonce par l'actionneur lui-meme. Null : il ne s'est pas
    *  manifeste -- son service est peut-etre arrete. Ne pas savoir n'est

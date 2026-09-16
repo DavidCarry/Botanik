@@ -48,19 +48,19 @@ function Habillage({ compact }: { compact: boolean }) {
 
       <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-1.5 rounded-carte bg-black/55 px-2 py-1 backdrop-blur-sm">
         <LuVideoOff size={11} className="shrink-0 text-texte-faible" />
-        <span className="text-[0.6rem] font-medium tracking-[0.18em] text-texte-doux">
+        <span className="text-nano font-medium tracking-etiquette text-texte-doux">
           LENTILLE CAM
         </span>
         {/* En vignette, la mention « hors ligne » ne tiendrait pas. */}
         {!compact && (
-          <span className="text-[0.6rem] tracking-[0.1em] text-texte-faible">
+          <span className="text-nano tracking-etiquette text-texte-faible">
             · HORS LIGNE
           </span>
         )}
       </div>
 
       {!compact && (
-        <span className="pointer-events-none absolute bottom-3 right-3 rounded-carte bg-black/55 px-2 py-1 text-[0.6rem] tabular-nums tracking-[0.1em] text-texte-faible backdrop-blur-sm">
+        <span className="pointer-events-none absolute bottom-3 right-3 rounded-carte bg-black/55 px-2 py-1 text-nano tabular-nums tracking-etiquette text-texte-faible backdrop-blur-sm">
           {PRISE_DE_VUE}
         </span>
       )}
@@ -68,9 +68,13 @@ function Habillage({ compact }: { compact: boolean }) {
   )
 }
 
-/** La vue, posee sous la liste de pilotage. Elle prend toute la largeur
- *  de sa colonne, au format d'un moniteur -- c'est ce cadrage qui la
- *  fait lire comme une camera et non comme une illustration. */
+/** La vue, posee sous la liste de pilotage.
+ *
+ *  Au grand ecran elle remplit le bloc qui l'accueille -- c'est lui qui
+ *  fixe la part de hauteur qui lui revient. Son format est donc libre,
+ *  et l'image le remplit sans se deformer, quitte a etre rognee.
+ *  Sur mobile, ou rien ne contraint la hauteur, elle reprend le format
+ *  d'un moniteur. */
 export default function Camera({ onAgrandir }: { onAgrandir: () => void }) {
   return (
     <button
@@ -79,7 +83,8 @@ export default function Camera({ onAgrandir }: { onAgrandir: () => void }) {
       aria-label="Agrandir la vue de la caméra"
       className="group relative aspect-video w-full overflow-hidden rounded-carte
                  border border-bordure bg-black transition-colors duration-200
-                 hover:border-bordure-forte"
+                 hover:border-bordure-forte
+                 md:aspect-auto md:h-full"
     >
       <img
         src={SOURCE}

@@ -22,23 +22,8 @@ from drivers import SORTIES
 
 
 def charger_actionneurs():
-    """Resout le registre selon MODE : a chaque actionneur actif, le driver
-    qui l'actionnera et les parametres a lui passer."""
-    retenus = {}
-    for a in registre.actionneurs_actifs():
-        if MODE == "faux":
-            driver, params = "simule", a.get("simule") or {}
-        else:
-            bloc = dict(a["reel"])
-            driver, params = bloc.pop("driver"), bloc
-
-        if driver not in SORTIES:
-            print(f"{a['id']} ignore : driver '{driver}' non implemente",
-                  flush=True)
-            continue
-
-        retenus[a["id"]] = {"driver": driver, "params": params}
-    return retenus
+    """Les actionneurs actifs, chacun avec le driver qui l'actionnera."""
+    return registre.resoudre(registre.actionneurs_actifs(), SORTIES)
 
 
 def annoncer(client: mqtt.Client, actionneur: str, valeur: float):

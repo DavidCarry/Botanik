@@ -7,13 +7,15 @@
    Un seul theme : sombre.
    ══════════════════════════════════════════════════════════════════ */
 
-/* ---------- Palette source (jamais utilisee telle quelle) ---------- */
+/* ---------- Palette source (jamais utilisee telle quelle) ----------
+   Toute couleur de l'application sort d'ici, y compris les lueurs du
+   fond : elles reecrivaient les memes teintes en rgba, si bien que deux
+   lueurs annoncees differentes etaient en fait identiques. */
 :root {
   --p-vert-300:     #86efac;
   --p-vert-400:     #4ade80;
   --p-vert-500:     #22c55e;
-  --p-vert-700:     #15803d;
-  --p-emeraude-400: #34d399;
+  --p-emeraude-300: #6ee7b7;
   --p-emeraude-500: #10b981;
   --p-lime-400:     #a3e635;
   --p-lime-500:     #84cc16;
@@ -36,13 +38,25 @@
   --texte-doux:      rgba(234, 243, 238, 0.60);
   --texte-faible:    rgba(234, 243, 238, 0.38);
 
+  /* Trois emplois du vert, et un seul par emploi -- c'est ce qui evite
+     de retrouver deux verts voisins cote a cote :
+       --accent-vif    ce qui est ACTIF : texte et icones sur fond sombre
+       --accent        le meme vert en remplissage : curseur, voile
+       --accent-voile  le fond tres dilue d'une pastille allumee */
   --accent:          var(--p-vert-400);
   --accent-vif:      var(--p-vert-300);
-  --accent-voile:    rgba(74, 222, 128, 0.14);
+  --accent-voile:    color-mix(in srgb, var(--p-vert-400) 14%, transparent);
 
-  --bon:             var(--p-vert-400);
+  /* Le vert de l'accent EST celui qui dit « tout va bien » : deux noms
+     pour deux intentions, une seule teinte. Les lier evite qu'un bouton
+     et un voyant finissent sur deux verts voisins. */
+  --bon:             var(--accent);
   --attention:       var(--p-ambre-400);
   --critique:        var(--p-rose-500);
+
+  /* Voile pose sur une ligne survolee. Plus discret qu'une surface :
+     il signale que la ligne repond, il ne la transforme pas en carte. */
+  --survol:          rgba(255, 255, 255, 0.03);
 
   --ombre-carte:     0 1px 0 rgba(255, 255, 255, 0.05) inset,
                      0 12px 32px -16px rgba(0, 0, 0, 0.8);
@@ -53,17 +67,18 @@
      ------------------------------------------------------------------ */
   --halo-force: 1;
 
-  /* Lueurs : teintes ecartees sur l'axe jaune-vert -> vert -> menthe,
-     en opacites faibles. C'est la superposition qui cree les nuances,
-     pas la saturation de chaque tache. */
-  --halo-1: rgba(34, 197, 94, 0.40);    /* vert franc */
-  --halo-2: rgba(163, 230, 53, 0.32);   /* vert-jaune */
-  --halo-3: rgba(16, 185, 129, 0.38);   /* emeraude */
-  --halo-4: rgba(34, 197, 94, 0.34);    /* vert profond */
-  --halo-5: rgba(110, 231, 183, 0.28);  /* menthe claire */
-  --halo-6: rgba(132, 204, 22, 0.30);   /* lime */
-  --halo-7: rgba(16, 185, 129, 0.33);    /* vert sombre */
-  --halo-8: rgba(74, 222, 128, 0.30);   /* vert clair */
+  /* Lueurs : cinq teintes ecartees sur l'axe jaune-vert -> vert ->
+     menthe, en opacites faibles. C'est la superposition qui cree les
+     nuances, pas la saturation de chaque tache -- trois d'entre elles
+     reviennent donc a une autre densite. */
+  --halo-1: color-mix(in srgb, var(--p-vert-500)     40%, transparent);
+  --halo-2: color-mix(in srgb, var(--p-lime-400)     32%, transparent);
+  --halo-3: color-mix(in srgb, var(--p-emeraude-500) 38%, transparent);
+  --halo-4: color-mix(in srgb, var(--p-vert-500)     34%, transparent);
+  --halo-5: color-mix(in srgb, var(--p-emeraude-300) 28%, transparent);
+  --halo-6: color-mix(in srgb, var(--p-lime-500)     30%, transparent);
+  --halo-7: color-mix(in srgb, var(--p-emeraude-500) 33%, transparent);
+  --halo-8: color-mix(in srgb, var(--p-vert-400)     30%, transparent);
 }
 
 /* ---------- Exposition a Tailwind ---------- */
@@ -83,12 +98,21 @@
   --color-bon:            var(--bon);
   --color-attention:      var(--attention);
   --color-critique:       var(--critique);
+  --color-survol:         var(--survol);
 }
 
 /* ---------- Echelle typographique (nommee par usage) ---------- */
 @theme {
+  --text-nano:   0.6rem;     /* 9.6px - pastilles, reperes d'axe */
   --text-micro:  0.6875rem;  /* 11px - unites, mentions */
   --text-menu:   0.875rem;   /* 14px - navigation, corps */
+
+  /* Un seul interlettrage pour les petites capitales. Il y en avait
+     quatre -- 0.10, 0.14, 0.16 et 0.18em -- selon le composant. */
+  --tracking-etiquette: 0.14em;
+
+  /* Largeur maximale du contenu, ecrite quatre fois en dur. */
+  --container-page: 1600px;
 
   --radius-pilule: 999px;
   --radius-carte:  1.25rem;

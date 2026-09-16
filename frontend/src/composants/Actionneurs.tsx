@@ -3,6 +3,7 @@ import {
 } from 'react-icons/lu'
 import type { IconType } from 'react-icons'
 import { useActionneurs } from '../useActionneurs'
+import Bloc from './Bloc'
 
 /** L'icone est de la presentation pure : elle n'a rien a faire dans le
  *  registre backend. Un actionneur inconnu retombe sur un symbole
@@ -30,15 +31,15 @@ const ICONES: Record<string, IconType> = {
 function Etat({ actif, muet }: { actif: boolean; muet: boolean }) {
   if (muet) {
     return (
-      <span className="shrink-0 rounded-pilule bg-texte/[0.06] px-2 py-0.5 text-[0.6rem] font-medium text-texte-faible">
+      <span className="shrink-0 rounded-pilule bg-surface px-2 py-0.5 text-nano font-medium text-texte-faible">
         Inconnu
       </span>
     )
   }
   return (
     <span
-      className={`shrink-0 rounded-pilule px-2 py-0.5 text-[0.6rem] font-medium ${
-        actif ? 'bg-accent-voile text-accent-vif' : 'bg-texte/[0.06] text-texte-faible'
+      className={`shrink-0 rounded-pilule px-2 py-0.5 text-nano font-medium ${
+        actif ? 'bg-accent-voile text-accent-vif' : 'bg-surface text-texte-faible'
       }`}
     >
       {actif ? 'Actif' : 'Arrêté'}
@@ -69,23 +70,24 @@ function Interrupteur({ actif, attendu }: { actif: boolean; attendu: boolean }) 
 export default function Actionneurs({ connecte }: { connecte: boolean }) {
   const { liste, attendus, erreur, basculer } = useActionneurs()
 
-  return (
-    <div className="flex flex-col">
-      <div className="flex items-center justify-between gap-3 px-1 pb-2">
-        <span className="text-micro font-medium uppercase tracking-[0.14em] text-texte-faible">
-          Pilotage
-        </span>
-        {erreur ? (
-          <span role="alert" className="text-micro text-critique">{erreur}</span>
-        ) : !connecte && (
-          <span className="flex items-center gap-1.5 text-micro text-texte-faible">
-            <LuLock size={12} className="shrink-0" />
-            Connexion requise
-          </span>
-        )}
-      </div>
+  const mention = erreur ? (
+    <span role="alert" className="text-micro text-critique">{erreur}</span>
+  ) : !connecte ? (
+    <span className="flex items-center gap-1.5 text-micro text-texte-faible">
+      <LuLock size={12} className="shrink-0" />
+      Connexion requise
+    </span>
+  ) : undefined
 
-      <div className="divide-y divide-bordure border-y border-bordure">
+  return (
+    // Meme en-tete que les autres sections, par le meme composant : le
+    // titre etait redessine ici, a deux pixels pres.
+    //
+    // En hauteur contrainte, c'est la LISTE qui cede, pas la camera :
+    // l'en-tete reste en place et les lignes defilent dessous.
+    <Bloc titre="Pilotage" actions={mention} className="md:min-h-0 md:flex-1">
+      <div className="divide-y divide-bordure border-y border-bordure
+                      md:h-full md:overflow-y-auto">
         {liste.map(({ id, libelle, detail, valeur }) => {
           const Icone = ICONES[id] ?? LuZap
           const attendu = attendus[id]
@@ -132,7 +134,7 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
               disabled={muet}
               onClick={() => basculer(id, actif ? 0 : 1)}
               className={`${classes} transition-colors duration-200 ${
-                muet ? 'cursor-not-allowed opacity-40' : 'hover:bg-texte/[0.03]'
+                muet ? 'cursor-not-allowed opacity-40' : 'hover:bg-survol'
               }`}
             >
               {contenu}
@@ -142,6 +144,6 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
           )
         })}
       </div>
-    </div>
+    </Bloc>
   )
 }

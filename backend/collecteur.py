@@ -15,9 +15,10 @@ from datetime import datetime, timezone
 
 import psycopg
 
-import service
+import bdd
 import schema
-from config import DB_URL, TOPIC_ALERTES, TOPIC_COMMANDES, TOPIC_MESURES
+import service
+from config import TOPIC_ALERTES, TOPIC_COMMANDES, TOPIC_MESURES
 
 INSERTION = (
     "INSERT INTO mesures (ts, capteur, valeur, unite) VALUES (%s, %s, %s, %s)"
@@ -137,7 +138,7 @@ def on_message(client, conn, msg):
 
 
 def main():
-    conn = psycopg.connect(DB_URL, autocommit=True)
+    conn = bdd.connexion()
     # Idempotent : la table des alertes peut ne pas exister si l'API n'a
     # jamais demarre sur cette base.
     schema.preparer(conn)

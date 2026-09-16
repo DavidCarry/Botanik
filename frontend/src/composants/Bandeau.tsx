@@ -141,7 +141,7 @@ export default function Bandeau({
         }}
       />
 
-      <header className="panneau barre-soudee relative mx-auto flex max-w-[1600px]
+      <header className="panneau barre-soudee relative mx-auto flex max-w-page
                    items-center gap-3 rounded-b-bloc rounded-t-none
                    px-3.5 py-2.5 sm:px-5 sm:py-3">
         {/* La marque n'est pas du contenu a selectionner : curseur de

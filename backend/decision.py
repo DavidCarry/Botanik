@@ -58,6 +58,53 @@ class Commande(NamedTuple):
     valeur: float
     source: str      # "ia" ou "securite"
 
+# Marge d'hysteresis, exprimee sur la CERTITUDE du reseau et non sur les
+# unites de chaque grandeur.
+#
+# Sans elle, une mesure qui oscille autour de sa frontiere fait osciller
+# le jugement avec elle : l'alerte s'ouvre, se ferme, se rouvre, et le
+# journal se remplit de bruit pendant que la pompe bat la mesure. Le
+# reseau, lui, ne se trompe pas -- il dit honnetement « 50,4 % puis
+# 49,6 % ». C'est notre lecture binaire qui est trop nerveuse.
+#
+# On ouvre donc a la moitie, et on ne referme qu'en dessous : tant que le
+# reseau reste hesitant, l'etat en cours tient. Une grandeur vraiment
+# revenue dans sa plage fait chuter la probabilite bien plus bas que
+# cette marge, donc l'alerte se leve normalement.
+#
+# La marge porte sur la certitude plutot que sur les degres ou les lux :
+# une seule regle vaut alors pour les cinq grandeurs, sans avoir a
+# choisir a la main ce que « un peu » veut dire pour chacune.
+CERTITUDE_OUVERTURE = 0.50
+CERTITUDE_FERMETURE = 0.35
+
+
+
+def _tenir(probabilite: float, actif: bool) -> bool:
+    """Le seuil a franchir depend de l'etat en cours : c'est tout le
+    principe de l'hysteresis."""
+    return probabilite >= (CERTITUDE_FERMETURE if actif else CERTITUDE_OUVERTURE)
+
+
+
+def juger(probabilites: dict[str, float],
+          precedents: dict[str, Jugement] | None = None) -> dict[str, Jugement]:
+    """Les jugements du reseau, lus avec hysteresis.
+
+    `probabilites` est indexe par sortie -- « humidite_sol_a_bas » -- et
+    `precedents` porte les jugements du tour d'avant. Vide au premier
+    tour : tout part alors de la simple moitie, sans etat a retenir.
+    """
+    anciens = precedents or {}
+    nouveaux: dict[str, Jugement] = {}
+    for grandeur in GRANDEURS:
+        avant = anciens.get(grandeur, Jugement(False, False))
+        nouveaux[grandeur] = Jugement(
+            _tenir(probabilites.get(f"{grandeur}_bas", 0.0), avant.bas),
+            _tenir(probabilites.get(f"{grandeur}_haut", 0.0), avant.haut),
+        )
+    return nouveaux
+
 
 # Ce qui merite d'alerter, et sous quel nom.
 #
@@ -81,6 +128,7 @@ ALERTES: dict[tuple[str, str], dict] = {
 }
 
 
+
 def alertes(jugements: dict[str, Jugement]) -> dict[str, str | None]:
     """Pour chaque grandeur, le cote en alerte, ou None si tout va bien.
 
@@ -97,6 +145,7 @@ def alertes(jugements: dict[str, Jugement]) -> dict[str, str | None]:
             cote = "haut"
         ouvertes[grandeur] = cote
     return ouvertes
+
 
 
 def decider(jugements: dict[str, Jugement],

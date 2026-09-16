@@ -1,10 +1,15 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import type { Point } from '../api'
 
+type Bornes = { min: number; max: number }
+
 type Props = {
   points: Point[]
   unite: string
-  ideal: { min: number; max: number }
+  ideal: Bornes
+  /** Domaine physique de la grandeur, tel que declare au registre. La
+   *  marge de dessin ne le franchit pas : pas de lux negatifs. */
+  echelle: Bornes
 }
 
 // La legende des valeurs occupe la gauche ; le trace commence apres.
@@ -59,7 +64,7 @@ type Geometrie = {
 }
 
 function geometrie(
-  valeurs: number[], l: number, h: number, ideal: { min: number; max: number },
+  valeurs: number[], l: number, h: number, ideal: Bornes, echelle: Bornes,
 ): Geometrie {
   const x0 = MARGE.gauche
   const x1 = l - MARGE.droite
@@ -71,8 +76,13 @@ function geometrie(
   let bas = Math.min(...valeurs, ideal.min)
   let haut = Math.max(...valeurs, ideal.max)
   const marge = (haut - bas) * 0.12 || 1
-  bas -= marge
-  haut += marge
+
+  // La marge de respiration ne doit pas inventer des valeurs impossibles :
+  // un axe de luminosite descendait jusqu'a -1357 lux. On la borne au
+  // domaine declare au registre -- sauf si une mesure en sort vraiment,
+  // auquel cas on la montre plutot que de la cacher.
+  bas = Math.max(bas - marge, Math.min(echelle.min, bas))
+  haut = Math.min(haut + marge, Math.max(echelle.max, haut))
 
   const px = (i: number) =>
     valeurs.length === 1 ? (x0 + x1) / 2 : x0 + (i / (valeurs.length - 1)) * (x1 - x0)
@@ -96,7 +106,7 @@ const heure = (iso: string) =>
 const jour = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
-export default function Graphique({ points, unite, ideal }: Props) {
+export default function Graphique({ points, unite, ideal, echelle }: Props) {
   const boite = useRef<HTMLDivElement>(null)
   const [taille, setTaille] = useState({ l: 0, h: 0 })
   const [survol, setSurvol] = useState<number | null>(null)
@@ -105,8 +115,6 @@ export default function Graphique({ points, unite, ideal }: Props) {
   const rAire = useRef<SVGPathElement>(null)
   const rSeuilHaut = useRef<SVGLineElement>(null)
   const rSeuilBas = useRef<SVGLineElement>(null)
-  const rZoneHaute = useRef<SVGRectElement>(null)
-  const rZoneBasse = useRef<SVGRectElement>(null)
   const rHorsHaut = useRef<SVGRectElement>(null)
   const rHorsBas = useRef<SVGRectElement>(null)
   const rLigneHors = useRef<SVGPathElement>(null)
@@ -145,7 +153,7 @@ export default function Graphique({ points, unite, ideal }: Props) {
     const depart = reechantillonner(affichees.current, cible.length)
 
     const peindre = (valeurs: number[]) => {
-      const g = geometrie(valeurs, l, h, ideal)
+      const g = geometrie(valeurs, l, h, ideal, echelle)
       rLigne.current?.setAttribute('d', g.ligne)
       rAire.current?.setAttribute('d', g.aire)
       rSeuilHaut.current?.setAttribute('y1', String(g.yIdealMax))
@@ -154,15 +162,11 @@ export default function Graphique({ points, unite, ideal }: Props) {
       rSeuilBas.current?.setAttribute('y2', String(g.yIdealMin))
       rLigneHors.current?.setAttribute('d', g.ligne)
 
-      // Les zones interdites et le decoupage qui colore la courbe suivent
-      // les memes bornes : une seule verite, deux usages.
-      for (const r of [rZoneHaute.current, rHorsHaut.current]) {
-        r?.setAttribute('height', String(Math.max(g.yIdealMax - MARGE.haut, 0)))
-      }
-      for (const r of [rZoneBasse.current, rHorsBas.current]) {
-        r?.setAttribute('y', String(g.yIdealMin))
-        r?.setAttribute('height', String(Math.max(h - MARGE.bas - g.yIdealMin, 0)))
-      }
+      // Le decoupage qui colore la courbe suit les memes bornes que les
+      // seuils : une seule verite, deux usages.
+      rHorsHaut.current?.setAttribute('height', String(Math.max(g.yIdealMax - MARGE.haut, 0)))
+      rHorsBas.current?.setAttribute('y', String(g.yIdealMin))
+      rHorsBas.current?.setAttribute('height', String(Math.max(h - MARGE.bas - g.yIdealMin, 0)))
 
       const fin = g.coords[g.coords.length - 1]
       rPoint.current?.setAttribute('cx', String(fin[0]))
@@ -195,12 +199,12 @@ export default function Graphique({ points, unite, ideal }: Props) {
     }
     raf = requestAnimationFrame(pas)
     return () => cancelAnimationFrame(raf)
-  }, [points, l, h, ideal, pret])
+  }, [points, l, h, ideal, echelle, pret])
 
   // Geometrie de reference, pour le rendu initial et le reperage du
   // survol. Elle part des points cibles : l'animation, elle, ecrit
   // directement dans le DOM et n'a pas besoin de repasser par React.
-  const g = pret ? geometrie(points.map((p) => p.valeur), l, h, ideal) : null
+  const g = pret ? geometrie(points.map((p) => p.valeur), l, h, ideal, echelle) : null
 
   const iSurvol = survol !== null && g
     ? Math.min(points.length - 1, Math.max(0, Math.round(
@@ -260,27 +264,22 @@ export default function Graphique({ points, unite, ideal }: Props) {
               </clipPath>
             </defs>
 
-            {/* Un voile tres leger sur les zones interdites : il situe la
-                plage favorable sans concurrencer la courbe. */}
-            <rect ref={rZoneHaute} x={MARGE.gauche} y={MARGE.haut}
-                  width={l - MARGE.gauche - MARGE.droite}
-                  height={Math.max(g.yIdealMax - MARGE.haut, 0)}
-                  fill="var(--attention)" opacity="0.055" />
-            <rect ref={rZoneBasse} x={MARGE.gauche} y={g.yIdealMin}
-                  width={l - MARGE.gauche - MARGE.droite}
-                  height={Math.max(h - MARGE.bas - g.yIdealMin, 0)}
-                  fill="var(--attention)" opacity="0.055" />
+            {/* Plage favorable : deux seuils en pointille, et rien
+                d'autre. Aucun aplat sur les zones interdites -- c'est la
+                COURBE qui change de couleur quand elle sort, et deux
+                signaux pour une meme information en affaiblissent un.
 
-            {/* Plage favorable : deux seuils en pointille. Une bande
-                pleine colorait tout l'arriere-plan et concurrencait la
-                courbe. */}
+                Les traits portent la couleur d'alerte, celle que prend la
+                courbe en les franchissant : le trait annonce la couleur,
+                la courbe la reprend. En vert, ils se confondaient avec
+                elle. */}
             <line ref={rSeuilHaut}
               x1={MARGE.gauche} x2={l - MARGE.droite} y1={g.yIdealMax} y2={g.yIdealMax}
-              stroke="var(--accent-vif)" strokeOpacity="0.75" strokeWidth="1.25"
+              stroke="var(--attention)" strokeOpacity="0.75" strokeWidth="1.25"
               strokeDasharray="5 4" />
             <line ref={rSeuilBas}
               x1={MARGE.gauche} x2={l - MARGE.droite} y1={g.yIdealMin} y2={g.yIdealMin}
-              stroke="var(--accent-vif)" strokeOpacity="0.75" strokeWidth="1.25"
+              stroke="var(--attention)" strokeOpacity="0.75" strokeWidth="1.25"
               strokeDasharray="5 4" />
 
             <path ref={rAire} d={g.aire} fill="url(#sous-courbe)" />
@@ -330,16 +329,16 @@ export default function Graphique({ points, unite, ideal }: Props) {
               plage favorable -- l'information utile -- et les extremes de
               l'echelle, qui ne servent qu'a cadrer. */}
           <div ref={rLegende}
-               className="pointer-events-none absolute inset-y-0 left-0 w-9 text-right text-[0.6rem] tabular-nums">
+               className="pointer-events-none absolute inset-y-0 left-0 w-9 text-right text-nano tabular-nums">
             <span className="absolute right-0 -translate-y-1/2 text-texte-faible"
                   style={{ top: MARGE.haut }}>
               {Math.round(g.haut * 10) / 10}
             </span>
-            <span className="absolute right-0 -translate-y-1/2 font-medium text-accent"
+            <span className="absolute right-0 -translate-y-1/2 font-medium text-attention"
                   style={{ top: g.yIdealMax }}>
               {ideal.max}
             </span>
-            <span className="absolute right-0 -translate-y-1/2 font-medium text-accent"
+            <span className="absolute right-0 -translate-y-1/2 font-medium text-attention"
                   style={{ top: g.yIdealMin }}>
               {ideal.min}
             </span>
@@ -349,23 +348,23 @@ export default function Graphique({ points, unite, ideal }: Props) {
             </span>
           </div>
 
-          <div className="pointer-events-none absolute bottom-0 left-10 right-2 flex justify-between text-[0.6rem] text-texte-faible">
+          <div className="pointer-events-none absolute bottom-0 left-10 right-2 flex justify-between text-nano text-texte-faible">
             <span>{points.length > 12 ? jour(points[0].ts) : heure(points[0].ts)}</span>
             <span>{heure(points[points.length - 1].ts)}</span>
           </div>
 
           {iSurvol !== null && g.coords[iSurvol] && (
             <div
-              className="pointer-events-none absolute top-0 -translate-x-1/2 rounded-lg border border-bordure bg-surface-creuse px-2 py-1 backdrop-blur-md"
+              className="pointer-events-none absolute top-0 -translate-x-1/2 rounded-carte border border-bordure bg-surface-creuse px-2 py-1 backdrop-blur-md"
               style={{ left: Math.min(Math.max(g.coords[iSurvol][0], 46), l - 46) }}
             >
               <p className="whitespace-nowrap text-center">
                 <span className="text-menu font-semibold text-texte">
                   {points[iSurvol].valeur}
                 </span>
-                <span className="ml-0.5 text-[0.6rem] text-texte-doux">{unite}</span>
+                <span className="ml-0.5 text-nano text-texte-doux">{unite}</span>
               </p>
-              <p className="text-center text-[0.6rem] text-texte-faible">
+              <p className="text-center text-nano text-texte-faible">
                 {heure(points[iSurvol].ts)}
               </p>
             </div>

@@ -107,7 +107,7 @@ export default function Systeme({ sante }: { sante: Sante | null }) {
               <span className="ml-auto text-micro tabular-nums text-texte-doux">{valeur}</span>
             </div>
             <Jauge part={part} />
-            <p className="mt-1 text-[0.6rem] tabular-nums text-texte-faible">{detail}</p>
+            <p className="mt-1 text-nano tabular-nums text-texte-faible">{detail}</p>
           </div>
         ))}
       </div>

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
 import { lireSante, type Sante } from './api'
+import { useSondage } from './useSondage'
 
 const RAFRAICHISSEMENT_MS = 10_000
 
@@ -15,20 +15,8 @@ const RAFRAICHISSEMENT_MS = 10_000
  *  affichage.
  */
 export function useSante() {
-  const [sante, setSante] = useState<Sante | null>(null)
-  const [joignable, setJoignable] = useState(true)
-
-  useEffect(() => {
-    let vivant = true
-    const relire = () =>
-      lireSante()
-        .then((s) => { if (vivant) { setSante(s); setJoignable(true) } })
-        .catch(() => { if (vivant) setJoignable(false) })
-
-    relire()
-    const t = setInterval(relire, RAFRAICHISSEMENT_MS)
-    return () => { vivant = false; clearInterval(t) }
-  }, [])
-
-  return { sante, joignable }
+  const { valeur, joignable } = useSondage<Sante | null>(
+    lireSante, RAFRAICHISSEMENT_MS, null,
+  )
+  return { sante: valeur, joignable }
 }

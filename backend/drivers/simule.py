@@ -42,7 +42,15 @@ def lire(capteur_id, params):
     else:
         raise ValueError(f"profil inconnu : {profil}")
 
-    return round(valeur + random.gauss(0, bruit), 2)
+    valeur += random.gauss(0, bruit)
+
+    # Le bruit ne doit pas produire l'impossible. On le borne au domaine
+    # declare au registre, quand le publisher nous l'a transmis.
+    echelle = params.get("echelle")
+    if echelle:
+        valeur = min(max(valeur, echelle["min"]), echelle["max"])
+
+    return round(valeur, 2)
 
 
 # Etat courant des sorties simulees, indexe par actionneur

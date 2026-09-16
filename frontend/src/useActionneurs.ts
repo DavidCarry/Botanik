@@ -2,8 +2,9 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { commander, lireActionneurs, type Actionneur } from './api'
 import { useFlux, type Pousse } from './useFlux'
 
-// Les verrous s'ecoulent a la seconde et ne sont pousses par personne :
-// il faut bien les relire. Le reste arrive par le flux.
+// Filet de securite : les etats arrivent par le flux, mais une attente
+// qui n'aboutit pas doit finir par etre declaree -- et le verrou pose par
+// une commande manuelle ne passe par aucun flux.
 const RAFRAICHISSEMENT_MS = 5000
 
 /** Au-dela, on cesse d'attendre la confirmation d'un actionneur. */

@@ -10,15 +10,12 @@ service d'inference, lui, se contente de relire les poids.
 import sys
 from datetime import datetime, timezone
 
-import numpy as np
-import psycopg
-
+import bdd
 import donnees
 import poids as magasin
 import reseau
 import seuils
 from decision import GRANDEURS
-from config import DB_URL
 
 # Dix jugements se partagent la meme couche cachee. A quatorze neurones,
 # les frontieres etroites -- « trop de lumiere », qui ne couvre qu'un
@@ -37,6 +34,7 @@ SITUATIONS = [
     ("plein soleil", {"temperature_air": 30, "luminosite": 10000, "heure": 14,
                       "eclairement_jour": 7, "niveau_eau": 80}),
 ]
+
 
 
 def main():
@@ -96,7 +94,7 @@ def main():
         "historique": histo,
     }
     version = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
-    with psycopg.connect(DB_URL, autocommit=True) as conn:
+    with bdd.connexion() as conn:
         magasin.enregistrer(conn, p, meta, version)
     print(f"\nmodele enregistre en base : {magasin.NOM} version {version}")
 

@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
 import { lireAlertes, type Alerte } from './api'
+import { useSondage } from './useSondage'
 
 const RAFRAICHISSEMENT_MS = 5000
 
@@ -8,18 +8,5 @@ const RAFRAICHISSEMENT_MS = 5000
  *  Plus frequent que les seuils : une alerte est ce qu'on veut voir tout
  *  de suite, et la liste est courte. */
 export function useAlertes() {
-  const [liste, setListe] = useState<Alerte[]>([])
-
-  useEffect(() => {
-    let vivant = true
-    const relire = () =>
-      lireAlertes()
-        .then((a) => { if (vivant) setListe(a) })
-        .catch(() => undefined)
-    relire()
-    const t = setInterval(relire, RAFRAICHISSEMENT_MS)
-    return () => { vivant = false; clearInterval(t) }
-  }, [])
-
-  return liste
+  return useSondage<Alerte[]>(lireAlertes, RAFRAICHISSEMENT_MS, []).valeur
 }

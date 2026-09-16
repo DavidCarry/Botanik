@@ -27,7 +27,7 @@ export default function Bloc({ titre, actions, className, children }: Props) {
       {(titre || actions) && (
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-1.5 pb-2 pt-1">
           {titre && (
-            <h2 className="shrink-0 text-micro font-medium uppercase tracking-[0.14em] text-texte-faible">
+            <h2 className="shrink-0 text-micro font-medium uppercase tracking-etiquette text-texte-faible">
               {titre}
             </h2>
           )}

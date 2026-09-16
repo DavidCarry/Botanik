@@ -23,6 +23,7 @@ from pydantic import BaseModel
 import numpy as np
 
 import auth
+import bdd
 import bus
 import decision
 import donnees
@@ -33,7 +34,7 @@ import schema
 import seuils
 import systeme
 import verrous
-from config import DB_URL, INTERVALLE_S, TOPIC_COMMANDES
+from config import INTERVALLE_S, TOPIC_COMMANDES
 
 RACINE = Path(__file__).parent.parent
 DIST = RACINE / "frontend" / "dist"
@@ -70,10 +71,13 @@ DERNIERES = """
 """
 
 def base():
-    """Connexion courte. A cette echelle, ouvrir a la demande coute moins
-    cher a maintenir qu'un pool, et evite les connexions mortes."""
+    """La connexion de `bdd`, dont l'echec devient une reponse HTTP.
+
+    C'est la seule difference entre l'API et les services de fond : une
+    base injoignable n'est pas une faute du client, elle merite un 503
+    que le dashboard sait interpreter."""
     try:
-        return psycopg.connect(DB_URL, connect_timeout=5, autocommit=True)
+        return bdd.connexion()
     except psycopg.Error as e:
         raise HTTPException(503, f"base de donnees injoignable : {e}") from e
 
@@ -333,8 +337,6 @@ def modele():
         "version": version,
         "architecture": meta["architecture"],
         "parametres": int(sum(np.asarray(v).size for v in p.values())),
-        "entrees": meta["entrees"],
-        "sorties": meta["sorties"],
         "grandeurs": meta["grandeurs"],
         "exactitude_test": meta["metriques"]["exactitude_test"],
         "exactitude_complete": meta["metriques"].get("exactitude_complete"),
@@ -414,13 +416,20 @@ def deconnexion(reponse: Response, botanik_session: str | None = Cookie(default=
     return {"ok": True}
 
 
+def compte_ouvert(jeton: str | None) -> str | None:
+    """L'identifiant derriere un cookie de session, ou None.
+
+    Une seule porte d'entree : une verification ecrite deux fois est une
+    verification qu'on oubliera de corriger une fois."""
+    with base() as conn:
+        return auth.compte_de(conn, jeton)
+
+
 @app.get("/api/moi")
 def moi(botanik_session: str | None = Cookie(default=None)):
     """Qui est connecte. Le frontend s'en sert pour decider s'il affiche
     le pilotage -- la verification reelle se fait a chaque commande."""
-    with base() as conn:
-        identifiant = auth.compte_de(conn, botanik_session)
-    return {"identifiant": identifiant}
+    return {"identifiant": compte_ouvert(botanik_session)}
 
 
 @app.get("/api/actionneurs")
@@ -435,7 +444,9 @@ def actionneurs():
     `verrou_s` dit combien de temps le modele s'abstient encore apres
     une reprise en main. Il est calcule ici et dans le cerveau par le
     MEME module, a partir du meme journal : l'ecran ne peut donc pas
-    annoncer un verrou que le modele ignorerait.
+    annoncer un verrou que le modele ignorerait. Le dashboard ne
+    l'affiche pas encore -- c'est la seule information de cette reponse
+    qui attend son emplacement.
     """
     connus = bus.etats()
     try:
@@ -449,9 +460,6 @@ def actionneurs():
             "id": a["id"],
             "libelle": a["libelle"],
             "detail": a["detail"],
-            # "ia" ou "manuel" : l'ecran doit distinguer ce qui obeit au
-            # modele de ce qui n'obeit qu'a l'utilisateur.
-            "pilote": a.get("pilote", "manuel"),
             "valeur": connus.get(a["id"], {}).get("valeur"),
             "ts": connus.get(a["id"], {}).get("ts"),
             # Secondes pendant lesquelles le modele s'abstient, apres
@@ -482,8 +490,7 @@ def commander(
     manuelle -- et `commandes` reste le journal de ce qui a REELLEMENT
     transite, non de ce qu'on a souhaite.
     """
-    with base() as conn:
-        identifiant = auth.compte_de(conn, botanik_session)
+    identifiant = compte_ouvert(botanik_session)
     if not identifiant:
         raise HTTPException(401, "connexion requise")
 

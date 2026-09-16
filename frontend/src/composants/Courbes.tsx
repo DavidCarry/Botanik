@@ -46,6 +46,7 @@ export default function Courbes({ etat }: { etat: EtatCourbes }) {
       points={etat.points}
       unite={etat.capteur.unite}
       ideal={plage(etat.capteur, modele)}
+      echelle={etat.capteur.echelle}
     />
   )
 }
