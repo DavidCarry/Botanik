@@ -61,21 +61,16 @@ function Navigation({ vue, onVue }: { vue: Vue; onVue: (v: Vue) => void }) {
       aria-label="Vue affichée"
       // Centree dans la barre horizontale, simplement posee dans la
       // colonne : au grand format elle n'a plus rien a centrer.
-      // Centree dans les deux sens : au milieu de la barre horizontale,
-      // au milieu de la colonne. C'est la meme place, tournee d'un quart
-      // de tour.
-      className="absolute left-1/2 hidden -translate-x-1/2 items-center md:flex
-                 lg:static lg:my-auto lg:translate-x-0 lg:flex-col"
+      // Centree dans la barre, quelle que soit la largeur des groupes
+      // qui l'encadrent : d'ou le positionnement absolu.
+      className="absolute left-1/2 hidden -translate-x-1/2 items-center md:flex"
     >
-      <ol className="flex items-center lg:flex-col">
+      <ol className="flex items-center">
         {VUES.map((v, i) => {
           const Icone = v.icone
           return (
             <Fragment key={v.valeur}>
-              {/* Le rail bascule avec la barre : couche, puis debout. */}
-              {i > 0 && (
-                <span aria-hidden className="h-px w-7 bg-bordure lg:h-7 lg:w-px" />
-              )}
+              {i > 0 && <span aria-hidden className="h-px w-7 bg-bordure" />}
               <li>
                 <button
                   type="button"
@@ -101,12 +96,7 @@ function Navigation({ vue, onVue }: { vue: Vue; onVue: (v: Vue) => void }) {
   )
 }
 
-/** La barre de l'application.
- *
- *  Horizontale en haut jusqu'a la tablette, elle devient une COLONNE a
- *  gauche au grand format -- ou la place manque en hauteur et abonde en
- *  largeur. Un seul balisage pour les deux : ce sont les memes elements,
- *  poses dans l'autre sens.
+/** Barre fixe, en haut, a toutes les largeurs.
  *
  *  Le flou d'arriere-plan prend appui sur les lueurs du fond et sur ce
  *  qui defile dessous : c'est ce qui la fait lire comme une plaque de
@@ -139,14 +129,12 @@ export default function Bandeau({
   const IconeLiaison = etat.icone
 
   return (
-    <div className="fixed inset-x-0 top-0 z-30 px-4 sm:px-7
-                    lg:inset-x-auto lg:inset-y-0 lg:left-0 lg:w-[4.75rem]
-                    lg:px-0 lg:py-4">
+    <div className="fixed inset-x-0 top-0 z-30 px-4 sm:px-7">
       {/* Voile de flou degressif. Le masque eteint progressivement le
           `backdrop-filter` vers le bas : la barre ne se termine plus par
           une arete nette, elle se dissout dans la page. */}
       <div
-        className="pointer-events-none absolute inset-x-0 top-0 -mx-4 h-24 backdrop-blur-lg sm:-mx-7 lg:hidden"
+        className="pointer-events-none absolute inset-x-0 top-0 -mx-4 h-24 backdrop-blur-lg sm:-mx-7"
         style={{
           maskImage: 'linear-gradient(to bottom, #000 42%, transparent 100%)',
           WebkitMaskImage: 'linear-gradient(to bottom, #000 42%, transparent 100%)',
@@ -155,13 +143,11 @@ export default function Bandeau({
 
       <header className="panneau barre-soudee relative mx-auto flex max-w-[1600px]
                    items-center gap-3 rounded-b-bloc rounded-t-none
-                   px-3.5 py-2.5 sm:px-5 sm:py-3
-                   lg:h-full lg:w-full lg:max-w-none lg:flex-col lg:gap-4
-                   lg:rounded-l-none lg:rounded-r-bloc lg:px-0 lg:py-5">
+                   px-3.5 py-2.5 sm:px-5 sm:py-3">
         {/* La marque n'est pas du contenu a selectionner : curseur de
             pointage plutot que curseur de texte. */}
         <Logo taille={26} />
-        <span className="cursor-default select-none leading-tight lg:hidden">
+        <span className="cursor-default select-none leading-tight">
           <span className="block text-menu font-semibold tracking-tight text-texte">
             Botanik
           </span>
@@ -172,7 +158,7 @@ export default function Bandeau({
 
         <Navigation vue={vue} onVue={onVue} />
 
-        <span className={`ml-auto ${ENTRE_RONDS} lg:ml-0 lg:flex-col`}>
+        <span className={`ml-auto ${ENTRE_RONDS}`}>
           {/* L'heure sort des boutons : elle ne se clique pas, elle n'a
               donc rien a faire dans une forme cliquable. */}
           <span className="cursor-default select-none text-micro tabular-nums text-texte-faible">

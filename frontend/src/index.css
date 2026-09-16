@@ -140,20 +140,12 @@ input, textarea {
   -webkit-backdrop-filter: blur(22px) saturate(150%);
 }
 
-/* La barre est soudee au bord de l'ecran, et l'arete de ce cote-la
-   disparait : en haut tant qu'elle est horizontale, a gauche une fois
-   devenue colonne. Elle semble alors sortir du cadre plutot que d'y
-   flotter.
+/* La barre est soudee au bord superieur de l'ecran : son arete haute
+   disparait, et elle semble sortir du cadre plutot que d'y flotter.
 
    En CSS et non en classe utilitaire : `.panneau` pose un `border`
    raccourci, qu'aucune classe de meme specificite ne peut defaire. */
-@media (max-width: 1023.98px) {
-  .barre-soudee { border-top: none; }
-}
-
-@media (min-width: 1024px) {
-  .barre-soudee { border-left: none; }
-}
+.barre-soudee { border-top: none; }
 
 /* ------------------------------------------------------------------
    Sphere de verre.

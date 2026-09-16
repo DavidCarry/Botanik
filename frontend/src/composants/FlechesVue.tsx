@@ -21,8 +21,7 @@ const BASE =
  *  est deja connu une fois qu'on est alle voir.
  *
  *  Absente sur mobile : on y defile, et c'est InviteDefilement qui
- *  s'en charge. La fleche gauche s'ecarte au grand format pour laisser
- *  passer la colonne de navigation.
+ *  s'en charge.
  */
 export default function FlechesVue({ rang, total, onAller }: Props) {
   const fleche = (
@@ -50,7 +49,7 @@ export default function FlechesVue({ rang, total, onAller }: Props) {
 
   return (
     <>
-      {fleche(-1, LuChevronLeft, 'left-3 lg:left-[6.2rem]', 'Vue précédente', false)}
+      {fleche(-1, LuChevronLeft, 'left-3', 'Vue précédente', false)}
       {fleche(1, LuChevronRight, 'right-3', 'Vue suivante', true)}
     </>
   )

@@ -66,10 +66,8 @@ export default function App() {
           lateralement ; sur mobile elles s'empilent et defilent, et la
           navigation disparait -- le pouce fait deja le travail.
 
-          Le retrait suit la barre : sous elle tant qu'elle est en haut,
-          a cote d'elle une fois devenue colonne. */}
-      <div className="pt-[4.2rem] sm:pt-[4.6rem] md:h-dvh md:overflow-hidden
-                      lg:pl-[4.75rem] lg:pt-0">
+          Le retrait degage la barre, qui flotte au-dessus. */}
+      <div className="pt-[4.2rem] sm:pt-[4.6rem] md:h-dvh md:overflow-hidden">
         <div
           className="mx-auto flex max-w-[1600px] flex-col gap-9 sm:gap-11
                      md:h-full md:max-w-none md:flex-row md:gap-0
@@ -79,33 +77,31 @@ export default function App() {
             '--glissement': `${-rang * 100}%`,
           } as React.CSSProperties}
         >
-          {/* Vue 1 : tout ce qui vient de la serre elle-meme -- ce que
-              les sondes mesurent, ce que la camera voit, et la maquette
-              de l'installation. C'est l'etat des lieux ; l'analyse et le
-              pilotage se meritent d'un geste. */}
+          {/* Vue 1 : les mesures seules. C'est l'etat de la serre qu'on
+              vient voir en premier ; le reste se merite d'un geste. */}
+          <section className={`${CADRE} md:flex md:flex-col`}>
+            <Bloc titre="Mesures" className="md:min-h-0 md:flex-1">
+              <div className="h-[calc(100dvh-9.5rem)] md:h-full">
+                <Mesures />
+              </div>
+            </Bloc>
+            <InviteDefilement />
+          </section>
+
+          {/* Vue 2 : la serre elle-meme -- sa maquette et ce que la
+              camera en voit. */}
           <section className={CADRE}>
             <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
-                            md:grid-cols-[56fr_44fr] md:grid-rows-[1fr_auto] md:gap-x-6 md:gap-y-4 lg:gap-x-8 lg:gap-y-5">
-              <Bloc titre="Mesures" className="md:row-span-2">
-                <div className="h-[calc(100dvh-9.5rem)] md:h-full">
-                  <Mesures />
-                </div>
-              </Bloc>
-
-              {/* En colonne, l'invite se glisse juste apres les bulles :
-                  c'est la qu'on arrive, et c'est de la qu'on defile.
-                  Masquee au grand format, elle ne prend aucune cellule. */}
-              <InviteDefilement />
-
+                            md:grid-rows-[1fr_auto] md:gap-y-4 lg:gap-y-5">
               <Bloc titre="Maquette">
-                <div className="h-[clamp(260px,38dvh,460px)] md:h-full">
+                <div className="h-[clamp(260px,42dvh,520px)] md:h-full">
                   <Serre />
                 </div>
               </Bloc>
 
               {/* La camera se pose en vignette, alignee a droite sous la
                   maquette. Sans titre : son encadre la nomme deja, et un
-                  intitule au-dessus d'un carre de 180 px desequilibrerait
+                  intitule au-dessus d'un carre de 190 px desequilibrerait
                   la colonne. */}
               <div className="flex justify-end">
                 <Camera onAgrandir={() => setCameraOuverte(true)} />
@@ -113,7 +109,7 @@ export default function App() {
             </div>
           </section>
 
-          {/* Vue 2 : le tableau de bord, quatre blocs. */}
+          {/* Vue 3 : le tableau de bord, quatre blocs. */}
           <section className={CADRE}>
             <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
                             md:grid-cols-[58fr_42fr] md:grid-rows-2 md:gap-x-6 md:gap-y-4 lg:gap-x-8 lg:gap-y-5">
