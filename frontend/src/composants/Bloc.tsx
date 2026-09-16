@@ -5,6 +5,10 @@ type Props = {
   titre?: string
   /** Commandes du bloc, sur la meme ligne que le titre, a droite. */
   actions?: ReactNode
+  /** Placement du bloc dans la grille qui l'accueille. C'est le bloc qui
+   *  est la cellule : poser le placement sur son contenu n'aurait aucun
+   *  effet. */
+  className?: string
   children?: ReactNode
 }
 
@@ -15,9 +19,11 @@ type Props = {
  *  que la mise en colonne -- un en-tete qui garde sa hauteur, un corps
  *  qui prend le reste sans jamais deborder.
  */
-export default function Bloc({ titre, actions, children }: Props) {
+export default function Bloc({ titre, actions, className, children }: Props) {
   return (
-    <section className="relative flex min-h-0 flex-col overflow-hidden">
+    <section
+      className={`relative flex min-h-0 flex-col overflow-hidden${className ? ` ${className}` : ''}`}
+    >
       {(titre || actions) && (
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-1.5 pb-2 pt-1">
           {titre && (

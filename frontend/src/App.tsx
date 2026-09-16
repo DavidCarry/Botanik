@@ -3,6 +3,7 @@ import { LuCpu } from 'react-icons/lu'
 import Actionneurs from './composants/Actionneurs'
 import Bandeau, { type EtatLiaison } from './composants/Bandeau'
 import Bloc from './composants/Bloc'
+import Camera from './composants/Camera'
 import Connexion from './composants/Connexion'
 import Courbes, { EnTeteCourbes } from './composants/Courbes'
 import Evenements from './composants/Evenements'
@@ -12,6 +13,8 @@ import InviteDefilement from './composants/InviteDefilement'
 import Mesures from './composants/Mesures'
 import Modale from './composants/Modale'
 import Modele from './composants/Modele'
+import Projet from './composants/Projet'
+import Serre from './composants/Serre'
 import Systeme from './composants/Systeme'
 import { useAuth } from './useAuth'
 import { useCourbes } from './useCourbes'
@@ -63,7 +66,7 @@ export default function App() {
                      lg:[translate:var(--glissement)_0]
                      lg:transition-[translate] lg:duration-500 lg:ease-[var(--ease-doux)]"
           style={{
-            '--glissement': vue === 'mesures' ? '0' : '-100%',
+            '--glissement': `${-rang * 100}%`,
           } as React.CSSProperties}
         >
           {/* Vue 1 : les mesures seules. C'est l'etat de la serre qu'on
@@ -75,7 +78,32 @@ export default function App() {
             <InviteDefilement />
           </section>
 
-          {/* Vue 2 : le tableau de bord, quatre blocs. */}
+          {/* Vue 2 : la serre elle-meme -- sa maquette, sa camera, et ce
+              que le projet cherche a faire. */}
+          <section className={CADRE}>
+            <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
+                            lg:grid-cols-[46fr_54fr] lg:grid-rows-2 lg:gap-x-8 lg:gap-y-5">
+              <Bloc titre="Maquette" className="lg:row-span-2">
+                <div className="h-[clamp(260px,34dvh,420px)] lg:h-full">
+                  <Serre />
+                </div>
+              </Bloc>
+
+              <Bloc titre="Caméra">
+                <div className="h-[clamp(200px,28dvh,340px)] lg:h-full">
+                  <Camera />
+                </div>
+              </Bloc>
+
+              <Bloc titre="Le projet">
+                <div className="h-[clamp(240px,30dvh,340px)] lg:h-full">
+                  <Projet />
+                </div>
+              </Bloc>
+            </div>
+          </section>
+
+          {/* Vue 3 : le tableau de bord, quatre blocs. */}
           <section className={CADRE}>
             <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
                             lg:grid-cols-[58fr_42fr] lg:grid-rows-2 lg:gap-x-8 lg:gap-y-5">

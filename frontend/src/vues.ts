@@ -1,4 +1,4 @@
-import { LuGauge, LuLayoutDashboard } from 'react-icons/lu'
+import { LuGauge, LuLayoutDashboard, LuSprout } from 'react-icons/lu'
 import type { IconType } from 'react-icons'
 
 /** Les deux vues de l'application.
@@ -9,9 +9,10 @@ import type { IconType } from 'react-icons'
  *  Dans son propre fichier, et non dans le Bandeau : une constante
  *  exportee depuis un module de composant casse le rechargement a chaud.
  */
-export type Vue = 'mesures' | 'tableau'
+export type Vue = 'mesures' | 'serre' | 'tableau'
 
 export const VUES: { valeur: Vue; libelle: string; icone: IconType }[] = [
   { valeur: 'mesures', libelle: 'Mesures', icone: LuGauge },
+  { valeur: 'serre', libelle: 'La serre', icone: LuSprout },
   { valeur: 'tableau', libelle: 'Tableau de bord', icone: LuLayoutDashboard },
 ]
