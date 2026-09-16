@@ -6,9 +6,9 @@ import Bloc from './composants/Bloc'
 import Connexion from './composants/Connexion'
 import Courbes, { EnTeteCourbes } from './composants/Courbes'
 import Evenements from './composants/Evenements'
+import FlechesVue from './composants/FlechesVue'
 import Fond from './composants/Fond'
 import InviteDefilement from './composants/InviteDefilement'
-import InviteVue from './composants/InviteVue'
 import Mesures from './composants/Mesures'
 import Modale from './composants/Modale'
 import Modele from './composants/Modele'
@@ -34,7 +34,6 @@ export default function App() {
   // Tant qu'on n'a pas de reponse, on ne crie pas : la premiere lecture
   // est en vol, et un echec basculera l'etat en moins d'une seconde.
   const rang = VUES.findIndex((v) => v.valeur === vue)
-  const suivante = VUES[rang + 1]
 
   const liaison: EtatLiaison = !joignable
     ? 'hors_ligne'
@@ -104,9 +103,10 @@ export default function App() {
         </div>
       </div>
 
-      <InviteVue
-        visible={Boolean(suivante)}
-        onSuivant={() => suivante && setVue(suivante.valeur)}
+      <FlechesVue
+        rang={rang}
+        total={VUES.length}
+        onAller={(i) => setVue(VUES[i].valeur)}
       />
 
       {connexionOuverte && (

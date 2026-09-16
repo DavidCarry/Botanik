@@ -1,6 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { LuChevronLeft, LuChevronRight, LuLogIn, LuLogOut } from 'react-icons/lu'
-import type { IconType } from 'react-icons'
+import { LuLogIn, LuLogOut } from 'react-icons/lu'
 import type { Auth } from '../useAuth'
 import { VUES, type Vue } from '../vues'
 import Logo from './Logo'
@@ -19,57 +18,25 @@ const PASTILLE =
 
 /** Fil d'etapes : une pastille par vue, reliees par un trait.
  *
- *  Le trait se colore a mesure qu'on avance -- il indique la position
- *  dans la suite, ce qu'une rangee de boutons ne dit pas. Les chevrons
- *  de part et d'autre s'eteignent aux extremites plutot que de
- *  disparaitre : un bouton qui s'efface deplace tout le reste.
+ *  Le trait reste neutre en toutes circonstances -- c'est un rail, pas
+ *  une jauge de progression. Seule la pastille courante s'allume.
+ *
+ *  Le changement de vue se fait par les fleches posees aux bords de la
+ *  page, pas ici : la barre dit ou l'on est, la page sert a naviguer.
  */
 function Navigation({ vue, onVue }: { vue: Vue; onVue: (v: Vue) => void }) {
-  const rang = VUES.findIndex((v) => v.valeur === vue)
-
-  const fleche = (delta: number, Icone: IconType, etiquette: string) => {
-    const cible = VUES[rang + delta]
-    return (
-      <button
-        type="button"
-        onClick={() => cible && onVue(cible.valeur)}
-        disabled={!cible}
-        aria-label={etiquette}
-        className={[
-          'grid size-7 shrink-0 place-items-center rounded-pilule',
-          'transition-colors duration-200',
-          cible
-            ? 'text-texte-faible hover:bg-surface-haute hover:text-texte'
-            : 'cursor-not-allowed text-texte-faible/25',
-        ].join(' ')}
-      >
-        <Icone size={16} />
-      </button>
-    )
-  }
-
   return (
     <nav
       aria-label="Vue affichée"
-      className="pointer-events-none absolute left-1/2 hidden -translate-x-1/2 items-center gap-1.5 lg:flex"
+      className="absolute left-1/2 hidden -translate-x-1/2 items-center lg:flex"
     >
-      <span className="pointer-events-auto contents">
-        {fleche(-1, LuChevronLeft, 'Vue précédente')}
-
+      <span className="contents">
         <ol className="flex items-center">
           {VUES.map((v, i) => {
             const Icone = v.icone
-            const atteint = i <= rang
             return (
               <Fragment key={v.valeur}>
-                {i > 0 && (
-                  <span
-                    aria-hidden
-                    className={`h-px w-7 transition-colors duration-300 ${
-                      atteint ? 'bg-accent/60' : 'bg-bordure'
-                    }`}
-                  />
-                )}
+                {i > 0 && <span aria-hidden className="h-px w-7 bg-bordure" />}
                 <li>
                   <button
                     type="button"
@@ -91,8 +58,6 @@ function Navigation({ vue, onVue }: { vue: Vue; onVue: (v: Vue) => void }) {
             )
           })}
         </ol>
-
-        {fleche(1, LuChevronRight, 'Vue suivante')}
       </span>
     </nav>
   )
