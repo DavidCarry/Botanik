@@ -9,7 +9,7 @@ type Props = {
 
 const BASE =
   'fixed top-1/2 z-20 hidden size-11 -translate-y-1/2 place-items-center ' +
-  'rounded-pilule transition-colors duration-300 lg:grid'
+  'rounded-pilule transition-colors duration-300 md:grid'
 
 /** Les fleches de changement de vue, aux deux bords de la page.
  *
@@ -20,8 +20,9 @@ const BASE =
  *  la suite ; revenir en arriere n'a pas besoin d'etre suggere, le geste
  *  est deja connu une fois qu'on est alle voir.
  *
- *  Reservee au grand format : en colonne, on defile, et c'est
- *  InviteDefilement qui s'en charge.
+ *  Absente sur mobile : on y defile, et c'est InviteDefilement qui
+ *  s'en charge. La fleche gauche s'ecarte au grand format pour laisser
+ *  passer la colonne de navigation.
  */
 export default function FlechesVue({ rang, total, onAller }: Props) {
   const fleche = (
@@ -49,7 +50,7 @@ export default function FlechesVue({ rang, total, onAller }: Props) {
 
   return (
     <>
-      {fleche(-1, LuChevronLeft, 'left-3', 'Vue précédente', false)}
+      {fleche(-1, LuChevronLeft, 'left-3 lg:left-[6.2rem]', 'Vue précédente', false)}
       {fleche(1, LuChevronRight, 'right-3', 'Vue suivante', true)}
     </>
   )

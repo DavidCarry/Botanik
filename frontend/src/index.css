@@ -140,6 +140,16 @@ input, textarea {
   -webkit-backdrop-filter: blur(22px) saturate(150%);
 }
 
+/* La barre est soudee au bord de l'ecran tant qu'elle est horizontale :
+   pas d'arete superieure, elle sort du cadre. Devenue colonne laterale,
+   elle flotte et retrouve son contour complet.
+
+   En CSS et non en classe utilitaire : `.panneau` pose un `border`
+   raccourci, qu'aucune classe de meme specificite ne peut defaire. */
+@media (max-width: 1023.98px) {
+  .barre-soudee { border-top: none; }
+}
+
 /* ------------------------------------------------------------------
    Sphere de verre.
    Le volume ne vient pas d'une image mais de la superposition de trois

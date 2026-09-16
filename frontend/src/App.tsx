@@ -22,10 +22,10 @@ import { useCourbes } from './useCourbes'
 import { useSante } from './useSante'
 import { VUES, type Vue } from './vues'
 
-// Marges laterales et retrait sous la barre, identiques pour les deux
-// vues : elles doivent se superposer exactement pendant le glissement,
-// sinon le contenu semble sauter au changement de page.
-const CADRE = 'w-full shrink-0 px-4 sm:px-8 pb-5 sm:pb-7 lg:pt-[4.6rem] lg:h-full'
+// Marges identiques pour les deux vues : elles doivent se superposer
+// exactement pendant le glissement, sinon le contenu semble sauter au
+// changement de page.
+const CADRE = 'w-full shrink-0 px-4 pb-5 sm:px-8 sm:pb-7 md:h-full md:py-4 lg:py-5'
 
 export default function App() {
   const auth = useAuth()
@@ -49,7 +49,7 @@ export default function App() {
       : 'en_ligne'
 
   return (
-    <div className="min-h-dvh lg:h-dvh lg:overflow-hidden">
+    <div className="min-h-dvh md:h-dvh md:overflow-hidden">
       <Fond />
       <Bandeau
         auth={auth}
@@ -62,15 +62,19 @@ export default function App() {
         onSysteme={() => setSystemeOuvert(true)}
       />
 
-      {/* Deux vues, un seul balisage. Sur grand ecran elles glissent
-          lateralement ; en dessous elles s'empilent et defilent, et la
-          navigation disparait -- le pouce fait deja le travail. */}
-      <div className="pt-[4.2rem] sm:pt-[4.6rem] lg:h-dvh lg:overflow-hidden lg:pt-0">
+      {/* Deux vues, un seul balisage. Des la tablette elles glissent
+          lateralement ; sur mobile elles s'empilent et defilent, et la
+          navigation disparait -- le pouce fait deja le travail.
+
+          Le retrait suit la barre : sous elle tant qu'elle est en haut,
+          a cote d'elle une fois devenue colonne. */}
+      <div className="pt-[4.2rem] sm:pt-[4.6rem] md:h-dvh md:overflow-hidden
+                      lg:pl-[5.5rem] lg:pt-0">
         <div
           className="mx-auto flex max-w-[1600px] flex-col gap-9 sm:gap-11
-                     lg:h-full lg:max-w-none lg:flex-row lg:gap-0
-                     lg:[translate:var(--glissement)_0]
-                     lg:transition-[translate] lg:duration-500 lg:ease-[var(--ease-doux)]"
+                     md:h-full md:max-w-none md:flex-row md:gap-0
+                     md:[translate:var(--glissement)_0]
+                     md:transition-[translate] md:duration-500 md:ease-[var(--ease-doux)]"
           style={{
             '--glissement': `${-rang * 100}%`,
           } as React.CSSProperties}
@@ -81,9 +85,9 @@ export default function App() {
               pilotage se meritent d'un geste. */}
           <section className={CADRE}>
             <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
-                            lg:grid-cols-[56fr_44fr] lg:grid-rows-[1fr_auto] lg:gap-x-8 lg:gap-y-5">
-              <Bloc titre="Mesures" className="lg:row-span-2">
-                <div className="h-[calc(100dvh-9.5rem)] lg:h-full">
+                            md:grid-cols-[56fr_44fr] md:grid-rows-[1fr_auto] md:gap-x-6 md:gap-y-4 lg:gap-x-8 lg:gap-y-5">
+              <Bloc titre="Mesures" className="md:row-span-2">
+                <div className="h-[calc(100dvh-9.5rem)] md:h-full">
                   <Mesures />
                 </div>
               </Bloc>
@@ -94,7 +98,7 @@ export default function App() {
               <InviteDefilement />
 
               <Bloc titre="Maquette">
-                <div className="h-[clamp(260px,38dvh,460px)] lg:h-full">
+                <div className="h-[clamp(260px,38dvh,460px)] md:h-full">
                   <Serre />
                 </div>
               </Bloc>
@@ -112,9 +116,9 @@ export default function App() {
           {/* Vue 2 : le tableau de bord, quatre blocs. */}
           <section className={CADRE}>
             <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
-                            lg:grid-cols-[58fr_42fr] lg:grid-rows-2 lg:gap-x-8 lg:gap-y-5">
+                            md:grid-cols-[58fr_42fr] md:grid-rows-2 md:gap-x-6 md:gap-y-4 lg:gap-x-8 lg:gap-y-5">
               <Bloc actions={<EnTeteCourbes etat={courbes} />}>
-                <div className="h-[clamp(350px,52dvh,540px)] lg:h-full">
+                <div className="h-[clamp(350px,52dvh,540px)] md:h-full">
                   <Courbes etat={courbes} />
                 </div>
               </Bloc>
@@ -124,7 +128,7 @@ export default function App() {
               </Bloc>
 
               <Bloc titre="Journal">
-                <div className="h-[clamp(220px,30dvh,360px)] lg:h-full">
+                <div className="h-[clamp(220px,30dvh,360px)] md:h-full">
                   <Evenements />
                 </div>
               </Bloc>

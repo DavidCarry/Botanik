@@ -4,8 +4,8 @@ import { LuChevronDown } from 'react-icons/lu'
 /** Invite a faire defiler, sous les mesures.
  *
  *  Elle s'efface des le premier defilement : une fois le geste compris,
- *  l'indication devient du bruit. Reservee aux formats en colonne --
- *  sur grand ecran tout tient deja dans la page. */
+ *  l'indication devient du bruit. Reservee au mobile : des la tablette,
+ *  on passe d'une vue a l'autre lateralement. */
 export default function InviteDefilement() {
   const [visible, setVisible] = useState(true)
 
@@ -19,7 +19,7 @@ export default function InviteDefilement() {
     <div
       aria-hidden
       className={[
-        'pointer-events-none flex flex-col items-center gap-1 pb-1 transition-opacity duration-500 lg:hidden',
+        'pointer-events-none flex flex-col items-center gap-1 pb-1 transition-opacity duration-500 md:hidden',
         visible ? 'opacity-100' : 'opacity-0',
       ].join(' ')}
     >
