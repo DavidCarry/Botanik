@@ -20,7 +20,12 @@ import seuils
 from decision import GRANDEURS
 from config import DB_URL
 
-HYPERPARAMETRES = {"n_caches": 14, "taux": 1.5, "epoques": 8000, "graine": 0}
+# Dix jugements se partagent la meme couche cachee. A quatorze neurones,
+# les frontieres etroites -- « trop de lumiere », qui ne couvre qu'un
+# douzieme de l'echelle -- restaient molles : la probabilite franchissait
+# 0,5 de justesse, et le seuil devenait sensible au contexte. Vingt
+# neurones laissent de quoi les representer toutes.
+HYPERPARAMETRES = {"n_caches": 20, "taux": 1.5, "epoques": 14000, "graine": 0}
 
 # Conditions sous lesquelles on montre les seuils appris, pour verifier
 # d'un coup d'oeil qu'ils se deplacent comme ils le doivent.
@@ -37,7 +42,7 @@ SITUATIONS = [
 def main():
     essai = "--essai" in sys.argv
 
-    X, Y = donnees.generer(8000, graine=0)
+    X, Y = donnees.generer(9000, graine=0)
     Xa, Ya, Xt, Yt = donnees.separer(X, Y, part_test=0.2, graine=0)
     b = donnees.bornes()
     Na, Nt = donnees.normaliser(Xa, b), donnees.normaliser(Xt, b)

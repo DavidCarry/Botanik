@@ -122,19 +122,53 @@ def etiqueter(X: np.ndarray) -> np.ndarray:
     ]).astype(float)
 
 
-def generer(n: int = 8000, graine: int = 0) -> tuple[np.ndarray, np.ndarray]:
+def _bords(r, n: int, b: np.ndarray) -> np.ndarray:
+    """Un lot concentre au voisinage des bords d'echelle.
+
+    Sans lui, une frontiere posee tout au bord reste sous-apprise : la
+    zone « trop de lumiere » ne couvre que le douzieme de l'echelle, donc
+    2 % d'un tirage uniforme. Le reseau n'y voyait pas assez d'exemples
+    pour etre sur de lui -- sa probabilite atteignait peine 0,53 au bout
+    de l'echelle, et le seuil devenait illisible selon les conditions.
+
+    Chaque exemple de ce lot pousse UNE grandeur tiree au sort dans le
+    cinquieme haut ou bas de son echelle, les autres restant uniformes :
+    les deux cotes de chaque bascule sont ainsi peuples.
+    """
+    X = np.column_stack([r.uniform(b[i, 0], b[i, 1], n) for i in range(len(ENTREES))])
+
+    mesurees = len(ENTREES) - len(HORS_REGISTRE)
+    axe = r.integers(0, mesurees, n)
+    haut = r.random(n) < 0.5
+    part = r.random(n) * 0.2
+
+    for i in range(n):
+        j = axe[i]
+        mini, maxi = b[j]
+        etendue = maxi - mini
+        X[i, j] = maxi - part[i] * etendue if haut[i] else mini + part[i] * etendue
+    return X
+
+
+def generer(n: int = 9000, graine: int = 0) -> tuple[np.ndarray, np.ndarray]:
     """Tire des conditions plausibles et les etiquette.
 
-    Deux tiers suivent un cycle jour/nuit -- temperature et luminosite y
-    sont correlees, comme dans la realite et comme dans le simulateur.
-    Le dernier tiers est tire uniformement sur toute l'etendue : sans lui,
-    le reseau n'aurait jamais vu de canicule nocturne, et se comporterait
-    n'importe comment dans les coins ou on l'interrogera pour tracer ses
-    frontieres.
+    Trois lots, chacun pour une raison :
+
+    - la moitie suit un cycle jour/nuit, temperature et luminosite
+      correlees comme dans la realite et comme dans le simulateur ;
+    - un quart est tire uniformement sur toute l'etendue, sans quoi le
+      reseau n'aurait jamais vu de canicule nocturne et repondrait
+      n'importe quoi dans les coins ou on l'interroge pour tracer ses
+      frontieres ;
+    - un quart se presse contre les bords, pour que les bascules situees
+      en bout d'echelle soient apprises aussi fermement que les autres.
     """
     r = np.random.default_rng(graine)
-    n_cycle = int(n * 2 / 3)
-    n_uniforme = n - n_cycle
+    b = bornes()
+    n_cycle = n // 2
+    n_bords = n // 4
+    n_uniforme = n - n_cycle - n_bords
 
     heure_c = r.uniform(0, 24, n_cycle)
     cycle = np.sin((heure_c - 6) / 24 * 2 * np.pi)
@@ -147,27 +181,36 @@ def generer(n: int = 8000, graine: int = 0) -> tuple[np.ndarray, np.ndarray]:
         heure_c,
     ])
 
-    heure_u = r.uniform(0, 24, n_uniforme)
     uniforme = np.column_stack([
         r.uniform(0, 100, n_uniforme),
         r.uniform(10, 35, n_uniforme),
         r.uniform(0, 12000, n_uniforme),
         r.uniform(0, 100, n_uniforme),
         np.zeros(n_uniforme),
-        heure_u,
+        r.uniform(0, 24, n_uniforme),
     ])
 
-    X = np.vstack([reel, uniforme])
+    X = np.vstack([reel, uniforme, _bords(r, n_bords, b)])
 
     # Le cumul du jour ne peut pas depasser le temps ecoule depuis minuit :
     # tirer les deux independamment produirait des situations impossibles,
     # et le reseau apprendrait sur des exemples qui n'arrivent jamais.
-    heure = X[:, ENTREES.index("heure")]
-    X[:, ENTREES.index("eclairement_jour")] = r.uniform(0, 1, len(X)) * np.minimum(heure, 16.0)
+    i_cumul, i_heure = ENTREES.index("eclairement_jour"), ENTREES.index("heure")
+    heure = X[:, i_heure]
+    plafond = np.minimum(heure, 16.0)
+    X[:, i_cumul] = r.uniform(0, 1, len(X)) * plafond
+
+    # Un cinquieme des exemples se place autour de la cible quotidienne,
+    # la seule bascule qui compte pour la lumiere. Un tirage uniforme ne
+    # place presque personne entre 12 et 13 heures.
+    proche = (r.random(len(X)) < 0.2) & (plafond > CIBLE_LUMIERE_H)
+    X[proche, i_cumul] = np.clip(
+        CIBLE_LUMIERE_H + r.uniform(-2, 2.5, proche.sum()),
+        0, plafond[proche],
+    )
 
     # Les bornes physiques restent des bornes : une sonde ne renvoie pas
     # -3 % d'humidite.
-    b = bornes()
     X = np.clip(X, b[:, 0], b[:, 1])
 
     r.shuffle(X)
