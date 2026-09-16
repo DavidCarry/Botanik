@@ -1,5 +1,6 @@
 import type { Fenetre } from '../api'
 import { LIBELLE_PILULE } from '../libelles'
+import { plage, useModele } from '../useModele'
 import type { EtatCourbes } from '../useCourbes'
 import Graphique from './Graphique'
 import Pilules from './Pilules'
@@ -37,13 +38,14 @@ export function EnTeteCourbes({ etat }: { etat: EtatCourbes }) {
 }
 
 export default function Courbes({ etat }: { etat: EtatCourbes }) {
+  const modele = useModele()
   if (!etat.capteur) return null
 
   return (
     <Graphique
       points={etat.points}
       unite={etat.capteur.unite}
-      ideal={etat.capteur.ideal}
+      ideal={plage(etat.capteur, modele)}
     />
   )
 }

@@ -7,7 +7,7 @@ set -uo pipefail
 
 RACINE="$(cd "$(dirname "$0")" && pwd)"
 LOGS="$RACINE/logs"
-SERVICES='collecteur.py|publisher.py|actionneurs.py|main.py'
+SERVICES='collecteur.py|publisher.py|actionneurs.py|cerveau.py|main.py'
 
 arreter() {
   pkill -f "$SERVICES" 2>/dev/null || true
@@ -41,6 +41,7 @@ case "${1:-demarrer}" in
     sleep 2
     setsid nohup .venv/bin/python publisher.py > "$LOGS/publisher.log" 2>&1 < /dev/null &
     setsid nohup .venv/bin/python actionneurs.py > "$LOGS/actionneurs.log" 2>&1 < /dev/null &
+    setsid nohup .venv/bin/python cerveau.py > "$LOGS/cerveau.log" 2>&1 < /dev/null &
     setsid nohup .venv/bin/python main.py > "$LOGS/api.log" 2>&1 < /dev/null &
     sleep 3
 

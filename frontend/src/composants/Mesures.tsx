@@ -1,6 +1,7 @@
 import { formaterValeur } from '../format'
 import { LIBELLE_BILLE } from '../libelles'
 import { useMesures } from '../useMesures'
+import { plage, useModele } from '../useModele'
 import SphereLiquide from './SphereLiquide'
 
 /** Quatre billes en contact, sans le moindre recouvrement.
@@ -23,6 +24,7 @@ const part = (v: number, min: number, max: number) =>
 
 export default function Mesures() {
   const { capteurs, muets } = useMesures()
+  const modele = useModele()
 
   const cases = capteurs?.length ? capteurs.slice(0, 4) : [null, null, null, null]
 
@@ -38,7 +40,12 @@ export default function Mesures() {
           const { taille, cx, cy, retard } = GRAPPE[i]
           const m = c?.mesure
           const niveau = c && m ? part(m.valeur, c.echelle.min, c.echelle.max) : 0
-          const dedans = Boolean(c && m && m.valeur >= c.ideal.min && m.valeur <= c.ideal.max)
+          // La plage vient du reseau quand il en a appris une ; sinon du
+          // registre. Une seule bulle est concernee aujourd'hui, celle
+          // que le modele pilote.
+          const bornes = c ? plage(c, modele) : null
+          const dedans = Boolean(c && m && bornes
+            && m.valeur >= bornes.min && m.valeur <= bornes.max)
           const muet = Boolean(c && muets.has(c.id))
 
           return (
@@ -48,9 +55,9 @@ export default function Mesures() {
               valeur={m ? formaterValeur(m.valeur, c!.unite) : '—'}
               unite={m ? c!.unite : undefined}
               niveau={niveau}
-              ideal={c
-                ? { bas: part(c.ideal.min, c.echelle.min, c.echelle.max),
-                    haut: part(c.ideal.max, c.echelle.min, c.echelle.max) }
+              ideal={c && bornes
+                ? { bas: part(bornes.min, c.echelle.min, c.echelle.max),
+                    haut: part(bornes.max, c.echelle.min, c.echelle.max) }
                 : { bas: 0, haut: 0 }}
               dansLaPlage={dedans}
               muet={muet}

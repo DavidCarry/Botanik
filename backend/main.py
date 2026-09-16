@@ -20,9 +20,15 @@ from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+import numpy as np
+
 import auth
 import bus
+import donnees
+import poids as magasin
 import registre
+import reseau
+import seuils
 import systeme
 from config import DB_URL, INTERVALLE_S, TOPIC_COMMANDES
 
@@ -190,6 +196,66 @@ async def flux():
     )
 
 
+# Le modele est relu de temps en temps plutot qu'a chaque appel : 67
+# parametres ne coutent rien a garder, et un reentrainement prend effet
+# sans redemarrer l'API.
+RELECTURE_MODELE_S = 300
+_modele: dict = {"relu": 0.0}
+
+
+def modele_courant():
+    """Poids et metadonnees du modele, ou None si aucun n'est entraine."""
+    if time.time() - _modele["relu"] < RELECTURE_MODELE_S and "poids" in _modele:
+        return _modele.get("poids"), _modele.get("meta"), _modele.get("version")
+    try:
+        with base() as conn:
+            charge = magasin.charger(conn)
+    except HTTPException:
+        return None, None, None
+    _modele.update(relu=time.time())
+    if charge is None:
+        _modele.update(poids=None, meta=None, version=None)
+        return None, None, None
+    p, meta, version = charge
+    _modele.update(poids=p, meta=meta, version=version)
+    return p, meta, version
+
+
+@app.get("/api/modele")
+def modele():
+    """Le reseau entraine, et les seuils qu'il applique en ce moment.
+
+    Les seuils ne sont pas stockes : ils sont RELUS dans le reseau a
+    chaque appel, en balayant l'axe de l'humidite aux conditions du
+    moment. C'est pour cela qu'ils se deplacent quand il fait chaud ou
+    clair -- deux constantes dans un fichier ne sauraient pas le faire.
+    """
+    p, meta, version = modele_courant()
+    if p is None:
+        return {"entraine": False}
+
+    # Conditions actuelles, prises sur la derniere mesure archivee.
+    dernieres = {capteur: valeur for capteur, valeur, _, _ in interroger(DERNIERES)}
+    temperature = dernieres.get("temperature_air")
+    luminosite = dernieres.get("luminosite")
+    if temperature is None or luminosite is None:
+        return {"entraine": True, "version": version, "seuils": None}
+
+    b = np.array(meta["bornes"])
+    return {
+        "entraine": True,
+        "version": version,
+        "architecture": meta["architecture"],
+        "parametres": int(sum(np.asarray(v).size for v in p.values())),
+        "entrees": meta["entrees"],
+        "actions": meta["actions"],
+        "exactitude_test": meta["metriques"]["exactitude_test"],
+        "capteur": donnees.ENTREES[0],
+        "seuils": seuils.frontieres(p, b, temperature, luminosite),
+        "conditions": {"temperature_air": temperature, "luminosite": luminosite},
+    }
+
+
 @app.get("/api/sante")
 def sante():
     """Sante de la chaine d'archivage.
@@ -305,27 +371,20 @@ def commander(
     Reservee aux comptes connectes : masquer le bouton cote navigateur ne
     protege rien.
 
-    L'ordre compte. La commande part d'abord sur MQTT ; elle n'est ecrite
-    en base que si le broker l'a prise. `commandes` est ainsi le journal
-    de ce qui a REELLEMENT ete emis, et non de ce qu'on a souhaite -- une
-    distinction qui comptera le jour ou l'IA relira cet historique pour
-    apprendre l'effet de ses propres actions.
+    L'API ne fait qu'emettre : c'est le collecteur qui consigne, en
+    ecoutant le topic. Ainsi une commande du modele, qui ne passe jamais
+    par ici, se retrouve journalisee exactement comme une commande
+    manuelle -- et `commandes` reste le journal de ce qui a REELLEMENT
+    transite, non de ce qu'on a souhaite.
     """
     with base() as conn:
         identifiant = auth.compte_de(conn, botanik_session)
-        if not identifiant:
-            raise HTTPException(401, "connexion requise")
+    if not identifiant:
+        raise HTTPException(401, "connexion requise")
 
-        topic = f"{TOPIC_COMMANDES}/{corps.actionneur}"
-        if not bus.publier(topic, {"valeur": corps.valeur, "source": "manuel"}):
-            raise HTTPException(503, "broker MQTT injoignable")
-
-        with conn.cursor() as cur:
-            cur.execute(
-                "INSERT INTO commandes (actionneur, valeur, source) "
-                "VALUES (%s, %s, 'manuel')",
-                (corps.actionneur, corps.valeur),
-            )
+    topic = f"{TOPIC_COMMANDES}/{corps.actionneur}"
+    if not bus.publier(topic, {"valeur": corps.valeur, "source": "manuel"}):
+        raise HTTPException(503, "broker MQTT injoignable")
     return {"ok": True, "par": identifiant, "topic": topic}
 
 

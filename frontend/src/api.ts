@@ -53,6 +53,26 @@ export async function lireHistorique(
   return d.points
 }
 
+// ---------- Modèle ----------
+
+export type Modele = {
+  entraine: boolean
+  version?: string
+  architecture?: number[]
+  parametres?: number
+  entrees?: string[]
+  actions?: string[]
+  exactitude_test?: number
+  /** Le capteur dont le modèle fixe les seuils. */
+  capteur?: string
+  /** Relus dans le réseau aux conditions du moment, donc mobiles.
+   *  Null si le modèle ne bascule jamais — signe d'un modèle douteux. */
+  seuils?: { bas: number | null; haut: number | null } | null
+  conditions?: { temperature_air: number; luminosite: number }
+}
+
+export const lireModele = () => json<Modele>('/api/modele')
+
 // ---------- Santé de la chaîne ----------
 
 export type Sante = {
