@@ -1,20 +1,40 @@
 import { Fragment, useEffect, useState } from 'react'
-import { LuLogIn, LuLogOut, LuTriangleAlert } from 'react-icons/lu'
+import {
+  LuDatabase, LuTriangleAlert, LuUserRound, LuWifi, LuWifiOff,
+} from 'react-icons/lu'
+import type { IconType } from 'react-icons'
 import type { Auth } from '../useAuth'
 import { VUES, type Vue } from '../vues'
 import Logo from './Logo'
 
-/** Bandeau fixe. Le flou d'arriere-plan prend appui sur les lueurs du fond
- *  et sur ce qui defile dessous : c'est ce qui la fait lire comme une
- *  plaque de verre posee sur la page, et non comme un bandeau opaque. */
-/** Trois etats, et non deux : « l'API repond » ne veut pas dire « tout
- *  va bien ». Depuis que les bulles recoivent les mesures par le flux, un
+/** Trois etats, et non deux : « l'API repond » ne veut pas dire « tout va
+ *  bien ». Depuis que les bulles recoivent les mesures par le flux, un
  *  collecteur arrete laisse l'ecran vivant alors que plus rien n'est
- *  enregistre -- c'est l'etat degrade. */
+ *  enregistre -- c'est l'etat degrade.
+ *
+ *  Chaque etat a SON icone, et pas seulement sa couleur : un daltonien,
+ *  ou un ecran mal regle, doit pouvoir les distinguer. */
 export type EtatLiaison = 'en_ligne' | 'degrade' | 'hors_ligne'
 
-const PASTILLE =
-  'grid size-8 place-items-center rounded-pilule border transition-all duration-300'
+const LIAISON: Record<EtatLiaison, {
+  icone: IconType; couleur: string; libelle: string
+}> = {
+  en_ligne: { icone: LuWifi, couleur: 'var(--bon)', libelle: 'En ligne' },
+  degrade: { icone: LuDatabase, couleur: 'var(--attention)', libelle: 'Archivage arrêté' },
+  hors_ligne: { icone: LuWifiOff, couleur: 'var(--critique)', libelle: 'Hors ligne' },
+}
+
+/** La forme commune a TOUS les elements cliquables de la barre : les
+ *  pastilles de navigation comme les boutons de droite. Un seul rond,
+ *  une seule taille, une seule bordure -- c'est ce qui fait tenir la
+ *  barre ensemble plutot qu'une suite de formes voisines. */
+const ROND =
+  'grid size-8 shrink-0 place-items-center rounded-pilule border ' +
+  'transition-all duration-200'
+
+const ROND_NEUTRE =
+  'border-bordure bg-surface-creuse text-texte-faible ' +
+  'hover:border-bordure-forte hover:text-texte'
 
 /** Fil d'etapes : une pastille par vue, reliees par un trait.
  *
@@ -30,45 +50,40 @@ function Navigation({ vue, onVue }: { vue: Vue; onVue: (v: Vue) => void }) {
       aria-label="Vue affichée"
       className="absolute left-1/2 hidden -translate-x-1/2 items-center lg:flex"
     >
-      <span className="contents">
-        <ol className="flex items-center">
-          {VUES.map((v, i) => {
-            const Icone = v.icone
-            return (
-              <Fragment key={v.valeur}>
-                {i > 0 && <span aria-hidden className="h-px w-7 bg-bordure" />}
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => onVue(v.valeur)}
-                    aria-current={v.valeur === vue ? 'page' : undefined}
-                    title={v.libelle}
-                    className={[
-                      PASTILLE,
-                      v.valeur === vue
-                        ? 'border-accent/60 bg-accent-voile text-accent-vif'
-                        : 'border-bordure text-texte-faible hover:border-bordure-forte hover:text-texte-doux',
-                    ].join(' ')}
-                  >
-                    <Icone size={15} />
-                    <span className="sr-only">{v.libelle}</span>
-                  </button>
-                </li>
-              </Fragment>
-            )
-          })}
-        </ol>
-      </span>
+      <ol className="flex items-center">
+        {VUES.map((v, i) => {
+          const Icone = v.icone
+          return (
+            <Fragment key={v.valeur}>
+              {i > 0 && <span aria-hidden className="h-px w-7 bg-bordure" />}
+              <li>
+                <button
+                  type="button"
+                  onClick={() => onVue(v.valeur)}
+                  aria-current={v.valeur === vue ? 'page' : undefined}
+                  title={v.libelle}
+                  className={[
+                    ROND,
+                    v.valeur === vue
+                      ? 'border-accent/60 bg-accent-voile text-accent-vif'
+                      : ROND_NEUTRE,
+                  ].join(' ')}
+                >
+                  <Icone size={15} />
+                  <span className="sr-only">{v.libelle}</span>
+                </button>
+              </li>
+            </Fragment>
+          )
+        })}
+      </ol>
     </nav>
   )
 }
 
-const LIAISON: Record<EtatLiaison, { couleur: string; libelle: string }> = {
-  en_ligne: { couleur: 'var(--bon)', libelle: 'En ligne' },
-  degrade: { couleur: 'var(--attention)', libelle: 'Archivage arrêté' },
-  hors_ligne: { couleur: 'var(--critique)', libelle: 'Hors ligne' },
-}
-
+/** Barre fixe. Le flou d'arriere-plan prend appui sur les lueurs du fond
+ *  et sur ce qui defile dessous : c'est ce qui la fait lire comme une
+ *  plaque de verre posee sur la page, et non comme un bandeau opaque. */
 export default function Bandeau({
   auth, onConnexion, onSysteme, onAlertes, liaison, alertes, vue, onVue,
 }: {
@@ -82,7 +97,6 @@ export default function Bandeau({
   vue: Vue
   onVue: (v: Vue) => void
 }) {
-  const { couleur, libelle } = LIAISON[liaison]
   const [heure, setHeure] = useState(() =>
     new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
 
@@ -93,6 +107,9 @@ export default function Bandeau({
     )
     return () => clearInterval(t)
   }, [])
+
+  const etat = LIAISON[liaison]
+  const IconeLiaison = etat.icone
 
   return (
     <div className="fixed inset-x-0 top-0 z-30 px-4 sm:px-7">
@@ -124,89 +141,71 @@ export default function Bandeau({
 
         <Navigation vue={vue} onVue={onVue} />
 
-        <span className="ml-auto flex items-center gap-2 sm:gap-3">
-          {/* Toujours present, meme sans probleme : un bouton qui
-              apparait et disparait deplace tout le reste, et on ne sait
-              plus ou regarder. */}
+        <span className="ml-auto flex items-center gap-2 sm:gap-2.5">
+          {/* L'heure sort des boutons : elle ne se clique pas, elle n'a
+              donc rien a faire dans une forme cliquable. */}
+          <span className="cursor-default select-none text-micro tabular-nums text-texte-faible">
+            {heure}
+          </span>
+
           <button
             type="button"
             onClick={onAlertes}
             aria-label={alertes > 0 ? `${alertes} alerte(s) en cours` : 'Aucune alerte'}
             className={[
-              'relative grid size-8 shrink-0 place-items-center rounded-pilule',
-              'border transition-all duration-200',
+              ROND,
               alertes > 0
-                ? 'border-critique/40 bg-critique/10 text-critique hover:bg-critique/20'
-                : 'border-bordure bg-surface-creuse text-texte-faible hover:border-bordure-forte hover:text-texte',
+                ? 'border-critique/45 bg-critique/12 text-critique hover:bg-critique/20'
+                : ROND_NEUTRE,
             ].join(' ')}
           >
-            <LuTriangleAlert size={14} />
-            {alertes > 0 && (
-              // Halo et point au meme centre, dans une grille : aucun des
-              // deux n'est dans le flux de l'autre.
-              <span className="absolute -right-0.5 -top-0.5 grid size-2.5 place-items-center">
-                <span
-                  className="col-start-1 row-start-1 size-2.5 animate-ping rounded-pilule opacity-75"
-                  style={{ background: 'var(--critique)' }}
-                />
-                <span
-                  className="col-start-1 row-start-1 size-2 rounded-pilule"
-                  style={{ background: 'var(--critique)' }}
-                />
+            {/* Le compte remplace l'icone quand il y a des alertes, comme
+                l'initiale remplace la silhouette du compte. L'etat ne
+                tient donc pas qu'a la couleur : un ecran mal regle, ou un
+                oeil qui la distingue mal, lit quand meme le nombre. */}
+            {alertes > 0 ? (
+              <span className="text-micro font-semibold leading-none tabular-nums">
+                {alertes}
               </span>
+            ) : (
+              <LuTriangleAlert size={14} />
             )}
           </button>
 
-          {/* Etat de la liaison : une pastille et un mot, jamais la
-              couleur seule. Le bouton ouvre l'etat de la machine. */}
           <button
             type="button"
             onClick={onSysteme}
-            aria-label="État de la machine"
-            className="flex items-center gap-1.5 rounded-pilule border border-bordure bg-surface-creuse px-2.5 py-1.5 transition-all duration-200 hover:border-bordure-forte hover:bg-surface-haute"
+            aria-label={`${etat.libelle} — état de la machine`}
+            title={etat.libelle}
+            className={`${ROND} border-bordure bg-surface-creuse hover:border-bordure-forte`}
+            style={{ color: etat.couleur }}
           >
-            {/* Halo et point superposes au meme centre par une grille :
-                aucun des deux n'est dans le flux de l'autre. Le halo ne
-                bat que si la liaison tient -- une pastille rouge qui pulse
-                ressemble a une alarme, alors qu'elle ne fait que
-                constater une absence. */}
-            <span className="relative grid size-2 shrink-0 place-items-center">
-              {liaison === 'en_ligne' && (
-                <span
-                  className="col-start-1 row-start-1 size-2 animate-ping rounded-pilule opacity-75"
-                  style={{ background: couleur }}
-                />
-              )}
-              <span
-                className="col-start-1 row-start-1 size-1.5 rounded-pilule"
-                style={{ background: couleur }}
-              />
-            </span>
-            <span className="hidden text-micro text-texte-doux sm:inline">
-              {libelle}
-            </span>
-            <span className="ml-1 text-micro tabular-nums text-texte-faible">{heure}</span>
+            <IconeLiaison size={14} />
           </button>
 
-          {auth.compte ? (
-            <button
-              type="button"
-              onClick={auth.deconnexion}
-              className="flex items-center gap-1.5 rounded-pilule border border-accent/35 bg-accent-voile px-2.5 py-1.5 text-micro font-medium text-accent-vif transition-all duration-200 hover:border-accent/60 hover:bg-accent/20"
-            >
-              <LuLogOut size={13} />
-              <span className="hidden sm:inline">{auth.compte}</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={onConnexion}
-              className="flex items-center gap-1.5 rounded-pilule border border-bordure bg-surface-creuse px-2.5 py-1.5 text-micro font-medium text-texte-doux transition-all duration-200 hover:border-bordure-forte hover:bg-surface-haute hover:text-texte"
-            >
-              <LuLogIn size={13} />
-              <span className="hidden sm:inline">Connexion</span>
-            </button>
-          )}
+          {/* Connecte : l'initiale du compte. Sinon : une silhouette.
+              Le meme rond dans les deux cas, pour que la barre ne change
+              pas de geometrie a la connexion. */}
+          <button
+            type="button"
+            onClick={auth.compte ? auth.deconnexion : onConnexion}
+            aria-label={auth.compte ? `Déconnecter ${auth.compte}` : 'Se connecter'}
+            title={auth.compte ?? 'Se connecter'}
+            className={[
+              ROND,
+              auth.compte
+                ? 'border-accent/45 bg-accent-voile text-accent-vif hover:border-accent/70 hover:bg-accent/20'
+                : ROND_NEUTRE,
+            ].join(' ')}
+          >
+            {auth.compte ? (
+              <span className="text-micro font-semibold uppercase leading-none">
+                {auth.compte[0]}
+              </span>
+            ) : (
+              <LuUserRound size={14} />
+            )}
+          </button>
         </span>
       </header>
     </div>
