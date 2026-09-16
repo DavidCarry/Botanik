@@ -39,7 +39,6 @@
   --accent:          var(--p-vert-400);
   --accent-vif:      var(--p-vert-300);
   --accent-voile:    rgba(74, 222, 128, 0.14);
-  --critique-voile:  rgba(244, 63, 94, 0.14);
 
   --bon:             var(--p-vert-400);
   --attention:       var(--p-ambre-400);
@@ -81,7 +80,6 @@
   --color-accent:         var(--accent);
   --color-accent-vif:     var(--accent-vif);
   --color-accent-voile:   var(--accent-voile);
-  --color-critique-voile: var(--critique-voile);
   --color-bon:            var(--bon);
   --color-attention:      var(--attention);
   --color-critique:       var(--critique);

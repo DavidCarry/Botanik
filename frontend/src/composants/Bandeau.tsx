@@ -39,9 +39,13 @@ const ICONE = 15
 /** Et un seul rythme d'espacement entre les ronds. */
 const ENTRE_RONDS = 'flex items-center gap-2.5'
 
-const ROND_NEUTRE =
-  'border-bordure bg-surface-creuse text-texte-faible ' +
-  'hover:border-bordure-forte hover:text-texte'
+/** Le fond et le contour des ronds ne bougent JAMAIS : seul ce qu'ils
+ *  contiennent change de couleur. Un cercle qui se remplit attire l'oeil
+ *  autant qu'une alarme, et la barre se mettrait a clignoter de partout
+ *  des qu'un etat change. */
+const ROND_FOND = 'border-bordure bg-surface-creuse hover:border-bordure-forte'
+
+const ROND_NEUTRE = `${ROND_FOND} text-texte-faible hover:text-texte`
 
 /** Fil d'etapes : une pastille par vue, reliees par un trait.
  *
@@ -69,12 +73,12 @@ function Navigation({ vue, onVue }: { vue: Vue; onVue: (v: Vue) => void }) {
                   onClick={() => onVue(v.valeur)}
                   aria-current={v.valeur === vue ? 'page' : undefined}
                   title={v.libelle}
-                  className={[
-                    ROND,
-                    v.valeur === vue
-                      ? 'border-accent/60 bg-accent-voile text-accent-vif'
-                      : ROND_NEUTRE,
-                  ].join(' ')}
+                  className={`${ROND} ${v.valeur === vue ? ROND_FOND : ROND_NEUTRE}`}
+                  // Meme traitement que les boutons de droite : le cercle
+                  // ne se remplit jamais, seule l'icone prend la couleur.
+                  // Les six ronds de la barre sont alors strictement
+                  // identiques, et rien n'attire l'oeil sans raison.
+                  style={v.valeur === vue ? { color: 'var(--bon)' } : undefined}
                 >
                   <Icone size={ICONE} />
                   <span className="sr-only">{v.libelle}</span>
@@ -159,24 +163,10 @@ export default function Bandeau({
             type="button"
             onClick={onAlertes}
             aria-label={alertes > 0 ? `${alertes} alerte(s) en cours` : 'Aucune alerte'}
-            className={[
-              ROND,
-              alertes > 0
-                ? 'border-critique/45 bg-critique-voile text-critique hover:bg-critique/20'
-                : ROND_NEUTRE,
-            ].join(' ')}
+            className={`${ROND} ${alertes > 0 ? ROND_FOND : ROND_NEUTRE}`}
+            style={alertes > 0 ? { color: 'var(--critique)' } : undefined}
           >
-            {/* Le compte remplace l'icone quand il y a des alertes, comme
-                l'initiale remplace la silhouette du compte. L'etat ne
-                tient donc pas qu'a la couleur : un ecran mal regle, ou un
-                oeil qui la distingue mal, lit quand meme le nombre. */}
-            {alertes > 0 ? (
-              <span className="text-micro font-semibold leading-none tabular-nums">
-                {alertes}
-              </span>
-            ) : (
-              <LuTriangleAlert size={ICONE} />
-            )}
+            <LuTriangleAlert size={ICONE} />
           </button>
 
           <button
@@ -198,12 +188,11 @@ export default function Bandeau({
             onClick={auth.compte ? auth.deconnexion : onConnexion}
             aria-label={auth.compte ? `Déconnecter ${auth.compte}` : 'Se connecter'}
             title={auth.compte ?? 'Se connecter'}
-            className={[
-              ROND,
-              auth.compte
-                ? 'border-accent/45 bg-accent-voile text-accent-vif hover:border-accent/70 hover:bg-accent/20'
-                : ROND_NEUTRE,
-            ].join(' ')}
+            className={`${ROND} ${auth.compte ? ROND_FOND : ROND_NEUTRE}`}
+            // Le meme vert que le wifi en ligne, et non l'accent du
+            // projet : plus clair, ce dernier virait au blanc a la taille
+            // d'une initiale.
+            style={auth.compte ? { color: 'var(--bon)' } : undefined}
           >
             {auth.compte ? (
               <span className="text-micro font-semibold uppercase leading-none">
