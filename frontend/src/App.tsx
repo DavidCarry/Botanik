@@ -4,7 +4,7 @@ import Actionneurs from './composants/Actionneurs'
 import Alertes from './composants/Alertes'
 import Bandeau, { type EtatLiaison } from './composants/Bandeau'
 import Bloc from './composants/Bloc'
-import Camera from './composants/Camera'
+import Camera, { CameraPleine } from './composants/Camera'
 import Connexion from './composants/Connexion'
 import Courbes, { EnTeteCourbes } from './composants/Courbes'
 import Evenements from './composants/Evenements'
@@ -14,7 +14,6 @@ import InviteDefilement from './composants/InviteDefilement'
 import Mesures from './composants/Mesures'
 import Modale from './composants/Modale'
 import Modele from './composants/Modele'
-import Projet from './composants/Projet'
 import Serre from './composants/Serre'
 import Systeme from './composants/Systeme'
 import { useAuth } from './useAuth'
@@ -37,6 +36,7 @@ export default function App() {
   const [connexionOuverte, setConnexionOuverte] = useState(false)
   const [systemeOuvert, setSystemeOuvert] = useState(false)
   const [alertesOuvertes, setAlertesOuvertes] = useState(false)
+  const [cameraOuverte, setCameraOuverte] = useState(false)
 
   // Tant qu'on n'a pas de reponse, on ne crie pas : la premiere lecture
   // est en vol, et un echec basculera l'etat en moins d'une seconde.
@@ -75,41 +75,41 @@ export default function App() {
             '--glissement': `${-rang * 100}%`,
           } as React.CSSProperties}
         >
-          {/* Vue 1 : les mesures seules. C'est l'etat de la serre qu'on
-              vient voir en premier ; le reste se merite d'un geste. */}
-          <section className={`${CADRE} lg:flex lg:flex-col`}>
-            <div className="mx-auto h-[calc(100dvh-7.5rem)] w-full max-w-[1600px] lg:h-auto lg:min-h-0 lg:flex-1">
-              <Mesures />
-            </div>
-            <InviteDefilement />
-          </section>
-
-          {/* Vue 2 : la serre elle-meme -- sa maquette, sa camera, et ce
-              que le projet cherche a faire. */}
+          {/* Vue 1 : tout ce qui vient de la serre elle-meme -- ce que
+              les sondes mesurent, ce que la camera voit, et la maquette
+              de l'installation. C'est l'etat des lieux ; l'analyse et le
+              pilotage se meritent d'un geste. */}
           <section className={CADRE}>
             <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
-                            lg:grid-cols-[46fr_54fr] lg:grid-rows-2 lg:gap-x-8 lg:gap-y-5">
-              <Bloc titre="Maquette" className="lg:row-span-2">
-                <div className="h-[clamp(260px,34dvh,420px)] lg:h-full">
+                            lg:grid-cols-[56fr_44fr] lg:grid-rows-[1fr_auto] lg:gap-x-8 lg:gap-y-5">
+              <Bloc titre="Mesures" className="lg:row-span-2">
+                <div className="h-[calc(100dvh-9.5rem)] lg:h-full">
+                  <Mesures />
+                </div>
+              </Bloc>
+
+              {/* En colonne, l'invite se glisse juste apres les bulles :
+                  c'est la qu'on arrive, et c'est de la qu'on defile.
+                  Masquee au grand format, elle ne prend aucune cellule. */}
+              <InviteDefilement />
+
+              <Bloc titre="Maquette">
+                <div className="h-[clamp(260px,38dvh,460px)] lg:h-full">
                   <Serre />
                 </div>
               </Bloc>
 
-              <Bloc titre="Caméra">
-                <div className="h-[clamp(200px,28dvh,340px)] lg:h-full">
-                  <Camera />
-                </div>
-              </Bloc>
-
-              <Bloc titre="Le projet">
-                <div className="h-[clamp(240px,30dvh,340px)] lg:h-full">
-                  <Projet />
-                </div>
-              </Bloc>
+              {/* La camera se pose en vignette, alignee a droite sous la
+                  maquette. Sans titre : son encadre la nomme deja, et un
+                  intitule au-dessus d'un carre de 180 px desequilibrerait
+                  la colonne. */}
+              <div className="flex justify-end">
+                <Camera onAgrandir={() => setCameraOuverte(true)} />
+              </div>
             </div>
           </section>
 
-          {/* Vue 3 : le tableau de bord, quatre blocs. */}
+          {/* Vue 2 : le tableau de bord, quatre blocs. */}
           <section className={CADRE}>
             <div className="mx-auto grid h-full max-w-[1600px] gap-9 sm:gap-11
                             lg:grid-cols-[58fr_42fr] lg:grid-rows-2 lg:gap-x-8 lg:gap-y-5">
@@ -142,6 +142,8 @@ export default function App() {
         total={VUES.length}
         onAller={(i) => setVue(VUES[i].valeur)}
       />
+
+      {cameraOuverte && <CameraPleine onFermer={() => setCameraOuverte(false)} />}
 
       {alertesOuvertes && (
         <Modale

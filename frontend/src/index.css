@@ -255,8 +255,14 @@ input, textarea {
    ══════════════════════════════════════════════════════════════════ */
 .serre {
   /* Toutes les cotes derivent de cette unite, qui suit la taille du bloc
-     -- la maquette remplit sa cellule sans reglage par palier. */
-  --u: clamp(15px, 5.2cqmin, 42px);
+     -- la maquette remplit sa cellule sans reglage par palier.
+
+     Deux contraintes, et la plus serree gagne. En hauteur : la caisse
+     fait 6 unites, le couvercle releve en ajoute pres de 6. En largeur :
+     la scene tourne de pres de 30 degres, ce qui etale sa projection
+     bien au-dela des 13 unites de la caisse -- pres de 16. Un
+     coefficient calcule sur la caisse seule la faisait deborder. */
+  --u: clamp(14px, min(7.5cqh, 5.5cqw), 44px);
   --tilt: 38deg;
   perspective: 1000px;
   perspective-origin: 50% 40%;
