@@ -53,6 +53,19 @@ export async function lireHistorique(
   return d.points
 }
 
+// ---------- Journal ----------
+
+export type Evenement = {
+  ts: string
+  actionneur: string
+  valeur: number
+  /** Qui a décidé : la main, le modèle, ou le garde-fou. */
+  source: 'manuel' | 'ia' | 'securite'
+}
+
+export const lireEvenements = (limite = 40) =>
+  json<Evenement[]>(`/api/evenements?limite=${limite}`)
+
 // ---------- Modèle ----------
 
 export type Modele = {

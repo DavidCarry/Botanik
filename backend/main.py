@@ -221,6 +221,28 @@ def modele_courant():
     return p, meta, version
 
 
+@app.get("/api/evenements")
+def evenements(limite: int = 40):
+    """Journal des commandes, de la plus recente a la plus ancienne.
+
+    `source` dit qui a decide : la main de l'utilisateur, le modele, ou le
+    garde-fou de securite. C'est la seule trace qui permette de relire
+    apres coup ce qu'a fait le reseau -- et de le distinguer de ce qu'on a
+    fait soi-meme.
+    """
+    limite = max(1, min(limite, 200))
+    lignes = interroger(
+        "SELECT ts, actionneur, valeur, source FROM commandes "
+        "ORDER BY ts DESC LIMIT %s",
+        (limite,),
+    )
+    return [
+        {"ts": ts.isoformat(), "actionneur": actionneur,
+         "valeur": float(valeur), "source": source}
+        for ts, actionneur, valeur, source in lignes
+    ]
+
+
 @app.get("/api/modele")
 def modele():
     """Le reseau entraine, et les seuils qu'il applique en ce moment.

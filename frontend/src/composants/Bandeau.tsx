@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { LuLogIn, LuLogOut } from 'react-icons/lu'
 import type { Auth } from '../useAuth'
 import Logo from './Logo'
+import Pilules from './Pilules'
 
 /** Bandeau fixe. Le flou d'arriere-plan prend appui sur les lueurs du fond
  *  et sur ce qui defile dessous : c'est ce qui la fait lire comme une
@@ -12,6 +13,15 @@ import Logo from './Logo'
  *  enregistre -- c'est l'etat degrade. */
 export type EtatLiaison = 'en_ligne' | 'degrade' | 'hors_ligne'
 
+/** Les deux vues. En dessous du grand format elles s'empilent et
+ *  defilent : la navigation n'a alors plus d'objet et disparait. */
+export type Vue = 'mesures' | 'tableau'
+
+const VUES: { valeur: Vue; libelle: string }[] = [
+  { valeur: 'mesures', libelle: 'Mesures' },
+  { valeur: 'tableau', libelle: 'Tableau de bord' },
+]
+
 const LIAISON: Record<EtatLiaison, { couleur: string; libelle: string }> = {
   en_ligne: { couleur: 'var(--bon)', libelle: 'En ligne' },
   degrade: { couleur: 'var(--attention)', libelle: 'Archivage arrêté' },
@@ -19,12 +29,14 @@ const LIAISON: Record<EtatLiaison, { couleur: string; libelle: string }> = {
 }
 
 export default function Bandeau({
-  auth, onConnexion, onSysteme, liaison,
+  auth, onConnexion, onSysteme, liaison, vue, onVue,
 }: {
   auth: Auth
   onConnexion: () => void
   onSysteme: () => void
   liaison: EtatLiaison
+  vue: Vue
+  onVue: (v: Vue) => void
 }) {
   const { couleur, libelle } = LIAISON[liaison]
   const [heure, setHeure] = useState(() =>
@@ -65,6 +77,11 @@ export default function Bandeau({
             Serre connectée
           </span>
         </span>
+
+        <div className="ml-5 hidden lg:block">
+          <Pilules etiquette="Vue affichée" options={VUES}
+                   choisi={vue} onChange={onVue} />
+        </div>
 
         <span className="ml-auto flex items-center gap-2 sm:gap-3">
           {/* Etat de la liaison : une pastille et un mot, jamais la
