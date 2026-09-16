@@ -47,6 +47,46 @@ class Commande(NamedTuple):
     source: str      # "ia" ou "securite"
 
 
+# Ce qui merite d'alerter, et sous quel nom.
+#
+# Tous les jugements n'en sont pas. « Luminosite trop basse » est vrai
+# chaque nuit, « reserve pleine » est une bonne nouvelle, et « pas encore
+# assez de lumiere aujourd'hui » est l'etat normal d'une matinee. En
+# faire des alertes noierait les vraies sous le bruit, et plus personne
+# ne regarderait le voyant.
+#
+# `humaine` distingue ce que la serre ne peut PAS corriger seule : il
+# faut alors quelqu'un. C'est ce qui justifie le bipeur.
+ALERTES: dict[tuple[str, str], dict] = {
+    ("humidite_sol_a", "bas"): {"libelle": "Sol trop sec", "humaine": False},
+    ("humidite_sol_a", "haut"): {"libelle": "Sol détrempé", "humaine": False},
+    ("temperature_air", "bas"): {"libelle": "Trop froid", "humaine": True},
+    ("temperature_air", "haut"): {"libelle": "Trop chaud", "humaine": True},
+    ("luminosite", "haut"): {"libelle": "Lumière excessive", "humaine": True},
+    ("niveau_eau", "bas"): {"libelle": "Réserve d'eau basse", "humaine": True},
+    ("eclairement_jour", "haut"): {"libelle": "Trop de lumière aujourd'hui",
+                                   "humaine": False},
+}
+
+
+def alertes(jugements: dict[str, Jugement]) -> dict[str, str | None]:
+    """Pour chaque grandeur, le cote en alerte, ou None si tout va bien.
+
+    Une seule alerte par grandeur : elle ne peut pas etre trop basse et
+    trop haute a la fois. Le cote suffit donc a la designer.
+    """
+    ouvertes: dict[str, str | None] = {}
+    for grandeur in GRANDEURS:
+        j = jugements.get(grandeur, Jugement(False, False))
+        cote = None
+        if j.bas and (grandeur, "bas") in ALERTES:
+            cote = "bas"
+        elif j.haut and (grandeur, "haut") in ALERTES:
+            cote = "haut"
+        ouvertes[grandeur] = cote
+    return ouvertes
+
+
 def decider(jugements: dict[str, Jugement],
             mesures: dict[str, float]) -> dict[str, Commande]:
     """Les etats voulus pour chaque actionneur pilote par le modele.

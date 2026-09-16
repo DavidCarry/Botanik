@@ -105,6 +105,11 @@ export default function Graphique({ points, unite, ideal }: Props) {
   const rAire = useRef<SVGPathElement>(null)
   const rSeuilHaut = useRef<SVGLineElement>(null)
   const rSeuilBas = useRef<SVGLineElement>(null)
+  const rZoneHaute = useRef<SVGRectElement>(null)
+  const rZoneBasse = useRef<SVGRectElement>(null)
+  const rHorsHaut = useRef<SVGRectElement>(null)
+  const rHorsBas = useRef<SVGRectElement>(null)
+  const rLigneHors = useRef<SVGPathElement>(null)
   const rPoint = useRef<SVGCircleElement>(null)
   const rLegende = useRef<HTMLDivElement>(null)
 
@@ -147,6 +152,17 @@ export default function Graphique({ points, unite, ideal }: Props) {
       rSeuilHaut.current?.setAttribute('y2', String(g.yIdealMax))
       rSeuilBas.current?.setAttribute('y1', String(g.yIdealMin))
       rSeuilBas.current?.setAttribute('y2', String(g.yIdealMin))
+      rLigneHors.current?.setAttribute('d', g.ligne)
+
+      // Les zones interdites et le decoupage qui colore la courbe suivent
+      // les memes bornes : une seule verite, deux usages.
+      for (const r of [rZoneHaute.current, rHorsHaut.current]) {
+        r?.setAttribute('height', String(Math.max(g.yIdealMax - MARGE.haut, 0)))
+      }
+      for (const r of [rZoneBasse.current, rHorsBas.current]) {
+        r?.setAttribute('y', String(g.yIdealMin))
+        r?.setAttribute('height', String(Math.max(h - MARGE.bas - g.yIdealMin, 0)))
+      }
 
       const fin = g.coords[g.coords.length - 1]
       rPoint.current?.setAttribute('cx', String(fin[0]))
@@ -229,22 +245,59 @@ export default function Graphique({ points, unite, ideal }: Props) {
                   <feMergeNode in="SourceGraphic" />
                 </feMerge>
               </filter>
+
+              {/* Tout ce qui sort de la plage. La courbe y est redessinee
+                  en couleur d'alerte, decoupee a ces deux bandes : on voit
+                  d'un coup d'oeil QUAND la mesure a derive, pas seulement
+                  qu'elle a derive. */}
+              <clipPath id="hors-plage">
+                <rect ref={rHorsHaut} x={MARGE.gauche} y={MARGE.haut}
+                      width={l - MARGE.gauche - MARGE.droite}
+                      height={Math.max(g.yIdealMax - MARGE.haut, 0)} />
+                <rect ref={rHorsBas} x={MARGE.gauche} y={g.yIdealMin}
+                      width={l - MARGE.gauche - MARGE.droite}
+                      height={Math.max(h - MARGE.bas - g.yIdealMin, 0)} />
+              </clipPath>
             </defs>
+
+            {/* Un voile tres leger sur les zones interdites : il situe la
+                plage favorable sans concurrencer la courbe. */}
+            <rect ref={rZoneHaute} x={MARGE.gauche} y={MARGE.haut}
+                  width={l - MARGE.gauche - MARGE.droite}
+                  height={Math.max(g.yIdealMax - MARGE.haut, 0)}
+                  fill="var(--attention)" opacity="0.055" />
+            <rect ref={rZoneBasse} x={MARGE.gauche} y={g.yIdealMin}
+                  width={l - MARGE.gauche - MARGE.droite}
+                  height={Math.max(h - MARGE.bas - g.yIdealMin, 0)}
+                  fill="var(--attention)" opacity="0.055" />
 
             {/* Plage favorable : deux seuils en pointille. Une bande
                 pleine colorait tout l'arriere-plan et concurrencait la
                 courbe. */}
             <line ref={rSeuilHaut}
               x1={MARGE.gauche} x2={l - MARGE.droite} y1={g.yIdealMax} y2={g.yIdealMax}
-              stroke="var(--accent)" strokeOpacity="0.35" strokeWidth="1" strokeDasharray="3 4" />
+              stroke="var(--accent-vif)" strokeOpacity="0.75" strokeWidth="1.25"
+              strokeDasharray="5 4" />
             <line ref={rSeuilBas}
               x1={MARGE.gauche} x2={l - MARGE.droite} y1={g.yIdealMin} y2={g.yIdealMin}
-              stroke="var(--accent)" strokeOpacity="0.35" strokeWidth="1" strokeDasharray="3 4" />
+              stroke="var(--accent-vif)" strokeOpacity="0.75" strokeWidth="1.25"
+              strokeDasharray="5 4" />
 
             <path ref={rAire} d={g.aire} fill="url(#sous-courbe)" />
             <path
               ref={rLigne} d={g.ligne} fill="none"
               stroke="var(--accent-vif)" strokeWidth="2"
+              strokeLinecap="round" strokeLinejoin="round" filter="url(#neon)"
+            />
+
+            {/* La meme courbe, en alerte, mais visible seulement hors
+                plage. Deux traces superposes plutot qu'un chemin decoupe
+                en segments : le decoupage suit exactement les seuils,
+                meme au milieu d'un pas. */}
+            <path
+              ref={rLigneHors} d={g.ligne} fill="none"
+              clipPath="url(#hors-plage)"
+              stroke="var(--attention)" strokeWidth="2.25"
               strokeLinecap="round" strokeLinejoin="round" filter="url(#neon)"
             />
 

@@ -30,7 +30,9 @@ import poids as magasin
 import registre
 import reseau
 import service
-from config import DB_URL, TOPIC_COMMANDES, TOPIC_ETAT, TOPIC_MESURES
+from config import (
+    DB_URL, TOPIC_ALERTES, TOPIC_COMMANDES, TOPIC_ETAT, TOPIC_MESURES,
+)
 
 # Cadence de decision. L'humidite d'un sol ne change pas en cinq secondes ;
 # decider plus souvent ne ferait qu'agiter les actionneurs.
@@ -68,6 +70,10 @@ class Cerveau:
         self.bornes = None
         self.version = None
         self.voulu: dict[str, decision.Commande] = {}
+        # Dernier cote publie pour chaque grandeur, afin de n'emettre que
+        # les changements. Vide au depart : la premiere decision publie
+        # donc l'etat de toutes, ce qui donne au journal une base saine.
+        self.alertes: dict[str, str | None] = {}
         self.prochaine_decision = 0.0
         self.prochaine_relecture = 0.0
         self.fin_impulsion = None
@@ -164,7 +170,35 @@ class Cerveau:
 
     # ---- boucle ----
 
-    def decider(self):
+    def annoncer_alertes(self, client, jugements, contexte):
+        """Publie ce qui ne va pas, et seulement quand cela change.
+
+        Message retenu : un service qui se connecte ensuite connait
+        immediatement les alertes en cours, sans avoir a interroger qui
+        que ce soit.
+
+        Une alerte reste ouverte meme quand la serre est en train d'y
+        remedier -- la pompe tourne, mais le sol est encore trop sec.
+        C'est precisement ce qu'on veut voir a l'ecran : le probleme, et
+        le fait qu'il soit pris en charge.
+        """
+        for grandeur, cote in decision.alertes(jugements).items():
+            if self.alertes.get(grandeur, "?") == cote:
+                continue
+            charge = {
+                "cote": cote,
+                "valeur": contexte.get(grandeur),
+                "ts": datetime.now(timezone.utc).isoformat(),
+            }
+            client.publish(f"{TOPIC_ALERTES}/{grandeur}", json.dumps(charge),
+                           qos=1, retain=True)
+            self.alertes[grandeur] = cote
+            if cote:
+                print(f"alerte {grandeur} {cote}", flush=True)
+            else:
+                print(f"alerte {grandeur} levee", flush=True)
+
+    def decider(self, client):
         """Met a jour les etats voulus. N'actionne rien : c'est `tour` qui
         traduit ces etats en impulsions et en salves."""
         if self.poids is None:
@@ -184,6 +218,7 @@ class Cerveau:
         }
 
         self.voulu = decision.decider(jugements, contexte)
+        self.annoncer_alertes(client, jugements, contexte)
         self.plainte = None
 
     def tour(self, client):
@@ -194,7 +229,7 @@ class Cerveau:
             self.prochaine_relecture = maintenant + RELECTURE_MODELE_S
 
         if maintenant >= self.prochaine_decision:
-            self.decider()
+            self.decider(client)
             self.prochaine_decision = maintenant + DECISION_S
 
         if not self.voulu:

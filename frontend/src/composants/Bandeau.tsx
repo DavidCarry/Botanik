@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react'
-import { LuLogIn, LuLogOut } from 'react-icons/lu'
+import { LuLogIn, LuLogOut, LuTriangleAlert } from 'react-icons/lu'
 import type { Auth } from '../useAuth'
 import { VUES, type Vue } from '../vues'
 import Logo from './Logo'
@@ -70,12 +70,15 @@ const LIAISON: Record<EtatLiaison, { couleur: string; libelle: string }> = {
 }
 
 export default function Bandeau({
-  auth, onConnexion, onSysteme, liaison, vue, onVue,
+  auth, onConnexion, onSysteme, onAlertes, liaison, alertes, vue, onVue,
 }: {
   auth: Auth
   onConnexion: () => void
   onSysteme: () => void
+  onAlertes: () => void
   liaison: EtatLiaison
+  /** Nombre de problemes en cours. */
+  alertes: number
   vue: Vue
   onVue: (v: Vue) => void
 }) {
@@ -122,6 +125,38 @@ export default function Bandeau({
         <Navigation vue={vue} onVue={onVue} />
 
         <span className="ml-auto flex items-center gap-2 sm:gap-3">
+          {/* Toujours present, meme sans probleme : un bouton qui
+              apparait et disparait deplace tout le reste, et on ne sait
+              plus ou regarder. */}
+          <button
+            type="button"
+            onClick={onAlertes}
+            aria-label={alertes > 0 ? `${alertes} alerte(s) en cours` : 'Aucune alerte'}
+            className={[
+              'relative grid size-8 shrink-0 place-items-center rounded-pilule',
+              'border transition-all duration-200',
+              alertes > 0
+                ? 'border-critique/40 bg-critique/10 text-critique hover:bg-critique/20'
+                : 'border-bordure bg-surface-creuse text-texte-faible hover:border-bordure-forte hover:text-texte',
+            ].join(' ')}
+          >
+            <LuTriangleAlert size={14} />
+            {alertes > 0 && (
+              // Halo et point au meme centre, dans une grille : aucun des
+              // deux n'est dans le flux de l'autre.
+              <span className="absolute -right-0.5 -top-0.5 grid size-2.5 place-items-center">
+                <span
+                  className="col-start-1 row-start-1 size-2.5 animate-ping rounded-pilule opacity-75"
+                  style={{ background: 'var(--critique)' }}
+                />
+                <span
+                  className="col-start-1 row-start-1 size-2 rounded-pilule"
+                  style={{ background: 'var(--critique)' }}
+                />
+              </span>
+            )}
+          </button>
+
           {/* Etat de la liaison : une pastille et un mot, jamais la
               couleur seule. Le bouton ouvre l'etat de la machine. */}
           <button

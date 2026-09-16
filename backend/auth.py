@@ -15,23 +15,6 @@ from datetime import datetime, timedelta, timezone
 
 DUREE_SESSION = timedelta(days=7)
 
-SCHEMA = """
-CREATE TABLE IF NOT EXISTS utilisateurs (
-    id          BIGSERIAL PRIMARY KEY,
-    identifiant TEXT UNIQUE NOT NULL,
-    empreinte   TEXT        NOT NULL,
-    cree_le     TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-CREATE TABLE IF NOT EXISTS sessions (
-    jeton     TEXT PRIMARY KEY,
-    compte_id BIGINT      NOT NULL REFERENCES utilisateurs(id) ON DELETE CASCADE,
-    expire_le TIMESTAMPTZ NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_sessions_expire ON sessions (expire_le);
-"""
-
 
 def hacher(mot_de_passe: str, sel: bytes | None = None) -> str:
     sel = sel or secrets.token_bytes(16)
@@ -49,14 +32,14 @@ def verifier(mot_de_passe: str, empreinte: str) -> bool:
     return hmac.compare_digest(hacher(mot_de_passe, bytes.fromhex(sel_hex)), empreinte)
 
 
-def preparer(conn):
-    """Cree le schema si besoin, et un compte initial s'il n'y en a aucun.
+def compte_initial(conn):
+    """Cree un compte s'il n'y en a aucun.
 
     Renvoie le mot de passe genere quand un compte vient d'etre cree, afin
-    qu'il soit affiche une fois au demarrage -- sinon None.
+    qu'il soit affiche une fois au demarrage -- sinon None. Les tables,
+    elles, sont creees par schema.py.
     """
     with conn.cursor() as cur:
-        cur.execute(SCHEMA)
         cur.execute("SELECT count(*) FROM utilisateurs")
         if cur.fetchone()[0] > 0:
             return None

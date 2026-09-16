@@ -55,13 +55,40 @@ export async function lireHistorique(
 
 // ---------- Journal ----------
 
-export type Evenement = {
-  ts: string
-  actionneur: string
-  valeur: number
-  /** Qui a décidé : la main, le modèle, ou le garde-fou. */
-  source: 'manuel' | 'ia' | 'securite'
+/** Un problème en cours. Il reste ouvert même pendant que la serre y
+ *  remédie — la pompe tourne, mais le sol est encore trop sec.
+ *  `humaine` marque ce que la serre ne peut pas corriger seule. */
+export type Alerte = {
+  grandeur: string
+  cote: 'bas' | 'haut'
+  depuis: string
+  libelle: string
+  humaine: boolean
 }
+
+export const lireAlertes = () => json<Alerte[]>('/api/alertes')
+
+/** Le journal mêle les deux : sans cela, la causalité disparaîtrait
+ *  entre « sol trop sec détecté » et « arrosage activé ». */
+export type Evenement =
+  | {
+      genre: 'commande'
+      ts: string
+      sujet: string
+      valeur: number
+      /** Qui a décidé : la main, le modèle, ou le garde-fou. */
+      source: 'manuel' | 'ia' | 'securite'
+    }
+  | {
+      genre: 'alerte'
+      ts: string
+      sujet: string
+      cote: 'bas' | 'haut'
+      /** Vrai à la détection, faux à la levée. */
+      ouverture: boolean
+      libelle: string
+      humaine: boolean
+    }
 
 export const lireEvenements = (limite = 40) =>
   json<Evenement[]>(`/api/evenements?limite=${limite}`)

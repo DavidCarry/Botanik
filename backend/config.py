@@ -56,6 +56,8 @@ INTERVALLE_S = float(os.getenv("INTERVALLE_S", "5"))
 #   mesures/<capteur>      ce que la serre observe
 #   commandes/<actionneur> ce qu'on lui demande
 #   etat/<actionneur>      ce qu'elle fait vraiment
+#   alertes/<grandeur>     ce qui ne va pas, et depuis quand
 TOPIC_MESURES = "botanik/mesures"
 TOPIC_COMMANDES = "botanik/commandes"
 TOPIC_ETAT = "botanik/etat"
+TOPIC_ALERTES = "botanik/alertes"

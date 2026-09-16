@@ -24,10 +24,12 @@ import numpy as np
 
 import auth
 import bus
+import decision
 import donnees
 import eclairement
 import poids as magasin
 import registre
+import schema
 import seuils
 import systeme
 from config import DB_URL, INTERVALLE_S, TOPIC_COMMANDES
@@ -97,7 +99,8 @@ async def cycle_de_vie(app: FastAPI):
     jamais sur une base deja en place."""
     try:
         with base() as conn:
-            neuf = auth.preparer(conn)
+            schema.preparer(conn)
+            neuf = auth.compte_initial(conn)
         if neuf:
             identifiant, mdp = neuf
             print(
@@ -221,26 +224,77 @@ def modele_courant():
     return p, meta, version
 
 
-@app.get("/api/evenements")
-def evenements(limite: int = 40):
-    """Journal des commandes, de la plus recente a la plus ancienne.
+def _nom_alerte(grandeur: str, cote: str) -> dict:
+    """Libelle et gravite d'une alerte, depuis les regles du domaine."""
+    return decision.ALERTES.get((grandeur, cote),
+                                {"libelle": f"{grandeur} {cote}", "humaine": False})
 
-    `source` dit qui a decide : la main de l'utilisateur, le modele, ou le
-    garde-fou de securite. C'est la seule trace qui permette de relire
-    apres coup ce qu'a fait le reseau -- et de le distinguer de ce qu'on a
-    fait soi-meme.
+
+@app.get("/api/alertes")
+def alertes():
+    """Ce qui ne va pas en ce moment.
+
+    Une alerte reste ouverte tant que le probleme dure, meme si la serre
+    est deja en train d'y remedier : la pompe tourne, mais le sol est
+    encore trop sec. C'est bien ce qu'on veut voir -- le probleme, et le
+    fait qu'il soit pris en charge.
     """
-    limite = max(1, min(limite, 200))
     lignes = interroger(
-        "SELECT ts, actionneur, valeur, source FROM commandes "
-        "ORDER BY ts DESC LIMIT %s",
-        (limite,),
+        "SELECT grandeur, cote, debut FROM alertes WHERE fin IS NULL "
+        "ORDER BY debut"
     )
     return [
-        {"ts": ts.isoformat(), "actionneur": actionneur,
-         "valeur": float(valeur), "source": source}
-        for ts, actionneur, valeur, source in lignes
+        {"grandeur": grandeur, "cote": cote, "depuis": debut.isoformat(),
+         **_nom_alerte(grandeur, cote)}
+        for grandeur, cote, debut in lignes
     ]
+
+
+@app.get("/api/evenements")
+def evenements(limite: int = 40):
+    """Journal melant les commandes et les alertes, du plus recent au plus
+    ancien.
+
+    Les deux dans le meme flux, parce qu'ils se lisent ensemble : « sol
+    trop sec detecte », puis « arrosage active », puis « sol trop sec
+    leve ». Separes en deux listes, la causalite disparaitrait.
+
+    `source` dit qui a decide d'une commande : la main de l'utilisateur,
+    le modele, ou le garde-fou de securite.
+    """
+    limite = max(1, min(limite, 200))
+
+    commandes = [
+        {"genre": "commande", "ts": ts.isoformat(), "sujet": actionneur,
+         "valeur": float(valeur), "source": source}
+        for ts, actionneur, valeur, source in interroger(
+            "SELECT ts, actionneur, valeur, source FROM commandes "
+            "ORDER BY ts DESC LIMIT %s", (limite,))
+    ]
+
+    # Chaque episode donne deux evenements : son ouverture, et sa cloture
+    # quand elle a eu lieu. UNION plutot que deux requetes : la limite
+    # doit s'appliquer au melange, pas a chaque source.
+    alertes_brutes = interroger(
+        """
+        SELECT ts, grandeur, cote, ouverture FROM (
+            SELECT debut AS ts, grandeur, cote, true  AS ouverture FROM alertes
+            UNION ALL
+            SELECT fin   AS ts, grandeur, cote, false AS ouverture FROM alertes
+            WHERE fin IS NOT NULL
+        ) t ORDER BY ts DESC LIMIT %s
+        """,
+        (limite,),
+    )
+    evenements_alertes = [
+        {"genre": "alerte", "ts": ts.isoformat(), "sujet": grandeur,
+         "cote": cote, "ouverture": ouverture, **_nom_alerte(grandeur, cote)}
+        for ts, grandeur, cote, ouverture in alertes_brutes
+    ]
+
+    tout = commandes + evenements_alertes
+    tout.sort(key=lambda e: e["ts"], reverse=True)
+    return tout[:limite]
 
 
 @app.get("/api/modele")

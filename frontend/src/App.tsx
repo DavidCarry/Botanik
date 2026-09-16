@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { LuCpu } from 'react-icons/lu'
+import { LuCpu, LuTriangleAlert } from 'react-icons/lu'
 import Actionneurs from './composants/Actionneurs'
+import Alertes from './composants/Alertes'
 import Bandeau, { type EtatLiaison } from './composants/Bandeau'
 import Bloc from './composants/Bloc'
 import Camera from './composants/Camera'
@@ -17,6 +18,7 @@ import Projet from './composants/Projet'
 import Serre from './composants/Serre'
 import Systeme from './composants/Systeme'
 import { useAuth } from './useAuth'
+import { useAlertes } from './useAlertes'
 import { useCourbes } from './useCourbes'
 import { useSante } from './useSante'
 import { VUES, type Vue } from './vues'
@@ -30,9 +32,11 @@ export default function App() {
   const auth = useAuth()
   const courbes = useCourbes()
   const { sante, joignable } = useSante()
+  const alertes = useAlertes()
   const [vue, setVue] = useState<Vue>('mesures')
   const [connexionOuverte, setConnexionOuverte] = useState(false)
   const [systemeOuvert, setSystemeOuvert] = useState(false)
+  const [alertesOuvertes, setAlertesOuvertes] = useState(false)
 
   // Tant qu'on n'a pas de reponse, on ne crie pas : la premiere lecture
   // est en vol, et un echec basculera l'etat en moins d'une seconde.
@@ -50,6 +54,8 @@ export default function App() {
       <Bandeau
         auth={auth}
         liaison={liaison}
+        alertes={alertes.length}
+        onAlertes={() => setAlertesOuvertes(true)}
         vue={vue}
         onVue={setVue}
         onConnexion={() => setConnexionOuverte(true)}
@@ -136,6 +142,21 @@ export default function App() {
         total={VUES.length}
         onAller={(i) => setVue(VUES[i].valeur)}
       />
+
+      {alertesOuvertes && (
+        <Modale
+          titre="Alertes"
+          sousTitre={
+            alertes.length > 0
+              ? `${alertes.length} problème${alertes.length > 1 ? 's' : ''} en cours`
+              : 'Tout est dans les clous'
+          }
+          icone={<LuTriangleAlert size={16} />}
+          onFermer={() => setAlertesOuvertes(false)}
+        >
+          <Alertes liste={alertes} />
+        </Modale>
+      )}
 
       {connexionOuverte && (
         <Connexion auth={auth} onFermer={() => setConnexionOuverte(false)} />
