@@ -11,7 +11,9 @@ const ICONES: Record<string, IconType> = {
   lumiere: LuSun,
   ventilation: LuFan,
   bipeur: LuBellRing,
-  leds: LuLightbulb,
+  led_rouge: LuLightbulb,
+  led_jaune: LuLightbulb,
+  led_verte: LuLightbulb,
   ecran: LuMonitor,
 }
 
@@ -20,7 +22,9 @@ const NOMS: Record<string, string> = {
   lumiere: 'Éclairage',
   ventilation: 'Ventilation',
   bipeur: 'Alerte sonore',
-  leds: 'Bandeau lumineux',
+  led_rouge: 'LED rouge',
+  led_jaune: 'LED jaune',
+  led_verte: 'LED verte',
   ecran: 'Écran',
 }
 

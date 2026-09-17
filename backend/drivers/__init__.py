@@ -10,7 +10,7 @@ table correspondante ; ni les services ni le reste de la chaine n'ont a
 changer. Un meme module peut figurer dans les deux, comme `simule`.
 """
 
-from . import mcp3004, simule
+from . import gpio, mcp3004, simule
 
 DRIVERS = {
     "simule": simule,
@@ -21,6 +21,7 @@ DRIVERS = {
 
 SORTIES = {
     "simule": simule,
-    # a venir, quand la carte de relais sera montee :
-    # "gpio": gpio,         une broche par actionneur
+    # Tout ce qui s'allume : LED, buzzer, et les relais le jour ou la
+    # pompe et la ventilation seront cablees.
+    "gpio": gpio,
 }

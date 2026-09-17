@@ -23,6 +23,9 @@ actionneurs:
     detail: 20 mL par impulsion
     actif: true
     pilote: ia
+    # Rien de cable a ce jour : garde en simulation pour qu'un
+    # ordre ne parte pas sur une broche occupee par autre chose.
+    simuler: true
     reel: {driver: gpio, broche: 23}
     simule: {}
 
@@ -31,6 +34,9 @@ actionneurs:
     detail: Assèche l'air ambiant
     actif: true
     pilote: ia
+    # Rien de cable a ce jour : garde en simulation pour qu'un
+    # ordre ne parte pas sur une broche occupee par autre chose.
+    simuler: true
     reel: {driver: gpio, broche: 25}
     simule: {}
 
@@ -39,6 +45,9 @@ actionneurs:
     detail: LED horticole, budget quotidien
     actif: true
     pilote: ia
+    # Rien de cable a ce jour : garde en simulation pour qu'un
+    # ordre ne parte pas sur une broche occupee par autre chose.
+    simuler: true
     reel: {driver: gpio, broche: 24}
     simule: {}
 
@@ -47,17 +56,36 @@ actionneurs:
     detail: Réserve d'eau à remplir
     actif: true
     pilote: ia
-    reel: {driver: gpio, broche: 18}
+    reel: {driver: gpio, broche: 24}
     simule: {}
 
   # ---- pilotables depuis l'interface, pas encore par le modele ----
 
-  - id: leds
-    libelle: Bandeau lumineux
-    detail: Trois LED d'état
+  # Trois LED distinctes plutot qu'un « bandeau » : elles sont cablees
+  # separement, elles se commandent separement, et l'ecran doit montrer
+  # laquelle est allumee. Les regrouper aurait cache l'information.
+  - id: led_rouge
+    libelle: LED rouge
+    detail: Témoin d'alerte
     actif: true
     pilote: manuel
-    reel: {driver: gpio, broche: 12}
+    reel: {driver: gpio, broche: 17}
+    simule: {}
+
+  - id: led_jaune
+    libelle: LED jaune
+    detail: Témoin d'attention
+    actif: true
+    pilote: manuel
+    reel: {driver: gpio, broche: 27}
+    simule: {}
+
+  - id: led_verte
+    libelle: LED verte
+    detail: Témoin de bon fonctionnement
+    actif: true
+    pilote: manuel
+    reel: {driver: gpio, broche: 22}
     simule: {}
 
   - id: ecran
