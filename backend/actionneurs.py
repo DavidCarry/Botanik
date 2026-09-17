@@ -155,6 +155,13 @@ def main():
     _libelles.update({c["id"]: c["libelle"] for c in registre.capteurs_actifs()})
     premier = next(iter(_libelles), "")
 
+    # L'afficheur a TOUJOURS un fond. C'est la couche qui reparait quand
+    # aucune regle ne le recouvre : sans elle, la levee d'un
+    # recouvrement rendrait l'ecran au noir au lieu de lui rendre ce
+    # qu'il montrait.
+    if "ecran" in actionneurs and premier:
+        _contenu.setdefault("ecran", {"mode": "mesure", "capteur": premier})
+
     def actionner(client, actionneur, valeur):
         """Applique un etat et annonce ce qui a ete atteint.
 
@@ -264,8 +271,6 @@ def main():
         else:
             if isinstance(charge.get("contenu"), dict):
                 _contenu[actionneur] = charge["contenu"]
-            elif actionneur == "ecran" and actionneur not in _contenu:
-                _contenu[actionneur] = {"mode": "mesure", "capteur": premier}
             _allumage[actionneur] = valeur
 
         try:
