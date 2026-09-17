@@ -23,7 +23,13 @@ from datetime import datetime, timezone
 import paho.mqtt.client as mqtt
 
 import service
-from config import MQTT_HOST, MQTT_PORT, TOPIC_ETAT, TOPIC_MESURES
+from config import (
+    MQTT_HOST,
+    MQTT_PORT,
+    TOPIC_ETAT,
+    TOPIC_MESURES,
+    TOPIC_VISAGES,
+)
 
 # Au-dela, un navigateur trop lent est en retard d'une minute : mieux
 # vaut lui faire sauter des mesures que laisser enfler la memoire.
@@ -64,6 +70,10 @@ def _on_connect(client, userdata, flags, reason_code, properties):
     # Les mesures ne sont pas retenues : on ne recevra que les suivantes,
     # ce qui suffit -- l'etat initial de l'ecran vient de /api/capteurs.
     client.subscribe(f"{TOPIC_MESURES}/#", qos=0)
+    # Les visages, eux, sont retenus : un navigateur qui arrive voit les
+    # cadres tout de suite. Topic unique, et non un par visage -- c'est
+    # la LISTE qui a un sens, un visage disparu devant se retirer.
+    client.subscribe(TOPIC_VISAGES, qos=0)
 
 
 def _deposer(file: asyncio.Queue, evenement: dict):
@@ -102,7 +112,11 @@ def _on_message(client, userdata, msg):
     # Le `genre` distingue les deux a l'arrivee. Sans lui, le navigateur
     # devrait deviner a quoi se rapporte un identifiant -- et « lumiere »
     # est a la fois un actionneur et une grandeur mesuree.
-    if msg.topic.startswith(TOPIC_ETAT):
+    if msg.topic == TOPIC_VISAGES:
+        # Rien n'est garde ici : les visages ne valent que dans l'instant,
+        # et le message retenu du broker les redonne a chaque connexion.
+        _diffuser({"genre": "visages", **charge})
+    elif msg.topic.startswith(TOPIC_ETAT):
         _etats[identifiant] = charge
         _diffuser({"genre": "etat", "actionneur": identifiant, **charge})
     else:

@@ -88,6 +88,30 @@ CAMERA_ROTATION = int(os.getenv("CAMERA_ROTATION", "0"))
 # dit plutot que de la faire passer pour du direct.
 CAMERA_FRAICHEUR_S = float(os.getenv("CAMERA_FRAICHEUR_S", "10"))
 
+# ---- Visages ----
+#
+# Un agrement, pas un organe de la serre : si ce service s'arrete, la
+# vue reste, et rien d'autre ne s'en apercoit.
+VISAGES_MODELE = os.getenv("VISAGES_MODELE", "modeles/visages-yunet.onnx")
+
+# On regarde chaque image produite par la camera, pas plus souvent : en
+# demander davantage ferait relire le meme fichier pour rien.
+VISAGES_S = float(os.getenv("VISAGES_S", "0.1"))
+
+# La detection travaille sur une image REDUITE a cette largeur. A 1280
+# elle coute quatre fois plus cher pour ne rien voir de plus : un visage
+# a portee de la serre fait encore une centaine de pixels a 640.
+VISAGES_LARGEUR = 640
+
+# En dessous, on ne retient pas : mieux vaut manquer un visage de dos
+# qu'encadrer un pot de fleurs.
+VISAGES_SCORE = float(os.getenv("VISAGES_SCORE", "0.8"))
+
+# Un visage perdu une image ou deux -- un clignement, un mouvement de
+# tete -- reste affiche ce laps de temps. Sans cela le cadre papillote
+# en permanence, ce qui se remarque bien plus qu'un leger retard.
+VISAGES_MEMOIRE_S = float(os.getenv("VISAGES_MEMOIRE_S", "0.5"))
+
 # Garde-fou de stockage. Sous ce seuil d'espace libre, le collecteur
 # efface les mesures les plus anciennes : perdre l'histoire vaut mieux
 # que de ne plus pouvoir enregistrer le present.
@@ -108,3 +132,9 @@ TOPIC_ALERTES = "botanik/alertes"
 # deux services qui se passeraient les regles par MQTT finiraient par
 # diverger.
 TOPIC_REGLES = "botanik/regles"
+
+# Les visages vus dans la derniere image, en coordonnees RELATIVES a
+# l'image (de 0 a 1). L'interface les pose ensuite sur la vue, quelle
+# que soit sa taille a l'ecran -- des pixels obligeraient chacun a
+# savoir en quelle resolution la camera filme.
+TOPIC_VISAGES = "botanik/visages"

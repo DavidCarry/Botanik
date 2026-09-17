@@ -1,0 +1,21 @@
+[Unit]
+Description=Botanik - detection des visages sur la vue de la camera
+# Depend du broker pour publier, mais pas de la base : rien n'est
+# archive ici. La camera, elle, n'est pas une dependance -- sans image,
+# ce service tourne a vide et repart tout seul quand elle revient.
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__RACINE__/backend
+ExecStart=__RACINE__/backend/.venv/bin/python visages.py
+# Un agrement, pas un organe de la serre : on le met au second plan pour
+# qu'il cede le processeur aux services qui decident et qui mesurent.
+Nice=10
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

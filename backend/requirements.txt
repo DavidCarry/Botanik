@@ -6,6 +6,11 @@ pyyaml==6.0.2
 psutil==6.1.1
 numpy==2.2.1
 
+# Detection des visages sur la vue de la camera. La variante « headless »
+# est SANS interface graphique : le serveur n'affiche aucune fenetre, et
+# la version complete tirerait Qt et GTK pour rien.
+opencv-python-headless==4.12.0.88
+
 # Materiel -- utiles seulement sur la Raspberry Pi, en MODE=reel.
 # Sur un poste de developpement elles s'installent sans servir : les
 # drivers ne les importent qu'a la premiere lecture, donc MODE=faux

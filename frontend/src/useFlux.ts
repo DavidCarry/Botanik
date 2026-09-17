@@ -1,5 +1,22 @@
 import { useEffect } from 'react'
 
+/** Un visage vu dans la derniere image de la camera.
+ *
+ *  Les quatre nombres sont RELATIFS a l'image, de 0 a 1 : le coin haut
+ *  gauche du cadre, puis sa largeur et sa hauteur. En pixels, il aurait
+ *  fallu connaitre ici la resolution de la camera -- et la vue s'affiche
+ *  tantot en vignette, tantot en plein ecran.
+ *
+ *  `nom` vaut « Personne » tant qu'aucune reference n'a ete enregistree. */
+export type Visage = {
+  x: number
+  y: number
+  l: number
+  h: number
+  nom: string
+  score: number
+}
+
 /** Un evenement pousse par le serveur : une mesure, ou l'etat d'un
  *  actionneur. Le `genre` les distingue -- sans lui, « lumiere » serait
  *  ambigu, puisque c'est a la fois un actionneur et une grandeur. */
@@ -18,6 +35,11 @@ export type Pousse =
       contenu?: unknown; lignes?: string[]
       /** true : rien ne repond, l'ordre est accepte sans effet. */
       simule?: boolean
+    }
+  | {
+      /** La LISTE complete des visages vus, et non un visage a la fois :
+       *  c'est elle qui a un sens, celui qui s'en va devant disparaitre. */
+      genre: 'visages'; visages: Visage[]
     }
 
 /** S'abonne au flux du serveur.

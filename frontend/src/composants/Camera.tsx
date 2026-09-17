@@ -1,5 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { LuExpand, LuVideoOff, LuX } from 'react-icons/lu'
+import Visages from './Visages'
 
 /** Vue de la serre.
  *
@@ -32,6 +33,29 @@ const SOURCE = '/serre.jpg'
 function useVue(enDirect: boolean) {
   const [depuis] = useState(() => Date.now())
   return enDirect ? `/api/camera.mjpg?t=${depuis}` : SOURCE
+}
+
+/** L'image elle-meme, et les visages poses dessus.
+ *
+ *  Les cadres ne s'affichent qu'EN DIRECT : sur la photo de secours, ils
+ *  encadreraient des visages qui ne sont plus la depuis longtemps.
+ */
+function Vue({ enDirect, opacite }: { enDirect: boolean; opacite: string }) {
+  const vue = useVue(enDirect)
+  const image = useRef<HTMLImageElement>(null)
+
+  return (
+    <>
+      <img
+        ref={image}
+        src={vue}
+        alt={enDirect ? 'Vue en direct de la serre'
+          : 'Le châssis de la serre, photographié en salle'}
+        className={`size-full object-cover ${opacite}`}
+      />
+      {enDirect && <Visages image={image} />}
+    </>
+  )
 }
 
 /** Equerres de cadrage, la signature d'un moniteur de surveillance. */
@@ -107,7 +131,6 @@ function Habillage({ compact, enDirect }: { compact: boolean; enDirect: boolean 
 export default function Camera({
   onAgrandir, enDirect,
 }: { onAgrandir: () => void; enDirect: boolean }) {
-  const vue = useVue(enDirect)
   return (
     <button
       type="button"
@@ -118,12 +141,7 @@ export default function Camera({
                  hover:border-bordure-forte
                  md:aspect-auto md:h-full"
     >
-      <img
-        src={vue}
-        alt={enDirect ? 'Vue en direct de la serre'
-          : 'Le châssis de la serre, photographié en salle'}
-        className="size-full object-cover opacity-80"
-      />
+      <Vue enDirect={enDirect} opacite="opacity-80" />
       <Habillage compact enDirect={enDirect} />
 
       {/* L'invitation n'apparait qu'au survol : en permanence, elle
@@ -147,8 +165,6 @@ export default function Camera({
 export function CameraPleine({
   onFermer, enDirect,
 }: { onFermer: () => void; enDirect: boolean }) {
-  const vue = useVue(enDirect)
-
   // Echap ferme : une vue qu'on ne peut quitter qu'a la souris est un
   // piege au clavier.
   useEffect(() => {
@@ -171,12 +187,7 @@ export function CameraPleine({
         aria-modal="true"
         aria-label="Vue de la caméra"
       >
-        <img
-          src={vue}
-          alt={enDirect ? 'Vue en direct de la serre'
-            : 'Le châssis de la serre, photographié en salle'}
-          className="size-full object-cover opacity-90"
-        />
+        <Vue enDirect={enDirect} opacite="opacity-90" />
         <Habillage compact={false} enDirect={enDirect} />
 
         <button
