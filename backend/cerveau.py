@@ -30,12 +30,14 @@ import eclairement
 import poids as magasin
 import registre
 import regles
+import regles_visages
 import reseau
 import seuils
 import service
 import verrous
 from config import (
     TOPIC_ALERTES, TOPIC_COMMANDES, TOPIC_ETAT, TOPIC_MESURES, TOPIC_REGLES,
+    TOPIC_VISAGES,
 )
 
 # Cadence de decision.
@@ -96,6 +98,10 @@ class Cerveau:
         # Les regles de l'utilisateur, l'etendue de chaque grandeur et les
         # seuils que le reseau a appris : de quoi resoudre une borne.
         self.regles: dict[str, decision.Regle] = {}
+        # Ce que la serre fait quand elle voit quelqu'un, et la
+        # derniere fois que chaque personne a ete apercue.
+        self.regles_visages: dict[str, decision.Action] = {}
+        self.vus: dict[str, float] = {}
         self.etendues: dict[str, float] = {}
         self.seuils_ia: dict[str, dict] = {}
         # Cote franchi au tour precedent, pour l'hysteresis des bornes.
@@ -153,7 +159,14 @@ class Cerveau:
             charge = json.loads(msg.payload)
         except json.JSONDecodeError:
             return
-        if msg.topic.startswith(TOPIC_ETAT):
+        if msg.topic == TOPIC_VISAGES:
+            # On note QUAND chacun a ete vu, plutot que qui est la :
+            # une detection saute une image des qu'on tourne la tete,
+            # et un actionneur commande par une presence clignoterait.
+            instant = time.monotonic()
+            for visage in charge.get("visages", []):
+                self.vus[visage.get("nom", decision.ANONYME)] = instant
+        elif msg.topic.startswith(TOPIC_ETAT):
             self.etats[identifiant] = float(charge.get("valeur", 0))
         elif msg.topic.startswith(TOPIC_COMMANDES):
             # Le verrou se pose des que la commande passe, sans attendre
@@ -168,6 +181,21 @@ class Cerveau:
                 print(f"main reprise sur {identifiant}", flush=True)
         else:
             self.mesures[identifiant] = (float(charge["valeur"]), time.monotonic())
+
+    def presents(self) -> set[str]:
+        """Qui se tient devant la camera en ce moment.
+
+        Quelqu'un y reste quelques secondes apres sa derniere detection.
+        C'est la meme hysteresis que sur les bornes, et pour la meme
+        raison : sans elle, une tete qui se tourne eteindrait la LED
+        qu'elle vient d'allumer.
+
+        Les noms trop vieux sont oublies au passage -- sinon la serre
+        garderait une entree par visiteur de la journee.
+        """
+        limite = time.monotonic() - decision.PRESENCE_S
+        self.vus = {nom: vu for nom, vu in self.vus.items() if vu > limite}
+        return set(self.vus)
 
     def situation(self):
         """Les six entrees du reseau, ou None s'il manque une mesure.
@@ -197,6 +225,7 @@ class Cerveau:
                     self.contexte_lent = (eclairement.heures_du_jour(conn),
                                           verrous.actifs(conn))
                     self.regles = regles.lire(conn)
+                    self.regles_visages = regles_visages.lire(conn)
                     # Les episodes encore ouverts en base. Le cerveau perd
                     # la memoire a chaque redemarrage ; sans cette
                     # relecture, une alerte ouverte avant l'arret -- ou
@@ -339,7 +368,8 @@ class Cerveau:
             self.regles, contexte, self.seuils_ia, self.etendues, self.franchis,
         )
         self.franchis = franchis
-        self.voulu = decision.decider(self.regles, franchis)
+        self.voulu = decision.decider(self.regles, franchis,
+                                      self.regles_visages, self.presents())
         self.annoncer_alertes(client, franchis, contexte)
         self.plainte = None
 
@@ -422,8 +452,13 @@ def main():
         # L'API previent ici quand une regle change : sans cela, un
         # reglage fait a l'ecran attendrait la relecture periodique.
         client.subscribe(TOPIC_REGLES, qos=1)
-        print("Abonne aux mesures, aux etats, aux commandes et aux regles",
-              flush=True)
+        # Les visages sont un capteur comme un autre, a ceci pres qu'ils
+        # ne mesurent pas une grandeur mais une presence. C'est le
+        # cerveau qui en tire des ordres, et lui seul : deux services qui
+        # commanderaient la meme LED se la disputeraient sans fin.
+        client.subscribe(TOPIC_VISAGES, qos=0)
+        print("Abonne aux mesures, aux etats, aux commandes, aux regles "
+              "et aux visages", flush=True)
 
     print(f"Cerveau : {len(c.pilotes)} actionneurs a disposition "
           f"({', '.join(sorted(c.pilotes)) or 'aucun'}), decision toutes "

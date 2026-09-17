@@ -11,33 +11,10 @@ qui agirait avant qu'on lui ait dit quoi faire serait une serre dont on
 ne comprend pas les gestes.
 """
 
-import json
-
-from decision import MODES, Action, Borne, Regle
+from decision import MODES, Borne, Regle, action_depuis, action_vers
 
 CHAMPS = """grandeur, mode_bas, mode_haut, valeur_bas, valeur_haut,
             action_bas, action_haut"""
-
-
-def _action(brut) -> Action | None:
-    """Convertit ce qui vient de la base en action, ou None."""
-    if not brut:
-        return None
-    if isinstance(brut, str):
-        brut = json.loads(brut)
-    return Action(
-        genre=brut.get("genre", "aucun"),
-        cible=brut.get("cible"),
-        valeur=brut.get("valeur"),
-        texte=brut.get("texte"),
-    )
-
-
-def _en_json(action: Action | None):
-    if action is None or action.genre == "aucun":
-        return None
-    return {"genre": action.genre, "cible": action.cible,
-            "valeur": action.valeur, "texte": action.texte}
 
 
 def lire(conn) -> dict[str, Regle]:
@@ -50,8 +27,8 @@ def lire(conn) -> dict[str, Regle]:
         grandeur: Regle(
             bas=Borne(mode_bas, valeur_bas),
             haut=Borne(mode_haut, valeur_haut),
-            action_bas=_action(action_bas),
-            action_haut=_action(action_haut),
+            action_bas=action_depuis(action_bas),
+            action_haut=action_depuis(action_haut),
         )
         for (grandeur, mode_bas, mode_haut, valeur_bas, valeur_haut,
              action_bas, action_haut) in lignes
@@ -68,9 +45,9 @@ def brutes(conn) -> list[dict]:
         {
             "grandeur": grandeur,
             "bas": {"mode": mode_bas, "valeur": valeur_bas,
-                    "action": _en_json(_action(action_bas))},
+                    "action": action_vers(action_depuis(action_bas))},
             "haut": {"mode": mode_haut, "valeur": valeur_haut,
-                     "action": _en_json(_action(action_haut))},
+                     "action": action_vers(action_depuis(action_haut))},
         }
         for (grandeur, mode_bas, mode_haut, valeur_bas, valeur_haut,
              action_bas, action_haut) in lignes
@@ -103,8 +80,8 @@ def enregistrer(conn, grandeur: str, regle: Regle) -> None:
                    modifie_le = now()""",
             (grandeur, regle.bas.mode, regle.haut.mode,
              regle.bas.valeur, regle.haut.valeur,
-             Jsonb(_en_json(regle.action_bas)) if regle.action_bas else None,
-             Jsonb(_en_json(regle.action_haut)) if regle.action_haut else None),
+             Jsonb(action_vers(regle.action_bas)) if regle.action_bas else None,
+             Jsonb(action_vers(regle.action_haut)) if regle.action_haut else None),
         )
 
 

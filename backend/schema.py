@@ -85,6 +85,21 @@ CREATE TABLE IF NOT EXISTS visages (
 );
 
 CREATE INDEX IF NOT EXISTS idx_visages_nom ON visages (nom);
+
+-- Ce que la serre fait quand elle voit quelqu'un.
+--
+-- Meme forme d'action que les regles de bornes -- allumer un actionneur,
+-- afficher un texte -- parce que c'est la meme chose qui se declenche.
+-- Seul le declencheur change : une personne devant la camera plutot
+-- qu'une mesure qui passe une borne.
+--
+-- `sujet` est le nom d'une personne apprise, ou « quiconque » (n'importe
+-- qui) ou « inconnu » (un visage qui ne correspond a aucune reference).
+CREATE TABLE IF NOT EXISTS regles_visages (
+    sujet      TEXT PRIMARY KEY,
+    action     JSONB       NOT NULL,
+    modifie_le TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 # Ce qui a change APRES coup sur une table d'`init.sql`, qu'une base deja

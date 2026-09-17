@@ -43,6 +43,36 @@ GRANDEURS = [
 # d'un essai.
 VERROU_MANUEL_S = 30
 
+# ---------------------------------------------------------------
+# Les sujets d'une regle de visage
+# ---------------------------------------------------------------
+#
+# Une regle de visage se lit « quand UNTEL est devant la camera, faire
+# ceci ». Le sujet est le nom d'une personne apprise, ou l'un des deux
+# sujets ci-dessous, qui ne designent personne en particulier.
+
+# Le nom que porte un visage que la serre ne reconnait pas. Il vient du
+# service de detection et sert ici de sujet : « un inconnu est la ».
+ANONYME = "Personne"
+
+# N'importe qui, connu ou non.
+QUICONQUE = "quiconque"
+
+# Un visage detecte qui ne correspond a aucune reference.
+INCONNU = "inconnu"
+
+# Personne ne peut porter ces noms : ils designent deja autre chose.
+SUJETS_RESERVES = (QUICONQUE, INCONNU, ANONYME.lower())
+
+# Duree pendant laquelle une personne reste tenue pour presente apres
+# sa derniere detection.
+#
+# La detection saute une image des qu'on tourne la tete ou qu'on cligne
+# des yeux. Sans ce delai, un actionneur commande par un visage
+# clignoterait -- exactement le probleme que l'hysteresis regle pour les
+# bornes, et pour la meme raison.
+PRESENCE_S = 3.0
+
 class Jugement(NamedTuple):
     """Ce que le reseau pense d'une grandeur."""
     bas: bool
@@ -186,43 +216,116 @@ def cotes_franchis(regles: dict[str, Regle],
     return franchis
 
 
-def decider(regles: dict[str, Regle],
-            franchis: dict[str, str | None]) -> dict[str, Commande]:
-    """Les etats voulus des actionneurs, d'apres les regles seules.
+def action_depuis(brut) -> Action | None:
+    """Convertit ce qui vient de la base en action, ou None.
 
-    Une action est MAINTENUE tant que la borne reste franchie, et
-    relachee ensuite -- l'actionneur revient alors a l'etat inverse.
-    Sans cela, un bipeur declenche par un reservoir vide sonnerait
-    encore une fois rempli.
-
-    Deux regles qui se disputent le meme actionneur : celle qui est
-    active l'emporte. Si les deux le sont, la premiere dans l'ordre des
-    grandeurs decide -- c'est arbitraire, mais c'est stable, et l'ecran
-    montre les deux alertes.
+    Ici, et non dans un module de table : deux tables portent des
+    actions -- les bornes et les visages -- et une seule forme doit
+    faire foi.
     """
-    ordres: dict[str, Commande] = {}
-    affichages: dict[str, Action] = {}
+    if not brut:
+        return None
+    if isinstance(brut, str):
+        import json
+        brut = json.loads(brut)
+    return Action(
+        genre=brut.get("genre", "aucun"),
+        cible=brut.get("cible"),
+        valeur=brut.get("valeur"),
+        texte=brut.get("texte"),
+    )
 
+
+def action_vers(action: Action | None) -> dict | None:
+    """La meme chose en sens inverse, pour la base et pour l'interface."""
+    if action is None or action.genre == "aucun":
+        return None
+    return {"genre": action.genre, "cible": action.cible,
+            "valeur": action.valeur, "texte": action.texte}
+
+
+def devant(sujet: str, presents: set[str]) -> bool:
+    """Ce sujet est-il devant la camera en ce moment ?
+
+    `presents` porte les noms reconnus, et « Personne » des qu'un visage
+    n'a ete rattache a aucune reference.
+    """
+    if sujet == QUICONQUE:
+        return bool(presents)
+    if sujet == INCONNU:
+        return ANONYME in presents
+    return sujet in presents
+
+
+def _appliquer(ordres: dict, affichages: dict, action: Action | None,
+               actif: bool) -> None:
+    """Traduit une action, et l'etat de son declencheur, en ordre.
+
+    Le SEUL endroit qui sache ce que declencher veut dire. Les bornes et
+    les visages y passent tous les deux : c'est ce qui garantit qu'une
+    action se comporte pareil, quelle que soit la raison qui l'a
+    reveillee.
+    """
+    if action is None or action.genre == "aucun":
+        return
+
+    if action.genre == "ecran":
+        if actif and (action.cible or "ecran") not in affichages:
+            affichages[action.cible or "ecran"] = action
+        return
+
+    if action.genre == "actionneur" and action.cible:
+        vise = float(action.valeur or 0.0)
+        # Au repos, l'actionneur revient a l'inverse de ce que l'action
+        # demande : sans cela, un bipeur declenche par un reservoir vide
+        # sonnerait encore une fois rempli.
+        voulu = vise if actif else (0.0 if vise > 0 else 1.0)
+        # Une regle active ne se laisse pas ecraser par une regle au
+        # repos.
+        if actif or action.cible not in ordres:
+            ordres[action.cible] = Commande(voulu, "regle")
+
+
+def _declenchements(regles: dict[str, Regle],
+                    franchis: dict[str, str | None],
+                    regles_visages: dict[str, Action],
+                    presents: set[str]):
+    """Chaque action reglee par l'utilisateur, avec son etat du moment.
+
+    Les bornes d'abord, les visages ensuite. L'ordre ne compte que pour
+    departager deux regles actives sur le meme actionneur -- il est
+    arbitraire, mais stable.
+    """
     for grandeur in GRANDEURS:
         regle = regles.get(grandeur)
         if regle is None:
             continue
-        for cote, action in (("bas", regle.action_bas), ("haut", regle.action_haut)):
-            if action is None or action.genre == "aucun":
-                continue
-            actif = franchis.get(grandeur) == cote
+        yield regle.action_bas, franchis.get(grandeur) == "bas"
+        yield regle.action_haut, franchis.get(grandeur) == "haut"
 
-            if action.genre == "ecran":
-                if actif and action.cible not in affichages:
-                    affichages[action.cible or "ecran"] = action
-                continue
+    for sujet, action in regles_visages.items():
+        yield action, devant(sujet, presents)
 
-            if action.genre == "actionneur" and action.cible:
-                voulu = float(action.valeur or 0.0) if actif else                     (0.0 if float(action.valeur or 0.0) > 0 else 1.0)
-                # Une regle active ne se laisse pas ecraser par une
-                # regle au repos.
-                if actif or action.cible not in ordres:
-                    ordres[action.cible] = Commande(voulu, "regle")
+
+def decider(regles: dict[str, Regle],
+            franchis: dict[str, str | None],
+            regles_visages: dict[str, Action] | None = None,
+            presents: set[str] | None = None) -> dict[str, Commande]:
+    """Les etats voulus des actionneurs, d'apres les regles seules.
+
+    Deux sources de declenchement, traitees ensemble : une borne
+    franchie, et une personne devant la camera. Elles aboutissent aux
+    memes actions et se disputent les memes actionneurs -- les melanger
+    ici plutot que de les additionner apres coup est ce qui evite que
+    deux regles commandent la meme LED chacune de leur cote.
+    """
+    ordres: dict[str, Commande] = {}
+    affichages: dict[str, Action] = {}
+
+    for action, actif in _declenchements(regles, franchis,
+                                         regles_visages or {},
+                                         presents or set()):
+        _appliquer(ordres, affichages, action, actif)
 
     for cible, action in affichages.items():
         ordres[cible] = Commande(1.0, "regle", action.texte)

@@ -28,9 +28,11 @@ import bus
 import decision
 import donnees
 import eclairement
+import empreintes
 import poids as magasin
 import registre
 import regles
+import regles_visages
 import schema
 import seuils
 import systeme
@@ -596,6 +598,110 @@ def retirer_regle(grandeur: str,
     bus.publier(TOPIC_REGLES, {"grandeur": grandeur})
     bus.diffuser({"genre": "plages", "plages": plages_affichees()})
     return {"ok": efface}
+
+
+# ---------------------------------------------------------------
+# Les visages : qui la serre connait, et ce qu'elle en fait
+# ---------------------------------------------------------------
+
+# Les deux sujets qui ne designent personne en particulier. Ils sont
+# toujours proposes, meme quand la serre ne connait encore personne :
+# « quelqu'un est la » ne demande aucune reference.
+SUJETS_SPECIAUX = [
+    {"id": decision.QUICONQUE, "libelle": "Quelqu’un",
+     "detail": "n’importe qui, connu ou non"},
+    {"id": decision.INCONNU, "libelle": "Un inconnu",
+     "detail": "un visage qui ne correspond à aucune référence"},
+]
+
+
+class ActionVisageRecue(BaseModel):
+    action: dict | None = None
+
+
+@app.get("/api/visages")
+def lire_visages():
+    """Qui la serre sait nommer, et ce qu'elle en fait.
+
+    Les personnes et les sujets speciaux sont rendus separement : seules
+    les premieres peuvent etre oubliees, et l'ecran doit savoir sur
+    lesquelles proposer une corbeille.
+    """
+    with base() as conn:
+        personnes = empreintes.inventaire(conn)
+        posees = regles_visages.brutes(conn)
+
+    return {
+        "speciaux": SUJETS_SPECIAUX,
+        "personnes": [
+            {"id": nom, "libelle": nom.capitalize(), "references": combien}
+            for nom, combien in personnes
+        ],
+        "regles": posees,
+        "actionneurs": [
+            {"id": a["id"], "libelle": a["libelle"]}
+            for a in registre.actionneurs_actifs()
+        ],
+    }
+
+
+def _sujet_connu(conn, sujet: str) -> bool:
+    if sujet in (decision.QUICONQUE, decision.INCONNU):
+        return True
+    return any(nom == sujet for nom, _ in empreintes.inventaire(conn))
+
+
+@app.put("/api/visages/regles/{sujet}")
+def poser_regle_visage(sujet: str, corps: ActionVisageRecue,
+                       botanik_session: str | None = Cookie(default=None)):
+    """Pose ou remplace ce que la serre fait en voyant ce sujet."""
+    if not compte_ouvert(botanik_session):
+        raise HTTPException(401, "connexion requise")
+
+    action = _verifier_action(corps.action)
+    if action is None:
+        raise HTTPException(400, "une règle de visage demande une action")
+
+    try:
+        with base() as conn:
+            if not _sujet_connu(conn, sujet):
+                raise HTTPException(400, f"sujet inconnu : {sujet}")
+            regles_visages.enregistrer(conn, sujet, action)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+    bus.publier(TOPIC_REGLES, {"visage": sujet})
+    return {"ok": True}
+
+
+@app.delete("/api/visages/regles/{sujet}")
+def retirer_regle_visage(sujet: str,
+                         botanik_session: str | None = Cookie(default=None)):
+    """La serre continue de reconnaitre ce sujet, sans plus rien en faire."""
+    if not compte_ouvert(botanik_session):
+        raise HTTPException(401, "connexion requise")
+    with base() as conn:
+        efface = regles_visages.retirer(conn, sujet)
+    bus.publier(TOPIC_REGLES, {"visage": sujet})
+    return {"ok": efface}
+
+
+@app.delete("/api/visages/personnes/{nom}")
+def oublier_personne(nom: str,
+                     botanik_session: str | None = Cookie(default=None)):
+    """Oublie quelqu'un : ses references, et la regle qui le visait.
+
+    La regle part avec la personne. La garder laisserait dans l'interface
+    un declencheur qui ne peut plus se produire, sans rien pour dire
+    pourquoi.
+    """
+    if not compte_ouvert(botanik_session):
+        raise HTTPException(401, "connexion requise")
+    with base() as conn:
+        efface = empreintes.retirer(conn, nom)
+        regles_visages.retirer(conn, nom)
+    bus.publier(TOPIC_REGLES, {"visage": nom})
+    return {"ok": efface > 0, "references": efface}
 
 
 @app.get("/api/sante")

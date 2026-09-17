@@ -7,6 +7,7 @@ import Bloc from './composants/Bloc'
 import Camera, { CameraPleine } from './composants/Camera'
 import Connexion from './composants/Connexion'
 import Courbes, { EnTeteCourbes } from './composants/Courbes'
+import Declencheurs from './composants/Declencheurs'
 import Evenements from './composants/Evenements'
 import FlechesVue from './composants/FlechesVue'
 import Fond from './composants/Fond'
@@ -160,12 +161,22 @@ export default function App() {
           </section>
 
           {/* Vue 3 : le reglage de la serre. Reservee aux comptes
-              ouverts -- elle ne se consulte pas, elle agit. */}
+              ouverts -- elle ne se consulte pas, elle agit.
+
+              Deux colonnes pour deux declencheurs : une mesure qui passe
+              une borne, et une personne devant la camera. Cote a cote
+              parce qu'ils aboutissent aux MEMES actions et se disputent
+              les memes actionneurs -- les separer en deux pages ferait
+              oublier qu'ils peuvent se contredire. */}
           {auth.compte && (
             <section className={CADRE}>
-              <div className="mx-auto h-full max-w-page">
+              <div className="mx-auto grid h-full max-w-page gap-9 sm:gap-11
+                              md:grid-cols-2 md:gap-x-8">
                 <div className="h-[calc(100dvh-11.5rem)] md:h-full">
                   <Regles />
+                </div>
+                <div className="h-[calc(100dvh-11.5rem)] md:h-full">
+                  <Declencheurs />
                 </div>
               </div>
             </section>

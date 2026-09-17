@@ -44,6 +44,9 @@ from config import (
     VISAGES_SIMILARITE,
     VISAGES_SUIVI,
 )
+# Le nom des inconnus est aussi un SUJET de regle : il vit donc avec le
+# reste du vocabulaire des regles, pas ici.
+from decision import ANONYME
 
 try:
     import cv2
@@ -51,11 +54,6 @@ except ImportError:
     # Un message clair au demarrage vaut mieux qu'une trace d'import au
     # milieu du journal de systemd.
     cv2 = None
-
-# Tant qu'aucune reference n'a ete enregistree, tout le monde porte ce
-# nom. Le jour ou on apprendra des visages a la serre, il ne restera
-# qu'aux inconnus.
-ANONYME = "Personne"
 
 # Une image de serre ne contient pas dix personnes : une limite protege
 # d'une detection qui s'emballerait sur un feuillage.

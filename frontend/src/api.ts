@@ -270,3 +270,37 @@ export const lireActionneurs = () => json<Actionneur[]>('/api/actionneurs')
 
 export const commander = (actionneur: string, valeur: number, contenu?: Contenu) =>
   poster<{ ok: boolean }>('/api/commandes', { actionneur, valeur, contenu })
+
+// ---------- Visages ----------
+
+/** Un sujet de règle : une personne apprise, ou l'un des deux sujets
+ *  qui ne désignent personne en particulier. */
+export type Sujet = {
+  id: string
+  libelle: string
+  /** Sujets spéciaux seulement : ce qu'ils recouvrent. */
+  detail?: string
+  /** Personnes seulement : combien de photos la serre a d'elles. Sa
+   *  présence marque aussi celles qu'on peut faire oublier. */
+  references?: number
+}
+
+export type ReglagesVisages = {
+  speciaux: Sujet[]
+  personnes: Sujet[]
+  /** Une action par sujet réglé. Un sujet absent ne déclenche rien. */
+  regles: Record<string, ActionRegle | null>
+  actionneurs: { id: string; libelle: string }[]
+}
+
+export const lireReglagesVisages = () => json<ReglagesVisages>('/api/visages')
+
+export const poserRegleVisage = (sujet: string, action: ActionRegle) =>
+  envoyer<{ ok: boolean }>(`/api/visages/regles/${sujet}`, 'PUT', { action })
+
+export const retirerRegleVisage = (sujet: string) =>
+  envoyer<{ ok: boolean }>(`/api/visages/regles/${sujet}`, 'DELETE')
+
+/** Efface les références d'une personne, et la règle qui la visait. */
+export const oublierPersonne = (nom: string) =>
+  envoyer<{ ok: boolean }>(`/api/visages/personnes/${nom}`, 'DELETE')

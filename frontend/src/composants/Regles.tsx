@@ -3,7 +3,7 @@ import { LuBrain, LuCheck, LuRotateCcw, LuTrash2 } from 'react-icons/lu'
 import type { BorneRegle, GrandeurReglee, ModeBorne } from '../api'
 import { useRegles } from '../useRegles'
 import Bloc from './Bloc'
-import Choix from './Choix'
+import EditeurAction, { CHAMP } from './EditeurAction'
 
 /** Les trois façons de poser une borne.
  *
@@ -19,10 +19,6 @@ const MODES: { valeur: ModeBorne; libelle: string }[] = [
 
 const VIDE: BorneRegle = { mode: 'aucun', valeur: null, action: null }
 
-const CHAMP =
-  'w-full rounded-carte border border-bordure bg-surface-creuse px-2.5 py-1.5 ' +
-  'text-menu text-texte outline-none focus:border-bordure-forte'
-
 /** Un côté d'une grandeur : où passe la borne, et ce qui se passe quand
  *  elle est franchie. */
 function Cote({
@@ -35,24 +31,6 @@ function Cote({
   actionneurs: { id: string; libelle: string }[]
   onChange: (b: BorneRegle) => void
 }) {
-  const action = borne.action
-  const genre = action?.genre ?? 'aucun'
-  // On isole chaque forme : le type d'une action depend de son genre, et
-  // TypeScript ne le devine pas au milieu d'un JSX.
-  const surActionneur = action?.genre === 'actionneur' ? action : null
-  const surEcran = action?.genre === 'ecran' ? action : null
-
-  const changerAction = (nouveau: string) => {
-    if (nouveau === 'aucun') return onChange({ ...borne, action: null })
-    if (nouveau === 'ecran') {
-      return onChange({ ...borne, action: { genre: 'ecran', texte: '' } })
-    }
-    onChange({
-      ...borne,
-      action: { genre: 'actionneur', cible: nouveau, valeur: 1 },
-    })
-  }
-
   return (
     <div className="space-y-2.5 rounded-carte border border-bordure p-3">
       <span className="block text-nano uppercase tracking-etiquette text-texte-faible">
@@ -105,64 +83,12 @@ function Cote({
       )}
 
       {borne.mode !== 'aucun' && (
-        <div className="space-y-2">
-          <Choix
-            etiquette={`Action quand ${titre.toLowerCase()}`}
-            choisi={surActionneur ? surActionneur.cible : genre}
-            onChange={changerAction}
-            // L'afficheur n'apparait PAS parmi les actionneurs : le
-            // mettre en marche sans lui dire quoi montrer n'a pas de
-            // sens, et deux entrees pour le meme materiel -- « Écran »
-            // et « Afficher un message » -- obligeaient a deviner
-            // laquelle fait quoi.
-            options={[
-              { valeur: 'aucun', libelle: 'Ne rien faire (alerter seulement)' },
-              ...actionneurs
-                .filter((a) => a.id !== 'ecran')
-                .map((a) => ({ valeur: a.id, libelle: a.libelle })),
-              { valeur: 'ecran', libelle: 'Afficher un message à l’écran' },
-            ]}
-          />
-
-          {surActionneur && (
-            <div className="flex gap-0.5 rounded-pilule border border-bordure bg-surface-creuse p-0.5">
-              {[1, 0].map((v) => (
-                <button
-                  key={v}
-                  type="button"
-                  aria-pressed={surActionneur.valeur === v}
-                  onClick={() => onChange({
-                    ...borne,
-                    action: { genre: 'actionneur', cible: surActionneur.cible,
-                              valeur: v },
-                  })}
-                  className={`flex-1 rounded-pilule px-2 py-1 text-micro font-medium
-                              transition-colors duration-200 ${
-                    surActionneur.valeur === v
-                      ? 'bg-accent-voile text-accent-vif'
-                      : 'text-texte-faible hover:text-texte-doux'
-                  }`}
-                >
-                  {v ? 'Allumer' : 'Éteindre'}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {surEcran && (
-            <input
-              type="text"
-              maxLength={32}
-              value={surEcran.texte}
-              placeholder="Message sur l’écran"
-              onChange={(e) => onChange({
-                ...borne,
-                action: { genre: 'ecran', texte: e.target.value },
-              })}
-              className={CHAMP}
-            />
-          )}
-        </div>
+        <EditeurAction
+          action={borne.action}
+          actionneurs={actionneurs}
+          etiquette={`Action quand ${titre.toLowerCase()}`}
+          onChange={(action) => onChange({ ...borne, action })}
+        />
       )}
     </div>
   )
