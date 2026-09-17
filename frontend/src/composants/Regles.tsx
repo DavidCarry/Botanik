@@ -3,6 +3,7 @@ import { LuBrain, LuCheck, LuTrash2 } from 'react-icons/lu'
 import type { BorneRegle, GrandeurReglee, ModeBorne } from '../api'
 import { useRegles } from '../useRegles'
 import Bloc from './Bloc'
+import Choix from './Choix'
 
 /** Les trois façons de poser une borne.
  *
@@ -105,17 +106,16 @@ function Cote({
 
       {borne.mode !== 'aucun' && (
         <div className="space-y-2">
-          <select
-            value={surActionneur ? surActionneur.cible : genre}
-            onChange={(e) => changerAction(e.target.value)}
-            className={CHAMP}
-          >
-            <option value="aucun">Ne rien faire (alerter seulement)</option>
-            {actionneurs.map((a) => (
-              <option key={a.id} value={a.id}>{a.libelle}</option>
-            ))}
-            <option value="ecran">Afficher un message</option>
-          </select>
+          <Choix
+            etiquette={`Action quand ${titre.toLowerCase()}`}
+            choisi={surActionneur ? surActionneur.cible : genre}
+            onChange={changerAction}
+            options={[
+              { valeur: 'aucun', libelle: 'Ne rien faire (alerter seulement)' },
+              ...actionneurs.map((a) => ({ valeur: a.id, libelle: a.libelle })),
+              { valeur: 'ecran', libelle: 'Afficher un message' },
+            ]}
+          />
 
           {surActionneur && (
             <div className="flex gap-0.5 rounded-pilule border border-bordure bg-surface-creuse p-0.5">
@@ -268,7 +268,7 @@ export default function Regles() {
         : <span className="text-micro text-texte-faible">
             Une grandeur sans règle ne déclenche rien
           </span>}
-      className="md:min-h-0"
+      className="h-full md:min-h-0"
     >
       <div className="h-full space-y-4 overflow-y-auto pr-1">
         {reglages.grandeurs.length === 0 ? (
