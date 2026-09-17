@@ -43,6 +43,28 @@ CREATE INDEX IF NOT EXISTS idx_alertes_ouvertes
     ON alertes (grandeur) WHERE fin IS NULL;
 
 CREATE INDEX IF NOT EXISTS idx_alertes_debut ON alertes (debut DESC);
+
+-- Ce que l'utilisateur a decide pour chaque grandeur : ou passent ses
+-- bornes, et ce que la serre doit faire quand elles sont franchies.
+--
+-- C'est la SEULE source des actions depuis qu'on a retire les regles
+-- ecrites en dur. Le reseau, lui, continue d'apprendre des seuils : une
+-- borne en mode « ia » le suit, une borne en mode « manuel » ne bouge
+-- plus, une borne « aucun » ignore ce cote.
+CREATE TABLE IF NOT EXISTS regles (
+    grandeur    TEXT PRIMARY KEY,
+    mode_bas    TEXT NOT NULL DEFAULT 'ia'
+                CHECK (mode_bas IN ('ia', 'manuel', 'aucun')),
+    mode_haut   TEXT NOT NULL DEFAULT 'ia'
+                CHECK (mode_haut IN ('ia', 'manuel', 'aucun')),
+    valeur_bas  DOUBLE PRECISION,
+    valeur_haut DOUBLE PRECISION,
+    -- {"genre": "actionneur", "cible": "bipeur", "valeur": 1}
+    -- {"genre": "ecran", "texte": "Reservoir vide"}   ou NULL
+    action_bas  JSONB,
+    action_haut JSONB,
+    modifie_le  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 

@@ -41,13 +41,6 @@ GRANDEURS = [
 # tout. Une pompe grillee ne se discute pas.
 VERROU_MANUEL_S = 300
 
-# Sous ce niveau, la pompe est bloquee quoi qu'il arrive. Ce n'est pas le
-# seuil d'alerte -- celui-la, le reseau l'apprend -- mais un plancher
-# materiel : une pompe qui tourne a sec s'abime en quelques secondes.
-# Pas zero : un flotteur bruite passe sous zero avant d'y arriver.
-PLANCHER_POMPE = 5.0
-
-
 class Jugement(NamedTuple):
     """Ce que le reseau pense d'une grandeur."""
     bas: bool
@@ -56,133 +49,158 @@ class Jugement(NamedTuple):
 
 class Commande(NamedTuple):
     valeur: float
-    source: str      # "ia" ou "securite"
+    # Qui a decide : "regle" pour une regle de l'utilisateur, "manuel"
+    # pour un clic. Le journal le garde, et l'ecran l'affiche.
+    source: str
+    # Texte a afficher, pour le seul afficheur.
+    texte: str | None = None
 
-# Marge d'hysteresis, exprimee sur la CERTITUDE du reseau et non sur les
-# unites de chaque grandeur.
+
+# ---------------------------------------------------------------
+# Les regles de l'utilisateur
+# ---------------------------------------------------------------
 #
-# Sans elle, une mesure qui oscille autour de sa frontiere fait osciller
-# le jugement avec elle : l'alerte s'ouvre, se ferme, se rouvre, et le
-# journal se remplit de bruit pendant que la pompe bat la mesure. Le
-# reseau, lui, ne se trompe pas -- il dit honnetement « 50,4 % puis
-# 49,6 % ». C'est notre lecture binaire qui est trop nerveuse.
+# Il n'y a plus AUCUNE regle ecrite en dur. « Sol trop sec, donc
+# arroser » etait une decision d'agronome deguisee en code : on ne
+# pouvait ni la lire depuis l'ecran, ni la changer sans redeployer, et
+# elle mentionnait des actionneurs qui n'existent plus.
 #
-# On ouvre donc a la moitie, et on ne referme qu'en dessous : tant que le
-# reseau reste hesitant, l'etat en cours tient. Une grandeur vraiment
-# revenue dans sa plage fait chuter la probabilite bien plus bas que
-# cette marge, donc l'alerte se leve normalement.
+# Desormais chaque grandeur porte deux bornes et deux actions, que
+# l'utilisateur regle depuis l'interface. Une grandeur sans regle ne
+# declenche rien : ni alerte, ni commande.
 #
-# La marge porte sur la certitude plutot que sur les degres ou les lux :
-# une seule regle vaut alors pour les cinq grandeurs, sans avoir a
-# choisir a la main ce que « un peu » veut dire pour chacune.
-CERTITUDE_OUVERTURE = 0.50
-CERTITUDE_FERMETURE = 0.35
+# Le reseau n'a pas disparu pour autant -- au contraire, il retrouve son
+# vrai role. Il APPREND ou passent les frontieres ; l'utilisateur decide
+# quoi en faire. Une borne en mode « ia » suit le seuil appris et se
+# deplace donc avec la chaleur et la lumiere ; en mode « manuel » elle
+# est fixe ; en mode « aucun » ce cote est ignore.
+
+MODES = ("ia", "manuel", "aucun")
+
+# Marge d'hysteresis sur une borne chiffree, en part de l'etendue du
+# capteur.
+#
+# Meme raison que pour les jugements du reseau : une mesure qui oscille
+# autour de la borne ferait battre l'actionneur et remplirait le journal.
+# On franchit a la borne, on ne revient qu'apres l'avoir repassee de
+# cette marge.
+MARGE_BORNE = 0.02
 
 
-
-def _tenir(probabilite: float, actif: bool) -> bool:
-    """Le seuil a franchir depend de l'etat en cours : c'est tout le
-    principe de l'hysteresis."""
-    return probabilite >= (CERTITUDE_FERMETURE if actif else CERTITUDE_OUVERTURE)
+class Borne(NamedTuple):
+    mode: str                     # "ia", "manuel" ou "aucun"
+    valeur: float | None = None   # seulement en mode "manuel"
 
 
+class Action(NamedTuple):
+    """Ce que la serre fait quand une borne est franchie.
 
-def juger(probabilites: dict[str, float],
-          precedents: dict[str, Jugement] | None = None) -> dict[str, Jugement]:
-    """Les jugements du reseau, lus avec hysteresis.
-
-    `probabilites` est indexe par sortie -- « humidite_sol_a_bas » -- et
-    `precedents` porte les jugements du tour d'avant. Vide au premier
-    tour : tout part alors de la simple moitie, sans etat a retenir.
+    `genre` vaut "actionneur" -- mettre un actionneur dans un etat --,
+    "ecran" -- y afficher un texte -- ou "aucun", pour une grandeur
+    qu'on veut surveiller sans rien declencher. La temperature est dans
+    ce cas : rien n'est cable pour la corriger.
     """
-    anciens = precedents or {}
-    nouveaux: dict[str, Jugement] = {}
-    for grandeur in GRANDEURS:
-        avant = anciens.get(grandeur, Jugement(False, False))
-        nouveaux[grandeur] = Jugement(
-            _tenir(probabilites.get(f"{grandeur}_bas", 0.0), avant.bas),
-            _tenir(probabilites.get(f"{grandeur}_haut", 0.0), avant.haut),
-        )
-    return nouveaux
+    genre: str
+    cible: str | None = None
+    valeur: float | None = None
+    texte: str | None = None
 
 
-# Ce qui merite d'alerter, et sous quel nom.
-#
-# Tous les jugements n'en sont pas. « Luminosite trop basse » est vrai
-# chaque nuit, « reserve pleine » est une bonne nouvelle, et « pas encore
-# assez de lumiere aujourd'hui » est l'etat normal d'une matinee. En
-# faire des alertes noierait les vraies sous le bruit, et plus personne
-# ne regarderait le voyant.
-#
-# `humaine` distingue ce que la serre ne peut PAS corriger seule : il
-# faut alors quelqu'un. C'est ce qui justifie le bipeur.
-ALERTES: dict[tuple[str, str], dict] = {
-    ("humidite_sol_a", "bas"): {"libelle": "Sol trop sec", "humaine": False},
-    ("humidite_sol_a", "haut"): {"libelle": "Sol détrempé", "humaine": False},
-    ("temperature_air", "bas"): {"libelle": "Trop froid", "humaine": True},
-    ("temperature_air", "haut"): {"libelle": "Trop chaud", "humaine": True},
-    ("luminosite", "haut"): {"libelle": "Lumière excessive", "humaine": True},
-    ("niveau_eau", "bas"): {"libelle": "Réserve d'eau basse", "humaine": True},
-    ("eclairement_jour", "haut"): {"libelle": "Trop de lumière aujourd'hui",
-                                   "humaine": False},
-}
+class Regle(NamedTuple):
+    bas: Borne
+    haut: Borne
+    action_bas: Action | None = None
+    action_haut: Action | None = None
 
 
+AUCUNE = Action("aucun")
 
-def alertes(jugements: dict[str, Jugement]) -> dict[str, str | None]:
-    """Pour chaque grandeur, le cote en alerte, ou None si tout va bien.
 
-    Une seule alerte par grandeur : elle ne peut pas etre trop basse et
-    trop haute a la fois. Le cote suffit donc a la designer.
+def _borne_effective(borne: Borne, cote_ia: float | None) -> float | None:
+    """La valeur a comparer, ou None si ce cote est ignore."""
+    if borne.mode == "manuel":
+        return borne.valeur
+    if borne.mode == "ia":
+        return cote_ia
+    return None
+
+
+def cotes_franchis(regles: dict[str, Regle],
+                   mesures: dict[str, float],
+                   seuils_ia: dict[str, dict],
+                   etendues: dict[str, float],
+                   precedents: dict[str, str | None]) -> dict[str, str | None]:
+    """Pour chaque grandeur reglee, le cote franchi -- ou None.
+
+    `precedents` porte l'etat du tour d'avant : c'est lui qui donne son
+    sens a l'hysteresis. Sans memoire, une marge ne sert a rien.
     """
-    ouvertes: dict[str, str | None] = {}
-    for grandeur in GRANDEURS:
-        j = jugements.get(grandeur, Jugement(False, False))
-        cote = None
-        if j.bas and (grandeur, "bas") in ALERTES:
-            cote = "bas"
-        elif j.haut and (grandeur, "haut") in ALERTES:
-            cote = "haut"
-        ouvertes[grandeur] = cote
-    return ouvertes
+    franchis: dict[str, str | None] = {}
+
+    for grandeur, regle in regles.items():
+        valeur = mesures.get(grandeur)
+        if valeur is None:
+            franchis[grandeur] = None
+            continue
+
+        appris = seuils_ia.get(grandeur) or {}
+        bas = _borne_effective(regle.bas, appris.get("bas"))
+        haut = _borne_effective(regle.haut, appris.get("haut"))
+        marge = MARGE_BORNE * etendues.get(grandeur, 100.0)
+        avant = precedents.get(grandeur)
+
+        # Sortir demande de repasser la borne d'une marge ; entrer se
+        # fait a la borne exacte, pour que le chiffre affiche soit bien
+        # celui qui declenche.
+        if bas is not None and valeur < (bas + marge if avant == "bas" else bas):
+            franchis[grandeur] = "bas"
+        elif haut is not None and valeur > (haut - marge if avant == "haut" else haut):
+            franchis[grandeur] = "haut"
+        else:
+            franchis[grandeur] = None
+
+    return franchis
 
 
+def decider(regles: dict[str, Regle],
+            franchis: dict[str, str | None]) -> dict[str, Commande]:
+    """Les etats voulus des actionneurs, d'apres les regles seules.
 
-def decider(jugements: dict[str, Jugement],
-            mesures: dict[str, float]) -> dict[str, Commande]:
-    """Les etats voulus pour chaque actionneur pilote par le modele.
+    Une action est MAINTENUE tant que la borne reste franchie, et
+    relachee ensuite -- l'actionneur revient alors a l'etat inverse.
+    Sans cela, un bipeur declenche par un reservoir vide sonnerait
+    encore une fois rempli.
 
-    Renvoie des ETATS, pas des impulsions : la duree d'un arrosage ou la
-    cadence d'une alerte sonore relevent du temps, donc du cerveau.
+    Deux regles qui se disputent le meme actionneur : celle qui est
+    active l'emporte. Si les deux le sont, la premiere dans l'ordre des
+    grandeurs decide -- c'est arbitraire, mais c'est stable, et l'ecran
+    montre les deux alertes.
     """
     ordres: dict[str, Commande] = {}
+    affichages: dict[str, Action] = {}
 
-    def juge(grandeur: str) -> Jugement:
-        return jugements.get(grandeur, Jugement(False, False))
+    for grandeur in GRANDEURS:
+        regle = regles.get(grandeur)
+        if regle is None:
+            continue
+        for cote, action in (("bas", regle.action_bas), ("haut", regle.action_haut)):
+            if action is None or action.genre == "aucun":
+                continue
+            actif = franchis.get(grandeur) == cote
 
-    # ---- humidite du sol : les deux actionneurs qui la corrigent ----
-    sol = juge("humidite_sol_a")
-    ordres["pompe"] = Commande(1.0 if sol.bas else 0.0, "ia")
-    ordres["ventilation"] = Commande(1.0 if sol.haut else 0.0, "ia")
+            if action.genre == "ecran":
+                if actif and action.cible not in affichages:
+                    affichages[action.cible or "ecran"] = action
+                continue
 
-    # ---- reserve d'eau : alerter, et proteger la pompe ----
-    eau = juge("niveau_eau")
-    ordres["bipeur"] = Commande(1.0 if eau.bas else 0.0, "ia")
+            if action.genre == "actionneur" and action.cible:
+                voulu = float(action.valeur or 0.0) if actif else                     (0.0 if float(action.valeur or 0.0) > 0 else 1.0)
+                # Une regle active ne se laisse pas ecraser par une
+                # regle au repos.
+                if actif or action.cible not in ordres:
+                    ordres[action.cible] = Commande(voulu, "regle")
 
-    niveau = mesures.get("niveau_eau")
-    if niveau is not None and niveau <= PLANCHER_POMPE:
-        # Prime sur la decision du reseau, meme s'il a raison par ailleurs.
-        ordres["pompe"] = Commande(0.0, "securite")
-
-    # ---- lumiere : un budget quotidien, pas un seuil instantane ----
-    # Trop peu de lumiere recue aujourd'hui : on eclaire jusqu'a combler.
-    # Assez, ou trop : on eteint. La plante a besoin de nuit autant que
-    # de jour.
-    jour = juge("eclairement_jour")
-    ordres["lumiere"] = Commande(1.0 if jour.bas and not jour.haut else 0.0, "ia")
-
-    # ---- temperature : jugee, mais rien ne peut agir dessus ----
-    # Le seuil sert a l'affichage et a l'alerte visuelle, pas a une
-    # commande. Aucune resistance ni climatisation dans le montage.
+    for cible, action in affichages.items():
+        ordres[cible] = Commande(1.0, "regle", action.texte)
 
     return ordres

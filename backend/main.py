@@ -30,12 +30,14 @@ import donnees
 import eclairement
 import poids as magasin
 import registre
+import regles
 import schema
 import seuils
 import systeme
 import verrous
 from config import (
     ARCHIVAGE_S, CAMERA_FICHIER, CAMERA_FRAICHEUR_S, TOPIC_COMMANDES,
+    TOPIC_REGLES,
 )
 from drivers import DRIVERS, SORTIES
 
@@ -383,6 +385,130 @@ def modele():
         "contexte": {cle: round(float(v), 2) for cle, v in contexte.items()},
         "cible_lumiere_h": donnees.CIBLE_LUMIERE_H,
     }
+
+
+class BorneRecue(BaseModel):
+    mode: str
+    valeur: float | None = None
+    action: dict | None = None
+
+
+class RegleRecue(BaseModel):
+    bas: BorneRecue
+    haut: BorneRecue
+
+
+def _verifier_action(brut: dict | None) -> decision.Action | None:
+    """Valide une action avant de l'enregistrer.
+
+    Le cerveau tourne sans surveillance : une action qui designe un
+    actionneur retire du registre le ferait publier dans le vide pour
+    toujours. On refuse ici, ou l'utilisateur peut encore l'apprendre.
+    """
+    if not brut or brut.get("genre") in (None, "aucun"):
+        return None
+
+    genre = brut.get("genre")
+    connus = {a["id"] for a in registre.actionneurs_actifs()}
+
+    if genre == "actionneur":
+        if brut.get("cible") not in connus:
+            raise HTTPException(400, f"actionneur inconnu : {brut.get('cible')}")
+        return decision.Action("actionneur", brut["cible"],
+                               1.0 if brut.get("valeur") else 0.0)
+
+    if genre == "ecran":
+        if brut.get("cible", "ecran") not in connus:
+            raise HTTPException(400, "aucun afficheur disponible")
+        texte = (brut.get("texte") or "").strip()
+        if not texte:
+            raise HTTPException(400, "texte d'affichage vide")
+        return decision.Action("ecran", brut.get("cible", "ecran"),
+                               texte=texte[:TEXTE_MAXIMAL])
+
+    raise HTTPException(400, f"genre d'action inconnu : {genre}")
+
+
+@app.get("/api/regles")
+def lire_regles():
+    """Les regles en place, et de quoi les editer.
+
+    Renvoie aussi les seuils que le reseau vient d'apprendre et les
+    actionneurs disponibles : l'ecran ne doit pas avoir a les deviner,
+    ni proposer un actionneur qui n'existe plus.
+    """
+    p, meta, _ = modele_courant()
+    appris = {}
+    if p is not None:
+        contexte = {c: v for c, v, _, _ in interroger(DERNIERES)}
+        maintenant = datetime.now()
+        contexte["heure"] = maintenant.hour + maintenant.minute / 60
+        try:
+            with base() as conn:
+                contexte["eclairement_jour"] = eclairement.heures_du_jour(conn)
+        except HTTPException:
+            contexte["eclairement_jour"] = 0.0
+        appris = seuils.frontieres(p, np.array(meta["bornes"]), contexte)
+
+    capteurs = {c["id"]: c for c in registre.capteurs_actifs()}
+    with base() as conn:
+        posees = {r["grandeur"]: r for r in regles.brutes(conn)}
+
+    return {
+        "grandeurs": [
+            {
+                "id": g,
+                "libelle": capteurs.get(g, {}).get("libelle", g),
+                "unite": capteurs.get(g, {}).get("unite", ""),
+                "echelle": capteurs.get(g, {}).get("echelle"),
+                "seuil_ia": appris.get(g),
+                "regle": posees.get(g),
+            }
+            for g in decision.GRANDEURS if g in capteurs
+        ],
+        "actionneurs": [
+            {"id": a["id"], "libelle": a["libelle"]}
+            for a in registre.actionneurs_actifs()
+        ],
+    }
+
+
+@app.put("/api/regles/{grandeur}")
+def poser_regle(grandeur: str, corps: RegleRecue,
+                botanik_session: str | None = Cookie(default=None)):
+    """Pose ou remplace la regle d'une grandeur."""
+    if not compte_ouvert(botanik_session):
+        raise HTTPException(401, "connexion requise")
+    if grandeur not in decision.GRANDEURS:
+        raise HTTPException(400, f"grandeur inconnue : {grandeur}")
+
+    regle = decision.Regle(
+        bas=decision.Borne(corps.bas.mode, corps.bas.valeur),
+        haut=decision.Borne(corps.haut.mode, corps.haut.valeur),
+        action_bas=_verifier_action(corps.bas.action),
+        action_haut=_verifier_action(corps.haut.action),
+    )
+    try:
+        with base() as conn:
+            regles.enregistrer(conn, grandeur, regle)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+    # Le cerveau relit aussitot plutot qu'a son prochain tour de garde.
+    bus.publier(TOPIC_REGLES, {"grandeur": grandeur})
+    return {"ok": True}
+
+
+@app.delete("/api/regles/{grandeur}")
+def retirer_regle(grandeur: str,
+                  botanik_session: str | None = Cookie(default=None)):
+    """Retire la regle d'une grandeur : la serre cesse de s'en occuper."""
+    if not compte_ouvert(botanik_session):
+        raise HTTPException(401, "connexion requise")
+    with base() as conn:
+        efface = regles.retirer(conn, grandeur)
+    bus.publier(TOPIC_REGLES, {"grandeur": grandeur})
+    return {"ok": efface}
 
 
 @app.get("/api/sante")

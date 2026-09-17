@@ -50,9 +50,14 @@ actionneurs:
 
   - id: bipeur
     libelle: Alerte sonore
-    detail: Réserve d'eau à remplir
+    detail: Avertisseur sonore
     actif: true
     pilote: ia
+    # Un avertisseur continu devient vite insupportable et plus personne
+    # n'y reagit : une seconde toutes les huit se remarque sans s'imposer.
+    # C'est une propriete du materiel, pas une regle de la serre -- elle
+    # s'applique quelle que soit la regle qui le declenche.
+    salve: {actif_s: 1, repos_s: 8}
     reel: {driver: gpio, broche: 24}
     simule: {}
 

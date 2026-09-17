@@ -102,3 +102,9 @@ TOPIC_MESURES = "botanik/mesures"
 TOPIC_COMMANDES = "botanik/commandes"
 TOPIC_ETAT = "botanik/etat"
 TOPIC_ALERTES = "botanik/alertes"
+
+# Un simple signal : « les regles ont change, relis-les ». Le contenu du
+# message n'a aucune importance -- la base reste la source de verite, et
+# deux services qui se passeraient les regles par MQTT finiraient par
+# diverger.
+TOPIC_REGLES = "botanik/regles"

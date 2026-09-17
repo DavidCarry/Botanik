@@ -29,11 +29,13 @@ import donnees
 import eclairement
 import poids as magasin
 import registre
+import regles
 import reseau
+import seuils
 import service
 import verrous
 from config import (
-    TOPIC_ALERTES, TOPIC_COMMANDES, TOPIC_ETAT, TOPIC_MESURES,
+    TOPIC_ALERTES, TOPIC_COMMANDES, TOPIC_ETAT, TOPIC_MESURES, TOPIC_REGLES,
 )
 
 # Cadence de decision.
@@ -107,6 +109,17 @@ class Cerveau:
         # ne doit pas continuer a recevoir des ordres que personne
         # n'ecoute : le journal se remplirait de commandes ignorees.
         self.pilotes: set[str] = set()
+        # Les regles de l'utilisateur, l'etendue de chaque grandeur et les
+        # seuils que le reseau a appris : de quoi resoudre une borne.
+        self.regles: dict[str, decision.Regle] = {}
+        self.etendues: dict[str, float] = {}
+        self.seuils_ia: dict[str, dict] = {}
+        # Cote franchi au tour precedent, pour l'hysteresis des bornes.
+        self.franchis: dict[str, str | None] = {}
+        # Actionneurs qui s'expriment par salves, d'apres le registre.
+        self.salves: dict[str, dict] = {}
+        self.bascules: dict[str, float] = {}
+        self.seuils_a_relire = True
         # Ce qui vient de la base, et l'instant ou il faudra le relire.
         self.contexte_lent = None
         self.prochain_contexte = 0.0
@@ -142,6 +155,13 @@ class Cerveau:
     # ---- entrees ----
 
     def sur_message(self, client, userdata, msg):
+        if msg.topic == TOPIC_REGLES:
+            # On ne lit pas la base ici -- on est dans le fil de paho.
+            # Il suffit de perimer le contexte : le prochain tour relira.
+            self.prochain_contexte = 0.0
+            print("regles modifiees, relecture au prochain tour", flush=True)
+            return
+
         identifiant = msg.topic.rsplit("/", 1)[-1]
         try:
             charge = json.loads(msg.payload)
@@ -190,10 +210,16 @@ class Cerveau:
                 with bdd.connexion() as conn:
                     self.contexte_lent = (eclairement.heures_du_jour(conn),
                                           verrous.actifs(conn))
+                    self.regles = regles.lire(conn)
             except psycopg.Error as e:
                 self._plaindre(f"lecture de la base impossible : {e}")
                 return None
             self.prochain_contexte = instant + CONTEXTE_LENT_S
+            # Les frontieres du reseau se relisent au meme rythme : elles
+            # dependent de la chaleur et de la lumiere, qui ne changent
+            # pas en deux secondes. Mais elles ont besoin du contexte
+            # complet, qui n'est pret qu'en fin de methode.
+            self.seuils_a_relire = True
 
         eclaire, journal = self.contexte_lent
         contexte["eclairement_jour"] = eclaire
@@ -210,12 +236,14 @@ class Cerveau:
         local = datetime.now()
         contexte["heure"] = local.hour + local.minute / 60
 
-        X = np.array([[contexte[e] for e in donnees.ENTREES]], dtype=float)
-        return X, contexte
+        if self.seuils_a_relire:
+            self.relire_seuils(contexte)
+            self.seuils_a_relire = False
+        return contexte
 
     # ---- sortie ----
 
-    def ordonner(self, client, actionneur, valeur, source):
+    def ordonner(self, client, actionneur, valeur, source, texte=None):
         """N'emet que si l'actionneur n'est pas deja dans cet etat.
 
         L'etat vient de l'actionneur lui-meme, pas d'un souvenir local :
@@ -234,12 +262,14 @@ class Cerveau:
             return
         charge = {"valeur": valeur, "source": source,
                   "ts": datetime.now(timezone.utc).isoformat()}
+        if texte is not None:
+            charge["contenu"] = {"mode": "texte", "texte": texte}
         client.publish(f"{TOPIC_COMMANDES}/{actionneur}", json.dumps(charge), qos=1)
         print(f"{source} -> {actionneur} = {valeur}", flush=True)
 
     # ---- boucle ----
 
-    def annoncer_alertes(self, client, jugements, contexte):
+    def annoncer_alertes(self, client, franchis, contexte):
         """Publie ce qui ne va pas, et seulement quand cela change.
 
         Message retenu : un service qui se connecte ensuite connait
@@ -251,7 +281,7 @@ class Cerveau:
         C'est precisement ce qu'on veut voir a l'ecran : le probleme, et
         le fait qu'il soit pris en charge.
         """
-        for grandeur, cote in decision.alertes(jugements).items():
+        for grandeur, cote in franchis.items():
             if self.alertes.get(grandeur, "?") == cote:
                 continue
             charge = {
@@ -267,26 +297,39 @@ class Cerveau:
             else:
                 print(f"alerte {grandeur} levee", flush=True)
 
-    def decider(self, client):
-        """Met a jour les etats voulus. N'actionne rien : c'est `tour` qui
-        traduit ces etats en impulsions et en salves."""
+    def relire_seuils(self, contexte):
+        """Ou le reseau place ses frontieres, aux conditions du moment.
+
+        Ce n'est plus lui qui commande, mais c'est toujours lui qui
+        APPREND : une borne reglee sur « ia » le suit, et se deplace
+        donc quand il fait chaud ou clair. Le balayage coute trop cher
+        pour le refaire deux fois par seconde -- et ces frontieres
+        bougent en minutes.
+        """
         if self.poids is None:
             return
-        situation = self.situation()
-        if situation is None:
+        try:
+            self.seuils_ia = seuils.frontieres(self.poids, self.bornes, contexte)
+        except Exception as e:
+            self._plaindre(f"lecture des seuils impossible : {e}")
+
+    def decider(self, client):
+        """Confronte les mesures aux bornes, et en tire les ordres.
+
+        Aucune regle n'est ecrite ici : tout vient de ce que
+        l'utilisateur a regle. Une grandeur sans regle ne declenche ni
+        alerte ni commande, et c'est l'etat de depart.
+        """
+        contexte = self.situation()
+        if contexte is None:
             return
-        X, contexte = situation
 
-        # On lit les PROBABILITES et non les jugements deja tranches :
-        # l'hysteresis a besoin de la nuance pour ne pas basculer sur un
-        # dixieme de point.
-        p = reseau.avant(self.poids, donnees.normaliser(X, self.bornes))[0][0]
-        probabilites = {sortie: float(p[i]) for i, sortie in enumerate(donnees.SORTIES)}
-        jugements = decision.juger(probabilites, self.jugements)
-        self.jugements = jugements
-
-        self.voulu = decision.decider(jugements, contexte)
-        self.annoncer_alertes(client, jugements, contexte)
+        franchis = decision.cotes_franchis(
+            self.regles, contexte, self.seuils_ia, self.etendues, self.franchis,
+        )
+        self.franchis = franchis
+        self.voulu = decision.decider(self.regles, franchis)
+        self.annoncer_alertes(client, franchis, contexte)
         self.plainte = None
 
     def tour(self, client):
@@ -303,55 +346,53 @@ class Cerveau:
         if not self.voulu:
             return
 
-        # Etats maintenus : ils suivent la decision sans mise en forme.
-        for actionneur in ("ventilation", "lumiere"):
-            ordre = self.voulu.get(actionneur)
-            if ordre:
-                self.ordonner(client, actionneur, ordre.valeur, ordre.source)
+        for actionneur, ordre in self.voulu.items():
+            salve = self.salves.get(actionneur)
+            if salve and ordre.valeur > 0:
+                self._salve(client, actionneur, salve, maintenant)
+            else:
+                self.bascules.pop(actionneur, None)
+                self.ordonner(client, actionneur, ordre.valeur, ordre.source,
+                              ordre.texte)
 
-        self._pompe(client, maintenant)
-        self._bipeur(client, maintenant)
+    def _salve(self, client, actionneur, salve, maintenant):
+        """Alterne allume et eteint tant que l'ordre tient.
 
-    def _pompe(self, client, maintenant):
-        """Impulsion puis repos : on laisse l'eau s'infiltrer avant de
-        juger a nouveau, sinon on noierait les graines."""
-        ordre = self.voulu.get("pompe")
-        if ordre is None:
+        Un avertisseur continu devient vite insupportable, et plus
+        personne n'y reagit. La cadence est declaree au registre, par
+        actionneur : c'est une propriete du materiel, pas une regle de
+        la serre.
+        """
+        if maintenant < self.bascules.get(actionneur, 0.0):
             return
-
-        if self.fin_impulsion is not None:
-            if maintenant >= self.fin_impulsion:
-                self.ordonner(client, "pompe", 0.0, "ia")
-                self.fin_impulsion = None
-                self.repos_jusqu_a = maintenant + REPOS_S
-            return
-
-        if ordre.valeur > 0 and maintenant >= self.repos_jusqu_a:
-            self.ordonner(client, "pompe", 1.0, ordre.source)
-            self.fin_impulsion = maintenant + IMPULSION_S
-        elif ordre.valeur == 0:
-            # Couvre le cas de la securite : couper meme hors impulsion.
-            self.ordonner(client, "pompe", 0.0, ordre.source)
-
-    def _bipeur(self, client, maintenant):
-        """Salves tant que l'alerte tient."""
-        ordre = self.voulu.get("bipeur")
-        if ordre is None or ordre.valeur == 0:
-            self.ordonner(client, "bipeur", 0.0, "ia")
-            return
-        if maintenant < self.bascule_bip:
-            return
-        actif = self.etats.get("bipeur", 0.0) > 0
-        self.ordonner(client, "bipeur", 0.0 if actif else 1.0, "ia")
-        self.bascule_bip = maintenant + (SILENCE_BIP_S if actif else BIP_S)
-
+        actif = self.etats.get(actionneur, 0.0) > 0
+        self.ordonner(client, actionneur, 0.0 if actif else 1.0, "regle")
+        repos = salve.get("repos_s", 8.0) if actif else salve.get("actif_s", 1.0)
+        self.bascules[actionneur] = maintenant + float(repos)
 
 
 def main():
     c = Cerveau()
-    pilotes = [a["id"] for a in registre.actionneurs_actifs()
-               if a.get("pilote") == "ia"]
-    c.pilotes = set(pilotes)
+
+    # Tout actionneur actif est pilotable par une regle : le registre ne
+    # dit plus qui « appartient » a l'IA, puisqu'il n'y a plus de regles
+    # ecrites en dur. C'est l'utilisateur qui designe les actionneurs, un
+    # par un, dans les regles qu'il ecrit.
+    actionneurs = registre.actionneurs_actifs()
+    c.pilotes = {a["id"] for a in actionneurs}
+    c.salves = {a["id"]: a["salve"] for a in actionneurs if a.get("salve")}
+
+    # L'etendue de chaque grandeur, pour donner son echelle a la marge
+    # d'hysteresis des bornes.
+    connus = {x["id"]: x for x in registre.capteurs_actifs()}
+    c.etendues = {}
+    for grandeur in decision.GRANDEURS:
+        if grandeur in connus:
+            e = connus[grandeur]["echelle"]
+            c.etendues[grandeur] = float(e["max"] - e["min"])
+        elif grandeur in donnees.HORS_REGISTRE:
+            bas, haut = donnees.HORS_REGISTRE[grandeur]
+            c.etendues[grandeur] = float(haut - bas)
 
     def on_connect(client, userdata, flags, reason_code, properties):
         if reason_code != 0:
@@ -360,14 +401,17 @@ def main():
         client.subscribe(f"{TOPIC_MESURES}/#", qos=0)
         client.subscribe(f"{TOPIC_ETAT}/#", qos=1)
         client.subscribe(f"{TOPIC_COMMANDES}/#", qos=1)
-        print("Abonne aux mesures, aux etats et aux commandes", flush=True)
-
-    print(f"Cerveau : {len(pilotes)} actionneurs pilotes "
-          f"({', '.join(pilotes) or 'aucun'}), decision toutes les "
-          f"{DECISION_S}s", flush=True)
-    if not pilotes:
-        print("  il juge et alerte, mais rien n'est cable pour agir",
+        # L'API previent ici quand une regle change : sans cela, un
+        # reglage fait a l'ecran attendrait la relecture periodique.
+        client.subscribe(TOPIC_REGLES, qos=1)
+        print("Abonne aux mesures, aux etats, aux commandes et aux regles",
               flush=True)
+
+    print(f"Cerveau : {len(c.pilotes)} actionneurs a disposition "
+          f"({', '.join(sorted(c.pilotes)) or 'aucun'}), decision toutes "
+          f"les {DECISION_S}s", flush=True)
+    print("  aucune regle n'est ecrite ici : tout vient de l'interface",
+          flush=True)
     service.executer("Cerveau", periode=1, travail=c.tour,
                      on_connect=on_connect, on_message=c.sur_message)
 
