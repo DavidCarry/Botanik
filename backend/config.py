@@ -75,6 +75,12 @@ CAMERA_FICHIER = os.getenv("CAMERA_FICHIER", "/dev/shm/botanik/vue.jpg")
 CAMERA_S = float(os.getenv("CAMERA_S", "1"))
 CAMERA_TAILLE = (1280, 720)
 
+# Rotation a appliquer, en degres : 0 ou 180 selon le sens de montage du
+# module. Une camera fixee tete en bas donne une image renversee, et la
+# retourner dans le navigateur ferait porter au client un probleme de
+# visserie.
+CAMERA_ROTATION = int(os.getenv("CAMERA_ROTATION", "0"))
+
 # Au-dela, la derniere vue est consideree comme perimee et l'ecran le
 # dit plutot que de la faire passer pour du direct.
 CAMERA_FRAICHEUR_S = float(os.getenv("CAMERA_FRAICHEUR_S", "10"))

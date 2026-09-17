@@ -27,7 +27,7 @@ import signal
 import sys
 import time
 
-from config import CAMERA_FICHIER, CAMERA_S, CAMERA_TAILLE
+from config import CAMERA_FICHIER, CAMERA_ROTATION, CAMERA_S, CAMERA_TAILLE
 
 # Delai avant la premiere prise : le reglage automatique de l'exposition
 # et de la balance des blancs a besoin de quelques images pour se poser.
@@ -67,7 +67,15 @@ def main() -> int:
     signal.signal(signal.SIGTERM, arreter)
 
     camera = Picamera2()
-    camera.configure(camera.create_still_configuration(main={"size": CAMERA_TAILLE}))
+    reglage = {"main": {"size": CAMERA_TAILLE}}
+
+    # Le retournement se fait a la prise, pas a l'affichage : c'est un
+    # fait de montage, et le navigateur n'a pas a le connaitre.
+    if CAMERA_ROTATION == 180:
+        from libcamera import Transform
+        reglage["transform"] = Transform(hflip=1, vflip=1)
+
+    camera.configure(camera.create_still_configuration(**reglage))
     camera.start()
 
     # Mise au point continue. Le module ne la fait PAS de lui-meme : sans
