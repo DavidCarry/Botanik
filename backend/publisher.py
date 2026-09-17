@@ -27,6 +27,33 @@ def charger_capteurs():
     ]
 
 
+# Marge toleree autour de l'echelle declaree, en part de son etendue.
+#
+# Une sonde analogique debranchee ne leve AUCUNE erreur : elle renvoie
+# zero volt, donc une valeur parfaitement lisible et completement fausse.
+# C'est arrive en cours de route -- le capteur de temperature est passe a
+# 1 degre sans que rien ne proteste. Attendre une exception pour basculer
+# revenait a n'attraper que les pannes bruyantes.
+#
+# On refuse donc ce qui sort du domaine physique declare au registre. La
+# marge evite de crier au loup sur une serre un peu froide : la
+# temperature s'annonce de 10 a 35, on accepte de 5 a 40.
+MARGE_PLAUSIBILITE = 0.2
+
+
+def _plausible(valeur: float, params: dict) -> bool:
+    """Vrai si la valeur peut venir du capteur declare.
+
+    Sans echelle declaree, on ne juge pas : mieux vaut laisser passer une
+    valeur douteuse que d'en rejeter une bonne faute de reference.
+    """
+    echelle = params.get("echelle")
+    if not echelle:
+        return True
+    marge = MARGE_PLAUSIBILITE * (echelle["max"] - echelle["min"])
+    return echelle["min"] - marge <= valeur <= echelle["max"] + marge
+
+
 # Capteurs actuellement en repli, pour n'annoncer que les bascules.
 # Sans cela, une sonde debranchee remplirait le journal de deux lignes
 # par seconde et noierait tout le reste.
@@ -48,8 +75,11 @@ def lire_capteurs(capteurs):
     for c in capteurs:
         identifiant = c["id"]
         try:
-            valeurs[identifiant] = (DRIVERS[c["driver"]].lire(identifiant, c["params"]),
-                                    c["source"] == "simule")
+            valeur = DRIVERS[c["driver"]].lire(identifiant, c["params"])
+            if not _plausible(valeur, c["params"]):
+                raise ValueError(f"{valeur} hors du domaine declare "
+                                 f"-- sonde debranchee ?")
+            valeurs[identifiant] = (valeur, c["source"] == "simule")
             if identifiant in _en_repli:
                 _en_repli.discard(identifiant)
                 print(f"{identifiant} repond de nouveau, retour a la sonde reelle",
