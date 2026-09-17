@@ -111,7 +111,7 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
     <Bloc titre="Pilotage" actions={mention} className="md:min-h-0 md:flex-1">
       <div className="divide-y divide-bordure border-y border-bordure
                       md:h-full md:overflow-y-auto">
-        {liste.map(({ id, libelle, detail, valeur, lignes, simule,
+        {liste.map(({ id, libelle, detail, valeur, lignes, simule, verrou_s,
                       contenu: quoi }) => {
           // Seul un actionneur qui PORTE du texte se regle ; les autres
           // n'ont qu'un etat, et rien a choisir.
@@ -126,9 +126,12 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
 
           // Un afficheur allume dit ce qu'il montre, a la place de sa
           // description : c'est l'information du moment.
+          // Un verrou manuel se DIT : sinon la serre semble ignorer une
+          // regle qu'on vient de poser, et on la croit cassee.
           const sousTitre = muet ? 'Sans réponse'
-            : actif && lignes?.some(Boolean) ? lignes.filter(Boolean).join(' · ')
-              : detail
+            : verrou_s > 0 ? `Repris en main — la règle reprend dans ${verrou_s} s`
+              : actif && lignes?.some(Boolean) ? lignes.filter(Boolean).join(' · ')
+                : detail
 
           const debut = (
             <>

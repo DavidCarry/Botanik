@@ -243,7 +243,8 @@ export const seDeconnecter = () => poster<{ ok: boolean }>('/api/deconnexion')
 /** Ce qu'un afficheur doit montrer : une intention, pas un texte figé.
  *  « la température » suit la mesure ; « 23.6 °C » resterait figé. */
 export type Contenu =
-  | { mode: 'mesure'; capteur: string }
+  /** Plusieurs capteurs : ils défilent, cinq secondes chacun. */
+  | { mode: 'mesure'; capteurs: string[]; capteur?: string }
   | { mode: 'texte'; texte: string }
 
 export type Actionneur = {

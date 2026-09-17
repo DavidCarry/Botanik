@@ -62,13 +62,24 @@ export default function Affichage({
   const { capteurs } = useMesures()
 
   const [mode, setMode] = useState<'mesure' | 'texte'>(actuel?.mode ?? 'mesure')
-  const [capteur, setCapteur] = useState(
-    actuel?.mode === 'mesure' ? actuel.capteur : '',
+  const [choisis, setChoisis] = useState<string[]>(
+    actuel?.mode === 'mesure'
+      ? actuel.capteurs ?? (actuel.capteur ? [actuel.capteur] : [])
+      : [],
   )
   const [texte, setTexte] = useState(actuel?.mode === 'texte' ? actuel.texte : '')
 
   const liste = capteurs ?? []
-  const choisi = liste.find((c) => c.id === capteur) ?? liste[0]
+  const retenus = liste.filter((c) => choisis.includes(c.id))
+  // L'aperçu montre le PREMIER du défilement : les autres suivront.
+  const choisi = retenus[0]
+
+  const basculer = (id: string) => {
+    setMode('mesure')
+    setChoisis((actuels) => actuels.includes(id)
+      ? actuels.filter((x) => x !== id)
+      : [...actuels, id])
+  }
 
   // L'aperçu compose exactement comme le service : libellé du registre,
   // puis valeur et unité.
@@ -79,7 +90,7 @@ export default function Affichage({
          choisi.mesure ? `${choisi.mesure.valeur} ${choisi.unite}` : 'en attente']
       : ['', '']
 
-  const valide = mode === 'texte' ? texte.trim().length > 0 : Boolean(choisi)
+  const valide = mode === 'texte' ? texte.trim().length > 0 : choisis.length > 0
 
   return (
     <Modale
@@ -91,13 +102,13 @@ export default function Affichage({
       <div className="space-y-4">
         <div className="grid grid-cols-2 gap-2">
           {liste.map((c) => {
-            const actif = mode === 'mesure' && choisi?.id === c.id
+            const actif = mode === 'mesure' && choisis.includes(c.id)
             return (
               <button
                 key={c.id}
                 type="button"
                 aria-pressed={actif}
-                onClick={() => { setMode('mesure'); setCapteur(c.id) }}
+                onClick={() => basculer(c.id)}
                 className={`rounded-carte border px-3 py-2 text-left text-menu
                             transition-colors duration-200 ${
                   actif
@@ -135,13 +146,20 @@ export default function Affichage({
 
         <Apercu lignes={lignes} />
 
+        {mode === 'mesure' && retenus.length > 1 && (
+          <p className="text-micro text-texte-faible">
+            {retenus.length} mesures choisies : elles défilent, cinq secondes
+            chacune, dans l’ordre où tu les as cochées.
+          </p>
+        )}
+
         <button
           type="button"
           disabled={!valide}
           onClick={() => onValider(
             mode === 'texte'
               ? { mode: 'texte', texte: texte.trim() }
-              : { mode: 'mesure', capteur: choisi!.id },
+              : { mode: 'mesure', capteurs: retenus.map((c) => c.id) },
           )}
           className="w-full rounded-carte border border-bordure bg-accent-voile
                      py-2 text-menu font-medium text-accent-vif transition-colors

@@ -29,9 +29,9 @@ HYPERPARAMETRES = {"n_caches": 20, "taux": 1.5, "epoques": 14000, "graine": 0}
 SITUATIONS = [
     ("nuit fraiche", {"temperature_air": 14, "luminosite": 0, "heure": 3,
                       "eclairement_jour": 0, "niveau_eau": 80}),
-    ("matinee douce", {"temperature_air": 20, "luminosite": 4000, "heure": 9,
+    ("matinee douce", {"temperature_air": 20, "luminosite": 33, "heure": 9,
                        "eclairement_jour": 2, "niveau_eau": 80}),
-    ("plein soleil", {"temperature_air": 30, "luminosite": 10000, "heure": 14,
+    ("plein soleil", {"temperature_air": 30, "luminosite": 83, "heure": 14,
                       "eclairement_jour": 7, "niveau_eau": 80}),
 ]
 

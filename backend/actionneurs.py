@@ -11,6 +11,7 @@ supposition, il attend la reponse du materiel.
 """
 
 import json
+import time
 from datetime import datetime, timezone
 
 import paho.mqtt.client as mqtt
@@ -46,22 +47,58 @@ _etats: dict[str, float] = {}
 _en_repli: set[str] = set()
 
 
-def composer(contenu: dict) -> list[str]:
-    """Les deux lignes a afficher, d'apres l'intention et les mesures.
+# Duree d'affichage de chaque mesure quand l'ecran en montre plusieurs.
+#
+# Cinq secondes : le temps de lire deux lignes sans avoir a attendre.
+# Plus court, on rate la valeur ; plus long, on croit l'ecran fige.
+DEFILEMENT_S = 5.0
 
-    Composer ici plutot que dans le driver : le service connait le
-    registre et recoit les mesures, le driver ne connait qu'un ecran.
-    """
-    if contenu.get("mode") == "texte":
-        texte = str(contenu.get("texte", ""))
-        return [texte[:COLONNES], texte[COLONNES:2 * COLONNES]]
 
-    capteur = contenu.get("capteur", "")
+def _une_mesure(capteur: str) -> list[str]:
     libelle = _libelles.get(capteur, capteur or "?")
     mesure = _mesures.get(capteur)
     if mesure is None:
         return [libelle, "en attente"]
     return [libelle, f"{mesure['valeur']} {mesure.get('unite', '')}".strip()]
+
+
+def capteurs_choisis(contenu: dict) -> list[str]:
+    """Les capteurs demandes, qu'il y en ait un ou plusieurs.
+
+    L'ancien format ne portait qu'un `capteur`; on l'accepte toujours,
+    sinon une regle enregistree avant ce changement cesserait d'afficher
+    quoi que ce soit.
+    """
+    plusieurs = contenu.get("capteurs")
+    if isinstance(plusieurs, list) and plusieurs:
+        return [c for c in plusieurs if isinstance(c, str)]
+    seul = contenu.get("capteur")
+    return [seul] if seul else []
+
+
+def composer(contenu: dict) -> list[str]:
+    """Les deux lignes a afficher, d'apres l'intention et les mesures.
+
+    Composer ici plutot que dans le driver : le service connait le
+    registre et recoit les mesures, le driver ne connait qu'un ecran.
+
+    Plusieurs mesures demandees : elles defilent, chacune son tour. Le
+    rang se calcule sur l'horloge et non sur un compteur -- ainsi deux
+    ecrans afficheraient la meme chose au meme instant, et un service
+    qui redemarre ne repart pas du debut.
+    """
+    if contenu.get("mode") == "texte":
+        texte = str(contenu.get("texte", ""))
+        return [texte[:COLONNES], texte[COLONNES:2 * COLONNES]]
+
+    choisis = capteurs_choisis(contenu)
+    if not choisis:
+        return ["", ""]
+    if len(choisis) == 1:
+        return _une_mesure(choisis[0])
+
+    rang = int(time.monotonic() / DEFILEMENT_S) % len(choisis)
+    return _une_mesure(choisis[rang])
 
 
 def charger_actionneurs():

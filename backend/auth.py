@@ -44,7 +44,9 @@ def compte_initial(conn):
         if cur.fetchone()[0] > 0:
             return None
 
-        identifiant = os.getenv("ADMIN_IDENTIFIANT", "admin")
+        # `david` par defaut plutot qu'`admin` : c'est le compte du
+        # projet, et un identifiant generique invite a le garder.
+        identifiant = os.getenv("ADMIN_IDENTIFIANT", "david")
         mot_de_passe = os.getenv("ADMIN_MDP") or secrets.token_urlsafe(9)
         cur.execute(
             "INSERT INTO utilisateurs (identifiant, empreinte) VALUES (%s, %s)",

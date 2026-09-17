@@ -826,9 +826,13 @@ class Contenu(BaseModel):
 
     Une INTENTION, pas un texte fige : « la temperature » suit la mesure,
     la ou « 23.6 C » resterait affiche apres coup.
+
+    Plusieurs capteurs sont acceptes : ils defilent alors a l'ecran,
+    cinq secondes chacun.
     """
     mode: str
     capteur: str | None = None
+    capteurs: list[str] | None = None
     texte: str | None = None
 
 
@@ -853,9 +857,17 @@ def verifier_contenu(contenu: Contenu) -> dict:
 
     if contenu.mode == "mesure":
         connus = {c["id"] for c in registre.capteurs_actifs()}
-        if contenu.capteur not in connus:
-            raise HTTPException(400, f"capteur inconnu : {contenu.capteur}")
-        return {"mode": "mesure", "capteur": contenu.capteur}
+        demandes = contenu.capteurs or (
+            [contenu.capteur] if contenu.capteur else [])
+        # On garde l'ordre demande, sans doublon : c'est celui du
+        # defilement, et l'utilisateur l'a choisi.
+        choisis = list(dict.fromkeys(demandes))
+        if not choisis:
+            raise HTTPException(400, "aucun capteur choisi")
+        for c in choisis:
+            if c not in connus:
+                raise HTTPException(400, f"capteur inconnu : {c}")
+        return {"mode": "mesure", "capteurs": choisis}
 
     raise HTTPException(400, f"mode d'affichage inconnu : {contenu.mode}")
 

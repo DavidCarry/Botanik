@@ -29,17 +29,19 @@ GRANDEURS = [
     "eclairement_jour",
 ]
 
-# Duree pendant laquelle le modele s'efface apres une commande manuelle.
+# Duree pendant laquelle une regle s'efface apres une commande manuelle.
 #
-# Reprendre la main doit avoir un effet durable : sans ce delai, le
-# modele remettrait l'actionneur dans SON etat a la decision suivante --
-# trente secondes plus tard -- et l'interrupteur reviendrait tout seul
-# sous le doigt de l'utilisateur.
+# Reprendre la main doit avoir un effet : sans ce delai, la regle
+# remettrait l'actionneur dans SON etat deux secondes plus tard, et
+# l'interrupteur reviendrait tout seul sous le doigt.
 #
-# Le garde-fou de securite, lui, n'est jamais verrouille : si la reserve
-# se vide pendant un arrosage manuel, la pompe doit s'arreter malgre
-# tout. Une pompe grillee ne se discute pas.
-VERROU_MANUEL_S = 300
+# Trente secondes, et non cinq minutes comme au depart. Ce verrou datait
+# d'une epoque ou les regles venaient du modele et non de l'utilisateur :
+# se proteger de sa propre consigne pendant cinq minutes, sans que rien
+# ne l'affiche, donnait une serre qui « ne fait rien » sans dire
+# pourquoi. L'ecran l'annonce desormais, et le delai tient dans le temps
+# d'un essai.
+VERROU_MANUEL_S = 30
 
 class Jugement(NamedTuple):
     """Ce que le reseau pense d'une grandeur."""
