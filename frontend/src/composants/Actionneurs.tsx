@@ -151,6 +151,27 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
                 </span>
               </span>
 
+              {/* Colonne du reglage, reservee sur TOUTES les lignes.
+                  Seul l'afficheur y met un bouton -- mais si la place
+                  n'etait prise que la, son interrupteur se retrouverait
+                  decale de deux centimetres par rapport aux autres, et
+                  la colonne des interrupteurs cesserait d'en etre une. */}
+              {connecte && (
+                <span className="flex w-7 shrink-0 justify-center">
+                  {reglable && (
+                    <button
+                      type="button"
+                      onClick={() => setReglage(id)}
+                      aria-label={`Choisir ce qu'affiche ${libelle}`}
+                      className="rounded-pilule p-1.5 text-texte-faible
+                                 transition-colors duration-200 hover:bg-survol
+                                 hover:text-texte"
+                    >
+                      <LuPencil size={14} />
+                    </button>
+                  )}
+                </span>
+              )}
             </>
           )
 
@@ -172,16 +193,6 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
             return (
               <div key={id} className={classes}>
                 {debut}
-                <button
-                  type="button"
-                  onClick={() => setReglage(id)}
-                  aria-label={`Choisir ce qu'affiche ${libelle}`}
-                  className="shrink-0 rounded-pilule p-1.5 text-texte-faible
-                             transition-colors duration-200 hover:bg-survol
-                             hover:text-texte"
-                >
-                  <LuPencil size={14} />
-                </button>
                 <button
                   type="button"
                   aria-pressed={actif}
