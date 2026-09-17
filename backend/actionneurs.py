@@ -225,9 +225,15 @@ def main():
         client.subscribe(f"{TOPIC_MESURES}/#", qos=0)
 
         # Au demarrage, tout est au repos : on l'annonce plutot que de
-        # laisser l'ecran deviner.
+        # laisser l'ecran deviner. Un afficheur annonce en plus son fond,
+        # sinon la page de pilotage ne saurait pas ce qu'il montrera une
+        # fois allume, et son selecteur partirait vide.
         for actionneur in actionneurs:
-            annoncer(client, actionneur, 0.0)
+            fond = _contenu.get(actionneur)
+            if fond is None:
+                annoncer(client, actionneur, 0.0)
+            else:
+                annoncer(client, actionneur, 0.0, contenu=fond)
 
     def on_message(client, userdata, msg):
         identifiant = msg.topic.rsplit("/", 1)[-1]
