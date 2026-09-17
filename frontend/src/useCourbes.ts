@@ -4,9 +4,11 @@ import {
 } from './api'
 import { useSondage } from './useSondage'
 
-// Le dernier intervalle agrege se remplit au fil des mesures : en le
-// relisant souvent, la courbe avance sous les yeux.
-const RAFRAICHISSEMENT_MS = 10_000
+// La courbe lit l'ARCHIVE, qui ne gagne un point que toutes les cinq
+// minutes : la redemander toutes les dix secondes revenait a poser
+// trente fois la meme question pour la meme reponse. Une minute laisse
+// le trace avancer sous les yeux sans interroger la base pour rien.
+const RAFRAICHISSEMENT_MS = 60_000
 
 /** Etat partage entre l'en-tete du panneau et le trace : le titre, la
  *  valeur courante et les selecteurs vivent dans la barre de titre, le

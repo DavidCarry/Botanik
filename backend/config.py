@@ -49,8 +49,27 @@ DB_URL = os.getenv(
     "DB_URL", "postgresql://botanik:botanik@127.0.0.1:5432/botanik"
 )
 
-# Periode de publication des mesures, en secondes
-INTERVALLE_S = float(os.getenv("INTERVALLE_S", "5"))
+# ---- Trois cadences, et une seule raison pour chacune ----
+#
+# Lire un capteur ne coute presque rien ; l'ecrire en base coute de la
+# place, pour toujours. Les deux n'ont donc pas a suivre le meme rythme,
+# et les confondre obligeait a choisir entre un ecran qui traine et une
+# carte SD qui se remplit.
+
+# Lecture des capteurs et diffusion sur MQTT : ce que voit le tableau de
+# bord, pousse par le flux. Deux fois par seconde, on suit un doigt pose
+# sur la sonde.
+INTERVALLE_S = float(os.getenv("INTERVALLE_S", "0.5"))
+
+# Ecriture en base : ce que montrent les courbes. Un point toutes les
+# cinq minutes fait 288 releves par jour et par capteur -- de quoi lire
+# une journee sans trou, pour environ trois megaoctets par mois.
+ARCHIVAGE_S = float(os.getenv("ARCHIVAGE_S", "300"))
+
+# Garde-fou de stockage. Sous ce seuil d'espace libre, le collecteur
+# efface les mesures les plus anciennes : perdre l'histoire vaut mieux
+# que de ne plus pouvoir enregistrer le present.
+ESPACE_MINIMAL_GO = float(os.getenv("ESPACE_MINIMAL_GO", "1.5"))
 
 # Racines des topics MQTT. Un niveau par sens de circulation :
 #   mesures/<capteur>      ce que la serre observe

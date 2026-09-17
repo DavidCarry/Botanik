@@ -10,7 +10,7 @@ redemarre a midi retrouve immediatement le bon cumul, au lieu de repartir
 de zero et de rallumer la lampe pour rien.
 """
 
-from config import INTERVALLE_S
+from config import ARCHIVAGE_S
 
 # Au-dela de ce niveau, la plante est consideree eclairee. En dessous,
 # la lumiere est trop faible pour compter dans son budget.
@@ -20,10 +20,11 @@ LUX_UTILE = 3000.0
 # ne compte pas le temps ecoule : sinon une coupure d'une nuit passerait
 # pour une nuit d'eclairage.
 #
-# Six cycles, mais jamais moins d'une demi-minute : la cadence de lecture
-# se regle librement, et a une mesure par seconde, six secondes de
-# hoquet auraient suffi a tronquer le budget du jour.
-TROU_MAXIMAL_S = max(30.0, INTERVALLE_S * 6)
+# Le trou se juge sur la cadence d'ARCHIVAGE, pas sur celle de lecture :
+# c'est l'archive qu'on relit ici. Trois intervalles, jamais moins d'une
+# demi-minute -- assez pour absorber un hoquet, assez peu pour qu'une
+# coupure ne passe pas pour une heure d'ensoleillement.
+TROU_MAXIMAL_S = max(30.0, ARCHIVAGE_S * 3)
 
 REQUETE = """
     WITH eclairee AS (

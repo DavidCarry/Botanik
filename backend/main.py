@@ -34,17 +34,21 @@ import schema
 import seuils
 import systeme
 import verrous
-from config import INTERVALLE_S, TOPIC_COMMANDES
+from config import ARCHIVAGE_S, TOPIC_COMMANDES
 from drivers import DRIVERS, SORTIES
 
 RACINE = Path(__file__).parent.parent
 DIST = RACINE / "frontend" / "dist"
 SAUVEGARDES = RACINE / "sauvegardes"
 
-# Au-dela, l'archivage est considere comme interrompu. Trois cycles de
-# publication laissent passer un retard ponctuel sans crier au loup ; le
-# plancher couvre le cas d'un intervalle tres court.
-RETARD_TOLERE_S = max(30, 3 * INTERVALLE_S)
+# Au-dela, l'archivage est considere comme interrompu.
+#
+# La reference est la cadence d'ARCHIVAGE et non celle de lecture : c'est
+# l'age de la derniere ligne EN BASE qu'on mesure ici. Depuis que les
+# deux sont decouplees, une mesure fraiche de 200 secondes est parfaitement
+# normale -- la comparer a la cadence de lecture ferait clignoter le
+# temoin en permanence.
+RETARD_TOLERE_S = max(30, 2.5 * ARCHIVAGE_S)
 
 # Fenetres proposees par le dashboard, et le pas d'agregation associe.
 # Sans regroupement, un mois de mesures a la minute ferait 43 000 points

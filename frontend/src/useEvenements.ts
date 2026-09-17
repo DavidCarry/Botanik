@@ -1,7 +1,11 @@
 import { lireEvenements, type Evenement } from './api'
 import { useSondage } from './useSondage'
 
-const RAFRAICHISSEMENT_MS = 5000
+// Le journal se lit comme il se vit : une commande ou une alerte doit
+// apparaitre dans la seconde. C'est le seul panneau qui raconte ce qui
+// s'est passe, et un decalage de cinq secondes suffisait a ce qu'on ne
+// fasse plus le lien entre un interrupteur bascule et sa ligne.
+const RAFRAICHISSEMENT_MS = 1000
 
 /** Les dernieres commandes emises, toutes origines confondues.
  *

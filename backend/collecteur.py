@@ -11,14 +11,18 @@ doit jamais s'arreter a cause d'un capteur qui deraille.
 """
 
 import json
-from datetime import datetime, timezone
+import shutil
+from datetime import datetime, timedelta, timezone
 
 import psycopg
 
 import bdd
 import schema
 import service
-from config import TOPIC_ALERTES, TOPIC_COMMANDES, TOPIC_MESURES
+from config import (
+    ARCHIVAGE_S, ESPACE_MINIMAL_GO, TOPIC_ALERTES, TOPIC_COMMANDES,
+    TOPIC_MESURES,
+)
 
 INSERTION = (
     "INSERT INTO mesures (ts, capteur, valeur, unite) VALUES (%s, %s, %s, %s)"
@@ -33,6 +37,85 @@ JOURNAL = (
 # l'insertion. On la verifie ici pour signaler l'emetteur fautif plutot
 # que de laisser remonter une erreur SQL opaque.
 SOURCES = {"manuel", "ia", "securite"}
+
+# Derniere mesure REELLEMENT ecrite pour chaque capteur.
+#
+# Les mesures arrivent deux fois par seconde, pour l'ecran ; on n'en
+# garde qu'une toutes les `ARCHIVAGE_S`. Les courbes n'ont pas besoin de
+# plus, et ecrire six cents fois par minute remplirait la carte pour rien.
+#
+# Seules les MESURES sont espacees. Les commandes et les alertes passent
+# toutes, sans exception : ce sont des evenements, pas un echantillonnage,
+# et en perdre un rendrait le journal faux.
+_dernier_archivage: dict[str, datetime] = {}
+
+
+def _a_archiver(capteur: str, ts: datetime) -> bool:
+    """Vrai si assez de temps s'est ecoule depuis la derniere ecriture.
+
+    Un capteur inconnu est toujours ecrit : au demarrage, chaque courbe
+    gagne ainsi un point tout de suite au lieu d'attendre cinq minutes.
+    """
+    precedent = _dernier_archivage.get(capteur)
+    if precedent is not None and ts - precedent < timedelta(seconds=ARCHIVAGE_S):
+        return False
+    _dernier_archivage[capteur] = ts
+    return True
+
+
+# Nombre de lignes effacees d'un coup quand la place vient a manquer.
+# Assez pour que la boucle avance, assez peu pour ne pas bloquer la table
+# pendant qu'une mesure cherche a s'inserer.
+LOT_PURGE = 50_000
+
+# Le disque ne se remplit pas en une seconde : le verifier toutes les
+# cinq minutes suffit, et ne coute rien.
+VERIFICATION_ESPACE_S = 300
+
+PLUS_ANCIENNES = (
+    "DELETE FROM mesures WHERE ctid IN "
+    "(SELECT ctid FROM mesures ORDER BY ts LIMIT %s)"
+)
+
+
+def _espace_libre_go() -> float:
+    return shutil.disk_usage("/").free / 1e9
+
+
+def surveiller_espace(conn) -> None:
+    """Efface les mesures les plus anciennes quand le disque se remplit.
+
+    Le raisonnement : une serre qui ne peut plus enregistrer ce qui se
+    passe MAINTENANT est en panne, alors qu'une serre qui a oublie le
+    mois dernier fonctionne encore. En cas de conflit, le present gagne.
+
+    On vide par lots plutot que d'un bloc, et on repasse le balai
+    derriere : un simple VACUUM ne rend pas la place au systeme, mais il
+    rend les pages reutilisables par les insertions suivantes -- ce qui
+    est exactement ce qu'on cherche. Un VACUUM FULL, lui, reecrirait la
+    table entiere, et reclamerait donc la place qui vient justement de
+    manquer.
+    """
+    libre = _espace_libre_go()
+    if libre >= ESPACE_MINIMAL_GO:
+        return
+
+    print(f"ALERTE STOCKAGE : {libre:.2f} Go libres, sous le seuil de "
+          f"{ESPACE_MINIMAL_GO} Go -- purge des mesures les plus anciennes",
+          flush=True)
+    try:
+        with conn.cursor() as cur:
+            cur.execute(PLUS_ANCIENNES, (LOT_PURGE,))
+            efacees = cur.rowcount
+            cur.execute("VACUUM mesures")
+        print(f"  {efacees} mesures effacees, {_espace_libre_go():.2f} Go libres",
+              flush=True)
+        if efacees == 0:
+            print("  plus rien a effacer : le disque se remplit AILLEURS "
+                  "que dans les mesures", flush=True)
+    except psycopg.Error as e:
+        print(f"  purge impossible : {e}", flush=True)
+        conn.rollback()
 
 # Une alerte est un episode, pas un instant : on ouvre une ligne quand le
 # probleme apparait, on la ferme quand il cesse. `fin IS NULL` designe
@@ -124,8 +207,10 @@ def on_message(client, conn, msg):
         requete = (JOURNAL, (_horodatage(data.get("ts")), identifiant, valeur, source))
         trace = f"commande {identifiant} = {valeur} ({source})"
     else:
-        requete = (INSERTION, (_horodatage(data.get("ts")), identifiant, valeur,
-                               data.get("unite")))
+        ts = _horodatage(data.get("ts"))
+        if not _a_archiver(identifiant, ts):
+            return          # diffusee a l'ecran, mais pas archivee
+        requete = (INSERTION, (ts, identifiant, valeur, data.get("unite")))
         trace = f"{identifiant} = {valeur} {data.get('unite', '')}"
 
     try:
@@ -144,9 +229,14 @@ def main():
     schema.preparer(conn)
     print("Connecte a la base", flush=True)
 
-    # Rien a faire periodiquement : tout se joue dans on_message.
+    print(f"Archivage : un point toutes les {ARCHIVAGE_S:.0f}s par capteur, "
+          f"garde-fou a {ESPACE_MINIMAL_GO} Go", flush=True)
+
+    # L'essentiel se joue dans on_message ; le battement ne sert qu'a
+    # surveiller la place restante.
     service.executer(
-        "Collecteur", periode=0.5, userdata=conn,
+        "Collecteur", periode=VERIFICATION_ESPACE_S, userdata=conn,
+        travail=lambda _client: surveiller_espace(conn),
         on_connect=on_connect, on_message=on_message,
     )
     conn.close()
