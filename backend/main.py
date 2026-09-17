@@ -451,6 +451,65 @@ def vue_camera():
                         headers={"Cache-Control": "no-store"})
 
 
+# Separateur des trames du flux video, et pause entre deux examens du
+# fichier. Trente millisecondes : assez court pour ne pas ajouter de
+# retard visible aux dix images par seconde, assez long pour ne pas
+# faire tourner la boucle dans le vide.
+TRAME = b"--trame"
+GUET_S = 0.03
+
+
+@app.get("/api/camera.mjpg")
+async def flux_camera():
+    """Les vues de la camera, en flux continu.
+
+    Une image redemandee une par une plafonne a la cadence des
+    allers-retours HTTP, et chaque requete recommence tout : connexion,
+    en-tetes, decodage. A dix images par seconde cela se voyait -- ca
+    saccadait.
+
+    Ici le navigateur ouvre UNE connexion et recoit les images a mesure
+    qu'elles arrivent. C'est le vieux `multipart/x-mixed-replace`, que
+    toutes les camera de surveillance utilisent : une balise `img`
+    l'affiche sans une ligne de JavaScript, et sans clignoter.
+
+    On ne renvoie une trame que lorsque le fichier a CHANGE : sinon on
+    enverrait trente fois la meme image par seconde.
+    """
+    chemin = Path(CAMERA_FICHIER)
+
+    async def trames():
+        derniere = 0.0
+        while True:
+            try:
+                instant = chemin.stat().st_mtime
+            except OSError:
+                # Pas de camera : on attend qu'elle revienne plutot que
+                # de fermer le flux, que le navigateur devrait rouvrir.
+                await asyncio.sleep(1.0)
+                continue
+
+            if instant != derniere:
+                derniere = instant
+                try:
+                    image = chemin.read_bytes()
+                except OSError:
+                    continue
+                # Les separateurs de trames sont des CRLF, comme
+                # l exige le format multipart.
+                entete = (b"\r\nContent-Type: image/jpeg\r\n"
+                          + b"Content-Length: " + str(len(image)).encode()
+                          + b"\r\n\r\n")
+                yield TRAME + entete + image + b"\r\n"
+            await asyncio.sleep(GUET_S)
+
+    return StreamingResponse(
+        trames(),
+        media_type="multipart/x-mixed-replace; boundary=" + TRAME[2:].decode(),
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @app.get("/api/systeme")
 def etat_systeme():
     """Sante de la machine : un sujet distinct de celui de la serre."""

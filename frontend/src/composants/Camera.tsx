@@ -15,28 +15,23 @@ import { LuExpand, LuVideoOff, LuX } from 'react-icons/lu'
 const PRISE_DE_VUE = '16/09/2026'
 const SOURCE = '/serre.jpg'
 
-/** Cadence de renouvellement de la vue.
+/** L'adresse de la vue a afficher.
  *
- *  Une image fixe redemandee chaque seconde, et non un flux video : la
- *  germination se regarde en heures, pas en images par seconde. Le
- *  sentiment de direct est le meme, le cout est vingt fois moindre. */
-const RENOUVELLEMENT_MS = 1000
-
-/** L'adresse de la vue a afficher, renouvelee tant que la camera produit.
+ *  Un FLUX et non des images redemandees une par une. Redemander une
+ *  image toutes les cent millisecondes plafonne a la cadence des
+ *  allers-retours HTTP, et chaque requete recommence tout : ca saccade.
  *
- *  L'horodatage dans l'adresse est indispensable : sans lui le
- *  navigateur garderait la premiere image pour toujours, quoi que dise
- *  le serveur. */
+ *  Ici le navigateur ouvre une seule connexion et recoit les images a
+ *  mesure qu'elles arrivent -- le vieux `multipart/x-mixed-replace` des
+ *  cameras de surveillance. Une balise `img` l'affiche sans une ligne de
+ *  JavaScript, et sans clignoter entre deux vues.
+ *
+ *  L'horodatage ne sert qu'a l'ouverture : il garantit une connexion
+ *  neuve quand la camera revient apres une coupure, plutot qu'une
+ *  reprise d'un flux que le navigateur croit encore valide. */
 function useVue(enDirect: boolean) {
-  const [tic, setTic] = useState(() => Date.now())
-
-  useEffect(() => {
-    if (!enDirect) return
-    const t = setInterval(() => setTic(Date.now()), RENOUVELLEMENT_MS)
-    return () => clearInterval(t)
-  }, [enDirect])
-
-  return enDirect ? `/api/camera.jpg?t=${tic}` : SOURCE
+  const [depuis] = useState(() => Date.now())
+  return enDirect ? `/api/camera.mjpg?t=${depuis}` : SOURCE
 }
 
 /** Equerres de cadrage, la signature d'un moniteur de surveillance. */

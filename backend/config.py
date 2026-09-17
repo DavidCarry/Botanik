@@ -72,7 +72,10 @@ ARCHIVAGE_S = float(os.getenv("ARCHIVAGE_S", "300"))
 # seconde useraient la carte en quelques mois, pour des images que
 # personne ne relit.
 CAMERA_FICHIER = os.getenv("CAMERA_FICHIER", "/dev/shm/botanik/vue.jpg")
-CAMERA_S = float(os.getenv("CAMERA_S", "1"))
+# Une prise toutes les 100 ms, soit dix images par seconde. La camera
+# en accepterait quarante ; dix suffisent a lire comme du mouvement, et
+# coutent un quart de coeur sur les quatre de la Pi.
+CAMERA_S = float(os.getenv("CAMERA_S", "0.1"))
 CAMERA_TAILLE = (1280, 720)
 
 # Rotation a appliquer, en degres : 0 ou 180 selon le sens de montage du
