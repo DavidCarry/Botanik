@@ -66,6 +66,10 @@ export function useActionneurs() {
     let vivant = true
 
     const rafraichir = async () => {
+      // L'instant de la DEMANDE, pas celui de la reponse : ce qui
+      // revient decrit l'etat d'avant, et ne peut donc rien dire d'une
+      // attente nee entre-temps.
+      const demande = Date.now()
       let recu: Actionneur[]
       try {
         recu = await lireActionneurs()
@@ -82,6 +86,20 @@ export function useActionneurs() {
         const restants: Record<string, Attendu> = {}
         let muet: string | null = null
         for (const [id, a] of Object.entries(en_cours)) {
+          // Une attente plus recente que la lecture ne peut pas etre
+          // confirmee par elle.
+          //
+          // Sans ce garde : deux clics rapides, le premier encore en
+          // vol, et la relecture renvoyait l'ancien etat -- qui se
+          // trouvait etre exactement celui que le SECOND clic demande.
+          // L'attente se levait par pure coincidence, l'interrupteur
+          // revenait a la position d'avant, puis sautait a la bonne
+          // quand le materiel repondait enfin. Il se corrigeait tout
+          // seul, mais il clignotait au passage.
+          if (a.depuis > demande) {
+            restants[id] = a
+            continue
+          }
           const actionneur = recu.find((x) => x.id === id)
           if (actionneur?.valeur === a.valeur) continue
           if (Date.now() - a.depuis > PATIENCE_MS) {
