@@ -34,6 +34,18 @@ _client: mqtt.Client | None = None
 # Dernier etat connu de chaque actionneur, alimente par le broker.
 _etats: dict[str, dict] = {}
 
+# Derniere mesure recue de chaque capteur.
+#
+# Depuis que l'archivage est espace, la base ne connait plus qu'un point
+# toutes les cinq minutes : interroger `/api/capteurs` juste apres une
+# variation renvoyait une valeur vieille de plusieurs minutes, alors que
+# le flux, lui, l'avait deja poussee. Deux reponses differentes pour la
+# meme question, selon la porte par laquelle on entrait.
+#
+# On garde donc ici ce qui vient d'arriver -- une entree par capteur, le
+# cout est nul -- et l'API sert cela en priorite.
+_mesures: dict[str, dict] = {}
+
 # Une file par navigateur connecte au flux, et la boucle asyncio dans
 # laquelle elles vivent. paho recoit ses messages dans SON PROPRE FIL :
 # deposer directement dans une file asyncio depuis la serait une course.
@@ -94,6 +106,7 @@ def _on_message(client, userdata, msg):
         _etats[identifiant] = charge
         _diffuser({"genre": "etat", "actionneur": identifiant, **charge})
     else:
+        _mesures[identifiant] = charge
         _diffuser({"genre": "mesure", "capteur": identifiant, **charge})
 
 
@@ -111,6 +124,15 @@ def etats() -> dict[str, dict]:
     """Ce que les actionneurs ont annonce. Un actionneur absent n'a pas
     encore parle -- son service est peut-etre arrete."""
     return dict(_etats)
+
+
+def mesures() -> dict[str, dict]:
+    """La derniere mesure de chaque capteur, telle qu'elle est passee.
+
+    Vide au demarrage de l'API : MQTT ne retient pas les mesures, on ne
+    recoit que les suivantes. Un demi-seconde d'attente, et c'est plein.
+    """
+    return dict(_mesures)
 
 
 def demarrer():

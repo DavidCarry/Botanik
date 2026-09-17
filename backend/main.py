@@ -131,7 +131,7 @@ app = FastAPI(title="Botanik", lifespan=cycle_de_vie)
 
 @app.get("/api/capteurs")
 def capteurs():
-    """Les capteurs actifs, chacun avec sa derniere mesure si elle existe.
+    """Les capteurs actifs, chacun avec sa derniere mesure connue.
 
     `simule` distingue une vraie sonde d'une valeur inventee. Le materiel
     arrive par morceaux : tant que tout n'est pas cable, l'ecran melange
@@ -139,10 +139,15 @@ def capteurs():
     que le publisher, donc l'ecran ne peut pas annoncer une sonde reelle
     la ou le service lit du simule.
     """
+    # La base d'abord -- elle survit a un redemarrage de l'API -- puis ce
+    # que le flux vient de pousser, qui est plus frais de plusieurs
+    # minutes depuis que l'archivage est espace. Cette route et le flux
+    # doivent raconter la meme chose.
     dernieres = {
         capteur: {"valeur": valeur, "unite": unite, "ts": ts.isoformat()}
         for capteur, valeur, unite, ts in interroger(DERNIERES)
     }
+    dernieres.update(bus.mesures())
     actifs = registre.capteurs_actifs()
     resolus = registre.resoudre(actifs, DRIVERS)
 
