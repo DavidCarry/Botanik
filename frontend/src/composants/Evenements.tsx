@@ -1,6 +1,6 @@
 import {
-  LuBellRing, LuCircleDot, LuDroplet, LuFan, LuLightbulb, LuMonitor,
-  LuSun, LuTriangleAlert, LuZap,
+  LuBellRing, LuCircleDot, LuDroplet, LuFan, LuHand, LuLightbulb, LuMonitor,
+  LuScanFace, LuSlidersHorizontal, LuSun, LuTriangleAlert, LuZap,
 } from 'react-icons/lu'
 import type { IconType } from 'react-icons'
 import { depuis } from '../format'
@@ -28,12 +28,21 @@ const NOMS: Record<string, string> = {
   ecran: 'Écran',
 }
 
-/** Qui a decide. La distinction est le seul moyen de relire apres coup
- *  ce que la serre a fait seule, et de le separer de ce qu'on a fait
- *  soi-meme. */
-const ORIGINES: Record<string, { libelle: string; classe: string }> = {
-  manuel: { libelle: 'manuel', classe: 'text-texte-faible' },
-  regle: { libelle: 'règle', classe: 'text-accent-vif' },
+/** Ce qui a déclenché une action. Trois causes, et trois seulement.
+ *
+ *  L'icône est celle de la page où la cause se règle -- le bouton des
+ *  réglages pour un seuil, le visage pour une personne. On retrouve donc
+ *  d'un coup d'œil où aller changer ce qui vient de se produire.
+ *
+ *  Les deux causes automatiques partagent la couleur d'accent : elles
+ *  disent toutes deux « la serre a agi seule ». L'ambre et le rouge
+ *  restent ce qu'ils sont ailleurs -- une alerte, un problème -- et
+ *  s'en servir ici ferait passer un visage reconnu pour un incident. */
+const ORIGINES: Record<string,
+  { libelle: string; classe: string; Icone: IconType }> = {
+  manuel: { libelle: 'manuel', classe: 'text-texte-faible', Icone: LuHand },
+  seuil: { libelle: 'seuil', classe: 'text-accent-vif', Icone: LuSlidersHorizontal },
+  visage: { libelle: 'visage', classe: 'text-accent-vif', Icone: LuScanFace },
 }
 
 /** Journal melant les alertes et les commandes.
@@ -113,10 +122,14 @@ export default function Evenements() {
                 </span>
               </span>
               <span
-                className={`shrink-0 text-nano font-medium ${
+                className={`flex shrink-0 items-center gap-1 text-nano font-medium ${
                   ORIGINES[e.source]?.classe ?? 'text-texte-faible'
                 }`}
               >
+                {(() => {
+                  const Cause = ORIGINES[e.source]?.Icone
+                  return Cause ? <Cause size={10} className="shrink-0" /> : null
+                })()}
                 {ORIGINES[e.source]?.libelle ?? e.source}
               </span>
             </>

@@ -2,8 +2,9 @@
 
 Ecoute les mesures sur MQTT, fait juger la situation au reseau, en deduit
 les commandes par les regles de decision.py, et les publie sur le meme
-topic que le pilotage manuel -- avec `source: "regle"` au lieu de
-`"manuel"`. Rien d'autre dans la chaine ne sait qui a decide.
+topic que le pilotage manuel -- avec `source: "seuil"` ou `"visage"` au
+lieu de `"manuel"`. C'est la seule trace de ce qui a decide, et elle va
+jusqu'au journal des evenements.
 
 Trois responsabilites, trois modules :
 
@@ -428,7 +429,7 @@ class Cerveau:
         for actionneur, ordre in self.voulu.items():
             salve = self.salves.get(actionneur)
             if salve and ordre.valeur > 0:
-                self._salve(client, actionneur, salve, maintenant)
+                self._salve(client, actionneur, salve, maintenant, ordre.source)
             else:
                 # Une salve qui s'arrete pendant un temps de repos laisse
                 # l'actionneur deja eteint : sans insister, le journal
@@ -438,7 +439,7 @@ class Cerveau:
                               ordre.texte, insister=sortie,
                               priorite=ordre.priorite)
 
-    def _salve(self, client, actionneur, salve, maintenant):
+    def _salve(self, client, actionneur, salve, maintenant, source):
         """Alterne allume et eteint tant que l'ordre tient.
 
         Un avertisseur continu devient vite insupportable, et plus
@@ -452,7 +453,7 @@ class Cerveau:
         # meme decision, exprimee en clignotant.
         premier = actionneur not in self.bascules
         actif = self.etats.get(actionneur, 0.0) > 0
-        self.ordonner(client, actionneur, 0.0 if actif else 1.0, "regle",
+        self.ordonner(client, actionneur, 0.0 if actif else 1.0, source,
                       journal=premier)
         repos = salve.get("repos_s", 8.0) if actif else salve.get("actif_s", 1.0)
         self.bascules[actionneur] = maintenant + float(repos)

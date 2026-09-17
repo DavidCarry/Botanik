@@ -94,8 +94,9 @@ export type Evenement =
       ts: string
       sujet: string
       valeur: number
-      /** Qui a décidé : un clic, ou une règle de l'utilisateur. */
-      source: 'manuel' | 'regle'
+      /** Ce qui l'a déclenché : la main, une borne franchie, ou une
+       *  personne reconnue. */
+      source: 'manuel' | 'seuil' | 'visage'
     }
   | {
       genre: 'alerte'

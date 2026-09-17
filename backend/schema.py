@@ -120,15 +120,21 @@ CREATE TABLE IF NOT EXISTS afficheurs (
 # installee ne reverra jamais autrement. On defait avant de reposer :
 # rejouer ces ordres a chaque demarrage ne coute rien et ne casse rien.
 MIGRATIONS = """
--- `commandes` date du temps ou le reseau decidait. Depuis, il n'y a plus
--- que deux sources : un clic, ou une regle de l'utilisateur. Sans cette
--- reprise, la contrainte refuse les ordres des regles -- et le journal
--- resterait muet sur tout ce que la serre fait d'elle-meme.
+-- `commandes` date du temps ou le reseau decidait. Depuis, une action
+-- a trois causes possibles : un clic, une borne franchie, ou une
+-- personne reconnue. Sans cette reprise, la contrainte refuse les
+-- ordres des regles -- et le journal resterait muet sur tout ce que la
+-- serre fait d'elle-meme.
+--
+-- Les lignes ecrites quand les deux causes automatiques n'en faisaient
+-- qu'une sont versees aux seuils : les regles de visages n'existaient
+-- pas encore quand elles ont ete enregistrees.
+UPDATE commandes SET source = 'seuil' WHERE source = 'regle';
 ALTER TABLE IF EXISTS commandes
     DROP CONSTRAINT IF EXISTS commandes_source_check;
 ALTER TABLE IF EXISTS commandes
     ADD CONSTRAINT commandes_source_check
-    CHECK (source IN ('manuel', 'regle'));
+    CHECK (source IN ('manuel', 'seuil', 'visage'));
 """
 
 

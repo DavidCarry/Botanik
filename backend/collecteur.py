@@ -37,10 +37,11 @@ JOURNAL = (
 # l'insertion. On la verifie ici pour signaler l'emetteur fautif plutot
 # que de laisser remonter une erreur SQL opaque.
 #
-# Deux sources, et deux seulement : un clic, ou une regle de
-# l'utilisateur. « ia » et « securite » sont partis avec les regles
-# ecrites en dur -- plus personne ne les emet.
-SOURCES = {"manuel", "regle"}
+# Trois causes possibles, et trois seulement : un clic, une borne
+# franchie, ou une personne reconnue. Le journal les distingue -- savoir
+# QUE le bipeur s'est declenche ne vaut pas grand-chose si l'on ne sait
+# pas pourquoi.
+SOURCES = {"manuel", "seuil", "visage"}
 
 # Derniere mesure REELLEMENT ecrite pour chaque capteur.
 #
