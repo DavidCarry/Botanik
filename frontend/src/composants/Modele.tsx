@@ -111,7 +111,7 @@ export default function Modele() {
         {m.contexte?.luminosite !== undefined
           ? Math.round(m.contexte.luminosite).toLocaleString('fr-FR')
           : '—'}{' '}
-        lux · version {m.version}
+        {UNITE_GRANDEUR.luminosite} · version {m.version}
       </p>
     </div>
   )

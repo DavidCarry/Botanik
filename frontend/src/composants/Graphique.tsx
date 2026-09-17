@@ -12,8 +12,14 @@ type Props = {
   echelle: Bornes
 }
 
-// La legende des valeurs occupe la gauche ; le trace commence apres.
-const MARGE = { haut: 12, bas: 20, gauche: 40, droite: 8 }
+// La legende des valeurs occupe la gauche, les dates occupent le bas :
+// le trace s'arrete avant les deux.
+//
+// La marge basse tient compte de la hauteur du texte ET du halo du
+// trace. Trop juste, une valeur posee au bas de l'echelle passait
+// derriere « 16 sept. » -- et une courbe qui traverse sa propre legende
+// se lit mal.
+const MARGE = { haut: 12, bas: 30, gauche: 40, droite: 8 }
 const DUREE = 620
 
 /** Lissage Catmull-Rom converti en Beziers cubiques.
