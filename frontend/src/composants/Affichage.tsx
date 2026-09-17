@@ -10,6 +10,16 @@ import Modale from './Modale'
 const COLONNES = 16
 const LIGNES = 2
 
+/** Le texte tel que l'afficheur saura le dessiner.
+ *
+ *  Un HD44780 ne connaît pas les accents : « Température » y sortirait
+ *  en caractères japonais, et le driver les retire donc avant d'écrire.
+ *  L'aperçu doit faire pareil, sinon il promet un mot que l'écran ne
+ *  montrera pas. */
+const pourEcran = (texte: string) =>
+  texte.normalize('NFKD').replace(/\p{Diacritic}/gu, '')
+    .replace(/[^ -~]/g, ' ')
+
 /** Ce que l'écran montrera, tel qu'il le montrera.
  *
  *  Un afficheur de seize caractères coupe sans prévenir : montrer les
@@ -24,7 +34,7 @@ function Apercu({ lignes }: { lignes: string[] }) {
       <div className="space-y-1 font-mono text-menu leading-snug text-accent-vif">
         {Array.from({ length: LIGNES }, (_, i) => (
           <div key={i} className="whitespace-pre">
-            {(lignes[i] ?? '').padEnd(COLONNES, ' ').slice(0, COLONNES)}
+            {pourEcran(lignes[i] ?? '').padEnd(COLONNES, ' ').slice(0, COLONNES)}
           </div>
         ))}
       </div>
