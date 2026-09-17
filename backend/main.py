@@ -452,11 +452,14 @@ def vue_camera():
 
 
 # Separateur des trames du flux video, et pause entre deux examens du
-# fichier. Trente millisecondes : assez court pour ne pas ajouter de
-# retard visible aux dix images par seconde, assez long pour ne pas
-# faire tourner la boucle dans le vide.
+# fichier.
+#
+# Dix millisecondes : le guet doit etre PLUS RAPIDE que la prise de vue,
+# sinon il en manque une sur deux et la cadence s'effondre de moitie.
+# A trente images par seconde une vue arrive toutes les 33 ms ; guetter
+# au meme rythme aurait suffi a tout desynchroniser.
 TRAME = b"--trame"
-GUET_S = 0.03
+GUET_S = 0.01
 
 
 @app.get("/api/camera.mjpg")
