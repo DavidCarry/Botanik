@@ -10,7 +10,7 @@ table correspondante ; ni les services ni le reste de la chaine n'ont a
 changer. Un meme module peut figurer dans les deux, comme `simule`.
 """
 
-from . import ds18b20, ecran, gpio, mcp3004, simule
+from . import ds18b20, ecran, gpio, hcsr04, mcp3004, simule
 
 DRIVERS = {
     "simule": simule,
@@ -19,6 +19,9 @@ DRIVERS = {
     "mcp3004": mcp3004,
     # Sonde numerique sur bus 1-Wire, lue dans un fil separe.
     "ds18b20": ds18b20,
+    # Telemetre a ultrasons : il mesure une distance, le registre dit
+    # quelle distance vaut plein et laquelle vaut vide.
+    "hcsr04": hcsr04,
 }
 
 SORTIES = {

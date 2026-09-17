@@ -67,14 +67,23 @@ capteurs:
     ideal: {min: 20, max: 100}     # sous 20 %, il faut remplir la reserve
     echelle: {min: 0, max: 100}
     reel:
-      # Sonde de niveau sur la voie 3. Contrairement aux autres, elle ne
-      # parcourt que la MOITIE de l'echelle du convertisseur : reservoir
-      # plein, elle plafonne autour de 0.5. D'ou la borne haute, qui
-      # revient a doubler la valeur brute.
-      driver: mcp3004
-      canal: 3
-      conversion: lineaire
-      etalonnage: {brut_bas: 0.0, brut_haut: 0.5}
+      # Telemetre a ultrasons au-dessus du reservoir, en remplacement de
+      # la sonde resistive qui plafonnait a mi-echelle.
+      #
+      # ETALONNAGE PROVISOIRE, pose au juge : `plein_cm` est la distance
+      # entre le capteur et le liquide quand le reservoir est plein,
+      # `vide_cm` celle qui le separe du fond. Les deux dependent de la
+      # hauteur a laquelle le capteur est visse, donc du montage et de
+      # rien d'autre.
+      #
+      # A refaire en deux mesures : relever la distance reservoir plein,
+      # puis reservoir vide, et reporter les chiffres ici. Tant que ce
+      # n'est pas fait, le pourcentage est une tendance, pas un niveau.
+      driver: hcsr04
+      trigger: 17
+      echo: 27
+      portee_m: 1.0
+      etalonnage: {plein_cm: 5, vide_cm: 25}
     simule: {profil: decroissant, depart: 85, vitesse: 0.02, plancher: 0, bruit: 0.1}
 
   # ---- non achetes pour l'instant : declares mais inactifs ----
