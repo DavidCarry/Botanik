@@ -69,6 +69,20 @@ def main() -> int:
     camera = Picamera2()
     camera.configure(camera.create_still_configuration(main={"size": CAMERA_TAILLE}))
     camera.start()
+
+    # Mise au point continue. Le module ne la fait PAS de lui-meme : sans
+    # cette ligne, l'objectif reste ou il etait et la serre sort floue.
+    # Continue plutot qu'une passe unique, parce qu'on deplace la camera
+    # et qu'on ouvre le chassis -- la scene change.
+    try:
+        from libcamera import controls
+        camera.set_controls({"AfMode": controls.AfModeEnum.Continuous})
+        print("Mise au point continue activee", flush=True)
+    except Exception as e:
+        # Toutes les cameras n'ont pas d'autofocus : la v2 est a focale
+        # fixe. Ce n'est pas une panne, juste une possibilite en moins.
+        print(f"Pas de mise au point automatique : {e}", flush=True)
+
     time.sleep(REGLAGE_S)
     print(f"Camera ouverte, une prise toutes les {CAMERA_S}s "
           f"vers {CAMERA_FICHIER}", flush=True)
