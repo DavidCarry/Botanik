@@ -10,6 +10,10 @@ export type Pousse =
       simule?: boolean
     }
   | {
+      genre: 'plages'
+      plages: Record<string, { bas: number | null; haut: number | null } | null>
+    }
+  | {
       genre: 'etat'; actionneur: string; valeur: number; ts: string
       contenu?: unknown; lignes?: string[]
       /** true : rien ne repond, l'ordre est accepte sans effet. */

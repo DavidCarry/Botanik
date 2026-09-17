@@ -53,6 +53,15 @@ export function useMesures() {
   const [capteurs, setCapteurs] = useState<Capteur[] | null>(null)
 
   const surPoussee = useCallback((p: Pousse) => {
+    // Un reglage vient de changer : les bornes a afficher avec.
+    // Sans cette poussee, une borne posee dans l'onglet des reglages
+    // n'apparaitrait sur la bulle qu'a la relecture suivante.
+    if (p.genre === 'plages') {
+      setCapteurs((liste) => liste?.map(
+        (c) => (c.id in p.plages ? { ...c, plage: p.plages[c.id] } : { ...c, plage: null }),
+      ) ?? liste)
+      return
+    }
     if (p.genre !== 'mesure') return
     setCapteurs((liste) =>
       liste?.map((c) =>

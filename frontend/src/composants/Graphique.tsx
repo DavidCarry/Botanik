@@ -3,10 +3,15 @@ import type { Point } from '../api'
 
 type Bornes = { min: number; max: number }
 
+/** Les bornes voulues, ou null quand aucune regle n'en definit. Une
+ *  borne a null veut dire « ce cote est infini » : rien n'y est trace,
+ *  et rien n'y sort de la plage. */
+type Plage = { bas: number | null; haut: number | null } | null
+
 type Props = {
   points: Point[]
   unite: string
-  ideal: Bornes
+  plage: Plage
   /** Domaine physique de la grandeur, tel que declare au registre. La
    *  marge de dessin ne le franchit pas : pas de lux negatifs. */
   echelle: Bornes
@@ -65,22 +70,23 @@ type Geometrie = {
   coords: [number, number][]
   bas: number
   haut: number
-  yIdealMin: number
-  yIdealMax: number
+  yIdealMin: number | null
+  yIdealMax: number | null
 }
 
 function geometrie(
-  valeurs: number[], l: number, h: number, ideal: Bornes, echelle: Bornes,
+  valeurs: number[], l: number, h: number, plage: Plage, echelle: Bornes,
 ): Geometrie {
   const x0 = MARGE.gauche
   const x1 = l - MARGE.droite
   const y0 = MARGE.haut
   const y1 = h - MARGE.bas
 
-  // L'echelle englobe la plage ideale : sans cela la bande sortirait du
-  // cadre des que les mesures s'en approchent.
-  let bas = Math.min(...valeurs, ideal.min)
-  let haut = Math.max(...valeurs, ideal.max)
+  // L'echelle englobe les bornes : sans cela une borne sortirait du
+  // cadre des que les mesures s'en approchent. Une borne absente ne
+  // contraint rien.
+  let bas = Math.min(...valeurs, plage?.bas ?? Infinity)
+  let haut = Math.max(...valeurs, plage?.haut ?? -Infinity)
   const marge = (haut - bas) * 0.12 || 1
 
   // La marge de respiration ne doit pas inventer des valeurs impossibles :
@@ -102,7 +108,8 @@ function geometrie(
   return {
     ligne, aire, coords,
     bas, haut,
-    yIdealMin: py(ideal.min), yIdealMax: py(ideal.max),
+    yIdealMin: plage?.bas == null ? null : py(plage.bas),
+    yIdealMax: plage?.haut == null ? null : py(plage.haut),
   }
 }
 
@@ -112,7 +119,7 @@ const heure = (iso: string) =>
 const jour = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
-export default function Graphique({ points, unite, ideal, echelle }: Props) {
+export default function Graphique({ points, unite, plage, echelle }: Props) {
   const boite = useRef<HTMLDivElement>(null)
   const [taille, setTaille] = useState({ l: 0, h: 0 })
   const [survol, setSurvol] = useState<number | null>(null)
@@ -159,20 +166,28 @@ export default function Graphique({ points, unite, ideal, echelle }: Props) {
     const depart = reechantillonner(affichees.current, cible.length)
 
     const peindre = (valeurs: number[]) => {
-      const g = geometrie(valeurs, l, h, ideal, echelle)
+      const g = geometrie(valeurs, l, h, plage, echelle)
       rLigne.current?.setAttribute('d', g.ligne)
       rAire.current?.setAttribute('d', g.aire)
-      rSeuilHaut.current?.setAttribute('y1', String(g.yIdealMax))
-      rSeuilHaut.current?.setAttribute('y2', String(g.yIdealMax))
-      rSeuilBas.current?.setAttribute('y1', String(g.yIdealMin))
-      rSeuilBas.current?.setAttribute('y2', String(g.yIdealMin))
+      // Une borne absente ne se dessine pas, et ne decoupe rien : de ce
+      // cote-la, aucune valeur n'est hors plage.
+      if (g.yIdealMax !== null) {
+        rSeuilHaut.current?.setAttribute('y1', String(g.yIdealMax))
+        rSeuilHaut.current?.setAttribute('y2', String(g.yIdealMax))
+      }
+      if (g.yIdealMin !== null) {
+        rSeuilBas.current?.setAttribute('y1', String(g.yIdealMin))
+        rSeuilBas.current?.setAttribute('y2', String(g.yIdealMin))
+      }
       rLigneHors.current?.setAttribute('d', g.ligne)
 
       // Le decoupage qui colore la courbe suit les memes bornes que les
       // seuils : une seule verite, deux usages.
-      rHorsHaut.current?.setAttribute('height', String(Math.max(g.yIdealMax - MARGE.haut, 0)))
-      rHorsBas.current?.setAttribute('y', String(g.yIdealMin))
-      rHorsBas.current?.setAttribute('height', String(Math.max(h - MARGE.bas - g.yIdealMin, 0)))
+      rHorsHaut.current?.setAttribute('height', String(
+        g.yIdealMax === null ? 0 : Math.max(g.yIdealMax - MARGE.haut, 0)))
+      rHorsBas.current?.setAttribute('y', String(g.yIdealMin ?? h))
+      rHorsBas.current?.setAttribute('height', String(
+        g.yIdealMin === null ? 0 : Math.max(h - MARGE.bas - g.yIdealMin, 0)))
 
       const fin = g.coords[g.coords.length - 1]
       rPoint.current?.setAttribute('cx', String(fin[0]))
@@ -183,8 +198,8 @@ export default function Graphique({ points, unite, ideal, echelle }: Props) {
       if (leg) {
         const e = Array.from(leg.children) as HTMLElement[]
         e[0].textContent = String(Math.round(g.haut * 10) / 10)
-        e[1].style.top = `${g.yIdealMax}px`
-        e[2].style.top = `${g.yIdealMin}px`
+        e[1].style.top = `${g.yIdealMax ?? -100}px`
+        e[2].style.top = `${g.yIdealMin ?? -100}px`
         e[3].textContent = String(Math.round(g.bas * 10) / 10)
       }
       affichees.current = valeurs
@@ -205,12 +220,12 @@ export default function Graphique({ points, unite, ideal, echelle }: Props) {
     }
     raf = requestAnimationFrame(pas)
     return () => cancelAnimationFrame(raf)
-  }, [points, l, h, ideal, echelle, pret])
+  }, [points, l, h, plage, echelle, pret])
 
   // Geometrie de reference, pour le rendu initial et le reperage du
   // survol. Elle part des points cibles : l'animation, elle, ecrit
   // directement dans le DOM et n'a pas besoin de repasser par React.
-  const g = pret ? geometrie(points.map((p) => p.valeur), l, h, ideal, echelle) : null
+  const g = pret ? geometrie(points.map((p) => p.valeur), l, h, plage, echelle) : null
 
   const iSurvol = survol !== null && g
     ? Math.min(points.length - 1, Math.max(0, Math.round(
@@ -275,10 +290,12 @@ export default function Graphique({ points, unite, ideal, echelle }: Props) {
               <clipPath id="hors-plage">
                 <rect ref={rHorsHaut} x={MARGE.gauche} y={MARGE.haut}
                       width={l - MARGE.gauche - MARGE.droite}
-                      height={Math.max(g.yIdealMax - MARGE.haut, 0)} />
-                <rect ref={rHorsBas} x={MARGE.gauche} y={g.yIdealMin}
+                      height={g.yIdealMax === null ? 0
+                        : Math.max(g.yIdealMax - MARGE.haut, 0)} />
+                <rect ref={rHorsBas} x={MARGE.gauche} y={g.yIdealMin ?? h}
                       width={l - MARGE.gauche - MARGE.droite}
-                      height={Math.max(h - MARGE.bas - g.yIdealMin, 0)} />
+                      height={g.yIdealMin === null ? 0
+                        : Math.max(h - MARGE.bas - g.yIdealMin, 0)} />
               </clipPath>
             </defs>
 
@@ -291,14 +308,20 @@ export default function Graphique({ points, unite, ideal, echelle }: Props) {
                 courbe en les franchissant : le trait annonce la couleur,
                 la courbe la reprend. En vert, ils se confondaient avec
                 elle. */}
-            <line ref={rSeuilHaut}
-              x1={MARGE.gauche} x2={l - MARGE.droite} y1={g.yIdealMax} y2={g.yIdealMax}
-              stroke="var(--attention)" strokeOpacity="0.75" strokeWidth="1.25"
-              strokeDasharray="5 4" />
-            <line ref={rSeuilBas}
-              x1={MARGE.gauche} x2={l - MARGE.droite} y1={g.yIdealMin} y2={g.yIdealMin}
-              stroke="var(--attention)" strokeOpacity="0.75" strokeWidth="1.25"
-              strokeDasharray="5 4" />
+            {g.yIdealMax !== null && (
+              <line ref={rSeuilHaut}
+                x1={MARGE.gauche} x2={l - MARGE.droite}
+                y1={g.yIdealMax} y2={g.yIdealMax}
+                stroke="var(--attention)" strokeOpacity="0.75" strokeWidth="1.25"
+                strokeDasharray="5 4" />
+            )}
+            {g.yIdealMin !== null && (
+              <line ref={rSeuilBas}
+                x1={MARGE.gauche} x2={l - MARGE.droite}
+                y1={g.yIdealMin} y2={g.yIdealMin}
+                stroke="var(--attention)" strokeOpacity="0.75" strokeWidth="1.25"
+                strokeDasharray="5 4" />
+            )}
 
             <g clipPath="url(#cadre-trace)">
               <path ref={rAire} d={g.aire} fill="url(#sous-courbe)" />
@@ -354,13 +377,17 @@ export default function Graphique({ points, unite, ideal, echelle }: Props) {
                   style={{ top: MARGE.haut }}>
               {Math.round(g.haut * 10) / 10}
             </span>
+            {/* Les quatre reperes existent TOUJOURS, meme vides :
+                l'animation les retrouve par leur rang, et en retirer un
+                du DOM decalerait les autres. Une borne absente se cache
+                hors du cadre. */}
             <span className="absolute right-0 -translate-y-1/2 font-medium text-attention"
-                  style={{ top: g.yIdealMax }}>
-              {ideal.max}
+                  style={{ top: g.yIdealMax ?? -100 }}>
+              {plage?.haut ?? ''}
             </span>
             <span className="absolute right-0 -translate-y-1/2 font-medium text-attention"
-                  style={{ top: g.yIdealMin }}>
-              {ideal.min}
+                  style={{ top: g.yIdealMin ?? -100 }}>
+              {plage?.bas ?? ''}
             </span>
             <span className="absolute right-0 -translate-y-1/2 text-texte-faible"
                   style={{ top: h - MARGE.bas }}>

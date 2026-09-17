@@ -1,7 +1,6 @@
 import { formaterValeur } from '../format'
 import { LIBELLE_BILLE } from '../libelles'
 import { useMesures } from '../useMesures'
-import { plage, useModele } from '../useModele'
 import SphereLiquide from './SphereLiquide'
 
 /** Quatre billes en contact, sans le moindre recouvrement.
@@ -24,7 +23,6 @@ const part = (v: number, min: number, max: number) =>
 
 export default function Mesures() {
   const { capteurs, muets } = useMesures()
-  const modele = useModele()
 
   const cases = capteurs?.length ? capteurs.slice(0, 4) : [null, null, null, null]
 
@@ -40,12 +38,18 @@ export default function Mesures() {
           const { taille, cx, cy, retard } = GRAPPE[i]
           const m = c?.mesure
           const niveau = c && m ? part(m.valeur, c.echelle.min, c.echelle.max) : 0
-          // La plage vient du reseau quand il en a appris une ; sinon du
-          // registre. Une seule bulle est concernee aujourd'hui, celle
-          // que le modele pilote.
-          const bornes = c ? plage(c, modele) : null
-          const dedans = Boolean(c && m && bornes
-            && m.valeur >= bornes.min && m.valeur <= bornes.max)
+          // La plage vient de la REGLE posee par l'utilisateur, resolue
+          // par le serveur. Aucune regle, aucune plage : la bulle ne
+          // trace alors rien, plutot que d'afficher une consigne que
+          // personne n'a donnee.
+          //
+          // Une borne peut manquer -- « au-dessus de 50 » est une
+          // consigne complete -- et ce cote vaut alors l'infini.
+          const bornes = c?.plage ?? null
+          const dedans = !bornes || !m ? true : (
+            (bornes.bas == null || m.valeur >= bornes.bas)
+            && (bornes.haut == null || m.valeur <= bornes.haut)
+          )
           const muet = Boolean(c && muets.has(c.id))
 
           return (
@@ -56,9 +60,13 @@ export default function Mesures() {
               unite={m ? c!.unite : undefined}
               niveau={niveau}
               ideal={c && bornes
-                ? { bas: part(bornes.min, c.echelle.min, c.echelle.max),
-                    haut: part(bornes.max, c.echelle.min, c.echelle.max) }
-                : { bas: 0, haut: 0 }}
+                ? {
+                    bas: bornes.bas == null ? 0
+                      : part(bornes.bas, c.echelle.min, c.echelle.max),
+                    haut: bornes.haut == null ? 1
+                      : part(bornes.haut, c.echelle.min, c.echelle.max),
+                  }
+                : null}
               dansLaPlage={dedans}
               muet={muet}
               simule={Boolean(c?.simule)}

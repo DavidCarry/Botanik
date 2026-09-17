@@ -133,6 +133,37 @@ async def cycle_de_vie(app: FastAPI):
 app = FastAPI(title="Botanik", lifespan=cycle_de_vie)
 
 
+def plages_affichees() -> dict[str, dict | None]:
+    """La plage a montrer pour chaque grandeur, d'apres les regles.
+
+    Rien n'est invente : une grandeur sans regle n'a pas de plage, et
+    l'ecran ne trace alors aucune ligne. Afficher la plage du registre
+    par defaut, comme on le faisait, laissait croire a une consigne que
+    personne n'avait donnee.
+    """
+    with base() as conn:
+        posees = regles.lire(conn)
+    if not posees:
+        return {}
+
+    appris = {}
+    p, meta, _ = modele_courant()
+    if p is not None and any(
+            b.mode == "ia"
+            for r in posees.values() for b in (r.bas, r.haut)):
+        contexte = {c: v for c, v, _, _ in interroger(DERNIERES)}
+        maintenant = datetime.now()
+        contexte["heure"] = maintenant.hour + maintenant.minute / 60
+        try:
+            with base() as conn:
+                contexte["eclairement_jour"] = eclairement.heures_du_jour(conn)
+        except HTTPException:
+            contexte["eclairement_jour"] = 0.0
+        appris = seuils.frontieres(p, np.array(meta["bornes"]), contexte)
+
+    return {g: decision.plage(r, appris.get(g)) for g, r in posees.items()}
+
+
 @app.get("/api/capteurs")
 def capteurs():
     """Les capteurs actifs, chacun avec sa derniere mesure connue.
@@ -159,6 +190,7 @@ def capteurs():
 
     actifs = registre.capteurs_actifs()
     resolus = registre.resoudre(actifs, DRIVERS)
+    plages = plages_affichees()
 
     def simulee(identifiant: str) -> bool:
         """La mesure en cours fait foi, le registre ne sert que d'attente.
@@ -179,6 +211,9 @@ def capteurs():
             "unite": c["unite"],
             "ideal": c["ideal"],
             "echelle": c["echelle"],
+            # La plage voulue par l'utilisateur, ou None s'il n'en a
+            # defini aucune. Une borne a None : ce cote est infini.
+            "plage": plages.get(c["id"]),
             "simule": simulee(c["id"]),
             # None tant qu'aucune mesure n'est arrivee pour ce capteur
             "mesure": dernieres.get(c["id"]),
@@ -531,8 +566,12 @@ def poser_regle(grandeur: str, corps: RegleRecue,
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
 
-    # Le cerveau relit aussitot plutot qu'a son prochain tour de garde.
+    # Le cerveau relit aussitot plutot qu'a son prochain tour de garde,
+    # et les ecrans ouverts voient la nouvelle plage sans attendre leur
+    # propre relecture : une borne qu'on vient de poser doit apparaitre
+    # sur la bulle tout de suite, sinon on doute de l'avoir enregistree.
     bus.publier(TOPIC_REGLES, {"grandeur": grandeur})
+    bus.diffuser({"genre": "plages", "plages": plages_affichees()})
     return {"ok": True}
 
 
@@ -545,6 +584,7 @@ def retirer_regle(grandeur: str,
     with base() as conn:
         efface = regles.retirer(conn, grandeur)
     bus.publier(TOPIC_REGLES, {"grandeur": grandeur})
+    bus.diffuser({"genre": "plages", "plages": plages_affichees()})
     return {"ok": efface}
 
 

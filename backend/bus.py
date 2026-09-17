@@ -110,6 +110,16 @@ def _on_message(client, userdata, msg):
         _diffuser({"genre": "mesure", "capteur": identifiant, **charge})
 
 
+def diffuser(evenement: dict) -> None:
+    """Pousse un evenement vers tous les navigateurs abonnes.
+
+    Sert a ce qui ne transite pas par MQTT : un reglage change dans
+    l'interface, par exemple, que les autres onglets doivent voir sans
+    attendre leur prochaine relecture.
+    """
+    _diffuser(evenement)
+
+
 def abonner() -> asyncio.Queue:
     file: asyncio.Queue = asyncio.Queue(maxsize=PROFONDEUR)
     _abonnes.add(file)

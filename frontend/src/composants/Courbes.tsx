@@ -1,7 +1,7 @@
 import type { Fenetre } from '../api'
 import { LIBELLE_PILULE } from '../libelles'
-import { plage, useModele } from '../useModele'
 import type { EtatCourbes } from '../useCourbes'
+import { useMesures } from '../useMesures'
 import Graphique from './Graphique'
 import Pilules from './Pilules'
 
@@ -38,14 +38,22 @@ export function EnTeteCourbes({ etat }: { etat: EtatCourbes }) {
 }
 
 export default function Courbes({ etat }: { etat: EtatCourbes }) {
-  const modele = useModele()
+  // La liste des courbes est lue une fois au chargement ; celle des
+  // mesures, elle, est tenue a jour par le flux. On y reprend donc la
+  // plage, sinon une borne posee dans les reglages n'apparaitrait ici
+  // qu'au prochain rechargement de la page.
+  const { capteurs } = useMesures()
+  const vivant = capteurs?.find((c) => c.id === etat.choisi)
+
   if (!etat.capteur) return null
 
   return (
     <Graphique
       points={etat.points}
       unite={etat.capteur.unite}
-      ideal={plage(etat.capteur, modele)}
+      // La plage vient de la regle posee par l'utilisateur. Aucune
+      // regle, aucune ligne : la courbe se lit alors sans consigne.
+      plage={vivant?.plage ?? etat.capteur.plage}
       echelle={etat.capteur.echelle}
     />
   )

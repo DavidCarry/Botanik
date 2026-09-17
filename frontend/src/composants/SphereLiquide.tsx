@@ -4,8 +4,9 @@ type Props = {
   unite?: string
   /** part remplie, 0 a 1 */
   niveau: number
-  /** bornes de la plage favorable, 0 a 1 */
-  ideal: { bas: number; haut: number }
+  /** bornes de la plage favorable, 0 a 1 -- ou null quand aucune regle
+   *  n'en definit. On ne dessine alors aucun reperage. */
+  ideal: { bas: number; haut: number } | null
   dansLaPlage: boolean
   /** plus aucune mesure recue : la valeur affichee est figee */
   muet?: boolean
@@ -42,8 +43,8 @@ export default function SphereLiquide({
 
   // Repere SVG en 0-100 : le liquide monte donc de 100 (vide) vers 0.
   const yLiquide = 100 - rempli * 100
-  const yIdealHaut = 100 - ideal.haut * 100
-  const yIdealBas = 100 - ideal.bas * 100
+  const yIdealHaut = 100 - (ideal?.haut ?? 0) * 100
+  const yIdealBas = 100 - (ideal?.bas ?? 0) * 100
 
   // Tout passe par des attributs SVG et par SMIL, jamais par CSS : a
   // l'interieur d'un clipPath, les animations CSS ne sont pas prises en
@@ -140,17 +141,29 @@ export default function SphereLiquide({
         </defs>
 
         <g clipPath={`url(#bille-${id})`}>
-          {/* Plage favorable : on lit d'un coup si le niveau y tombe. */}
-          <rect
-            x="0" y={yIdealHaut} width="100"
-            height={Math.max(yIdealBas - yIdealHaut, 0.8)}
-            fill={dansLaPlage ? 'var(--accent)' : 'var(--attention)'}
-            opacity="0.13"
-          />
-          <line x1="0" x2="100" y1={yIdealHaut} y2={yIdealHaut}
-                stroke="var(--texte)" strokeOpacity="0.18" strokeWidth="0.5" />
-          <line x1="0" x2="100" y1={yIdealBas} y2={yIdealBas}
-                stroke="var(--texte)" strokeOpacity="0.18" strokeWidth="0.5" />
+          {/* Plage favorable : on lit d'un coup si le niveau y tombe.
+              Rien n'est trace sans regle -- une bande dessinee par
+              defaut ferait croire a une consigne que personne n'a
+              donnee. Et un cote sans borne va jusqu'au bord : « au-dessus
+              de 50 » couvre tout le haut de la bille. */}
+          {ideal && (
+            <>
+              <rect
+                x="0" y={yIdealHaut} width="100"
+                height={Math.max(yIdealBas - yIdealHaut, 0.8)}
+                fill={dansLaPlage ? 'var(--accent)' : 'var(--attention)'}
+                opacity="0.13"
+              />
+              {ideal.haut < 1 && (
+                <line x1="0" x2="100" y1={yIdealHaut} y2={yIdealHaut}
+                      stroke="var(--texte)" strokeOpacity="0.18" strokeWidth="0.5" />
+              )}
+              {ideal.bas > 0 && (
+                <line x1="0" x2="100" y1={yIdealBas} y2={yIdealBas}
+                      stroke="var(--texte)" strokeOpacity="0.18" strokeWidth="0.5" />
+              )}
+            </>
+          )}
 
           {/* Deux vagues de periodes differentes : leur dephasage continu
               evite le battement mecanique d'une seule. */}

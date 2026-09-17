@@ -125,6 +125,28 @@ def _borne_effective(borne: Borne, cote_ia: float | None) -> float | None:
     return None
 
 
+def plage(regle: Regle | None, appris: dict | None) -> dict | None:
+    """Les bornes a AFFICHER pour une grandeur, ou None s'il n'y en a pas.
+
+    Exactement la meme resolution que celle qui decide -- meme fonction,
+    memes modes. C'est ce qui garantit que la ligne tracee sur la courbe
+    est bien celle qui declenchera l'alerte : deux calculs separes
+    finiraient par diverger, et l'ecran mentirait sans qu'on le sache.
+
+    Une borne peut manquer, et ce n'est pas une erreur : « au-dessus de
+    50, tout va bien » est une consigne complete. L'autre cote vaut
+    alors l'infini, et rien n'est trace de ce cote-la.
+    """
+    if regle is None:
+        return None
+    connus = appris or {}
+    bas = _borne_effective(regle.bas, connus.get("bas"))
+    haut = _borne_effective(regle.haut, connus.get("haut"))
+    if bas is None and haut is None:
+        return None
+    return {"bas": bas, "haut": haut}
+
+
 def cotes_franchis(regles: dict[str, Regle],
                    mesures: dict[str, float],
                    seuils_ia: dict[str, dict],
