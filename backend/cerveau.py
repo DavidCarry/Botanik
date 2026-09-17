@@ -281,7 +281,13 @@ class Cerveau:
         C'est precisement ce qu'on veut voir a l'ecran : le probleme, et
         le fait qu'il soit pris en charge.
         """
-        for grandeur, cote in franchis.items():
+        # On parcourt aussi les grandeurs qu'on a deja signalees : une
+        # regle retiree fait disparaitre sa grandeur de `franchis`, et
+        # son alerte resterait ouverte pour toujours si personne ne
+        # venait la fermer.
+        a_examiner = dict.fromkeys(franchis, None) | dict.fromkeys(self.alertes, None)
+        for grandeur in a_examiner:
+            cote = franchis.get(grandeur)
             if self.alertes.get(grandeur, "?") == cote:
                 continue
             charge = {

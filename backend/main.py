@@ -270,7 +270,11 @@ def modele_courant():
     return p, meta, version
 
 
-COTES = {"bas": "trop bas", "haut": "trop haut"}
+# Formulations sans accord : « Temperature trop haut » etait faux, et
+# accorder demanderait de connaitre le genre de chaque libelle. Dire ou
+# se situe la mesure par rapport a la borne evite le probleme et dit
+# exactement la meme chose.
+COTES = {"bas": "sous la borne", "haut": "au-dessus de la borne"}
 
 
 def noms_alertes() -> dict:
