@@ -25,6 +25,22 @@ empecher de tourner en MODE=faux.
 
 TENSION_PLEINE = 3.3
 
+# Nombre de conversions moyennees pour UNE mesure.
+#
+# Le convertisseur a dix bits sur 3,3 V, soit 3,2 mV par pas -- et le
+# LM35 ne rend que 10 mV par degre : un seul pas d'ecart, et la
+# temperature affichee bouge d'un tiers de degre. Ajoutez le bruit
+# electrique, et la valeur sautait de deux degres d'une seconde a
+# l'autre. Vu une fois toutes les cinq secondes cela passait inapercu ;
+# a une mesure par seconde, le nombre se met a danser et l'ecran a l'air
+# casse.
+#
+# On moyenne donc plusieurs conversions, en ecartant la plus basse et la
+# plus haute : le bruit s'annule, une impulsion parasite ne compte pas,
+# et le battement du bruit fait mieux que compenser la quantification.
+# Quinze conversions coutent moins d'une milliseconde sur le bus SPI.
+ECHANTILLONS = 15
+
 # Une voie ouverte par capteur, gardee entre deux lectures : gpiozero
 # ouvre le peripherique SPI a la construction, et le rouvrir cinq fois
 # par seconde finissait par echouer.
@@ -64,9 +80,18 @@ CONVERSIONS = {
 }
 
 
+def _mesurer(canal: int, echantillons: int) -> float:
+    """Moyenne elaguee de plusieurs conversions successives."""
+    voie = _voie(canal)
+    lots = sorted(voie.value for _ in range(max(1, echantillons)))
+    if len(lots) > 2:
+        lots = lots[1:-1]           # on jette les deux extremes
+    return sum(lots) / len(lots)
+
+
 def lire(capteur_id, params):
     """Le rapport lu sur la voie, converti selon le registre."""
-    brut = _voie(params["canal"]).value
+    brut = _mesurer(params["canal"], params.get("echantillons", ECHANTILLONS))
 
     conversion = params.get("conversion", "lineaire")
     if conversion not in CONVERSIONS:
