@@ -68,12 +68,14 @@ capteurs:
     ideal: {min: 20, max: 100}     # sous 20 %, il faut remplir la reserve
     echelle: {min: 0, max: 100}
     reel:
-      # Sonde de niveau sur la voie 3. Pleine echelle elle aussi :
-      # 0 reservoir vide, 1 reservoir plein, affiche en pourcentage.
+      # Sonde de niveau sur la voie 3. Contrairement aux autres, elle ne
+      # parcourt que la MOITIE de l'echelle du convertisseur : reservoir
+      # plein, elle plafonne autour de 0.5. D'ou la borne haute, qui
+      # revient a doubler la valeur brute.
       driver: mcp3004
       canal: 3
       conversion: lineaire
-      etalonnage: {brut_bas: 0.0, brut_haut: 1.0}
+      etalonnage: {brut_bas: 0.0, brut_haut: 0.5}
     simule: {profil: decroissant, depart: 85, vitesse: 0.02, plancher: 0, bruit: 0.1}
 
   # ---- non achetes pour l'instant : declares mais inactifs ----
