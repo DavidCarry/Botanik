@@ -25,10 +25,18 @@ from pathlib import Path
 
 RACINE = Path("/sys/bus/w1/devices")
 
-# Rythme du fil de lecture. Plus rapide serait sans objet : la sonde met
-# deja 800 ms a repondre, et une temperature d'air ne change pas en deux
-# secondes.
-PERIODE_S = 2.0
+# Repos entre deux lectures.
+#
+# Ce n'est PAS la cadence de rafraichissement : la conversion elle-meme
+# prend environ 800 ms en douze bits, et c'est elle qui commande. Deux
+# secondes de repos donnaient une valeur nouvelle toutes les trois
+# secondes, la ou les autres capteurs se renouvellent deux fois par
+# seconde -- l'ecart se voyait.
+#
+# A 200 ms, la sonde tourne pratiquement en continu et rend une valeur
+# neuve chaque seconde. C'est son plafond materiel : descendre plus bas
+# imposerait de baisser sa resolution, ce qui demande les droits root.
+PERIODE_S = 0.2
 
 # Au-dela, la derniere valeur est jugee perimee et le driver echoue --
 # ce qui fait basculer le publisher sur la simulation, en le disant.
