@@ -72,8 +72,14 @@ export default function Choix({
           // Au-dessus du reste de la page, et detache du bouton : une
           // liste qui pousserait le contenu ferait sauter la mise en
           // page a chaque ouverture.
-          className="panneau absolute left-0 right-0 top-full z-20 mt-1 max-h-56
-                     overflow-y-auto rounded-carte p-1"
+          //
+          // Fond presque opaque, contrairement aux panneaux de verre du
+          // reste de l'interface : ceux-ci flottent au-dessus d'un fond
+          // de lueurs, celui-ci se pose sur du TEXTE. A 80 % on lisait
+          // les libelles de la page au travers des options.
+          className="absolute left-0 right-0 top-full z-20 mt-1 max-h-56
+                     overflow-y-auto rounded-carte border border-bordure-forte
+                     bg-page/95 p-1 shadow-[var(--ombre-carte)] backdrop-blur-xl"
         >
           {options.map((o) => {
             const actif = o.valeur === choisi
