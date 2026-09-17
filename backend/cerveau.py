@@ -102,9 +102,6 @@ class Cerveau:
         # derniere fois que chaque personne a ete apercue.
         self.regles_visages: dict[str, decision.Action] = {}
         self.vus: dict[str, float] = {}
-        # Les noms de la derniere annonce, pour reagir a une arrivee ou
-        # a un depart sans attendre le prochain tour de garde.
-        self.derniers_visages: set[str] = set()
         # Dernier message pose sur chaque afficheur. None : recouvrement
         # leve. Sert a n'emettre que les changements.
         self.recouvrements: dict[str, str | None] = {}
@@ -170,16 +167,19 @@ class Cerveau:
             # une detection saute une image des qu'on tourne la tete,
             # et un actionneur commande par une presence clignoterait.
             instant = time.monotonic()
-            noms = {v.get("nom", decision.ANONYME)
-                    for v in charge.get("visages", [])}
             # Une arrivee ne doit pas attendre la prochaine decision :
             # entre deux tours de garde, l'action se faisait attendre
             # assez pour qu'on la croie cassee.
-            if noms != self.derniers_visages:
-                self.derniers_visages = noms
+            #
+            # On compare la PRESENCE avant et apres, et non l'annonce a
+            # la precedente : quelqu'un qui s'eloigne puis revient
+            # renvoie exactement la meme annonce, et son retour passait
+            # alors inapercu.
+            avant = self._presents(instant)
+            for visage in charge.get("visages", []):
+                self.vus[visage.get("nom", decision.ANONYME)] = instant
+            if self._presents(instant) != avant:
                 self.prochaine_decision = 0.0
-            for nom in noms:
-                self.vus[nom] = instant
         elif msg.topic.startswith(TOPIC_ETAT):
             self.etats[identifiant] = float(charge.get("valeur", 0))
         elif msg.topic.startswith(TOPIC_COMMANDES):
@@ -196,6 +196,11 @@ class Cerveau:
         else:
             self.mesures[identifiant] = (float(charge["valeur"]), time.monotonic())
 
+    def _presents(self, instant: float) -> set[str]:
+        """Les noms vus assez recemment pour compter comme presents."""
+        return {nom for nom, vu in self.vus.items()
+                if instant - vu <= decision.PRESENCE_S}
+
     def presents(self) -> set[str]:
         """Qui se tient devant la camera en ce moment.
 
@@ -207,9 +212,10 @@ class Cerveau:
         Les noms trop vieux sont oublies au passage -- sinon la serre
         garderait une entree par visiteur de la journee.
         """
-        limite = time.monotonic() - decision.PRESENCE_S
-        self.vus = {nom: vu for nom, vu in self.vus.items() if vu > limite}
-        return set(self.vus)
+        maintenant = time.monotonic()
+        ici = self._presents(maintenant)
+        self.vus = {nom: vu for nom, vu in self.vus.items() if nom in ici}
+        return ici
 
     def situation(self):
         """Les six entrees du reseau, ou None s'il manque une mesure.
