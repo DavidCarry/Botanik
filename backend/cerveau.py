@@ -120,6 +120,8 @@ class Cerveau:
         self.salves: dict[str, dict] = {}
         self.bascules: dict[str, float] = {}
         self.seuils_a_relire = True
+        # Grandeurs dont un episode d'alerte est encore ouvert en base.
+        self.ouvertes: set[str] = set()
         # Ce qui vient de la base, et l'instant ou il faudra le relire.
         self.contexte_lent = None
         self.prochain_contexte = 0.0
@@ -211,6 +213,16 @@ class Cerveau:
                     self.contexte_lent = (eclairement.heures_du_jour(conn),
                                           verrous.actifs(conn))
                     self.regles = regles.lire(conn)
+                    # Les episodes encore ouverts en base. Le cerveau perd
+                    # la memoire a chaque redemarrage ; sans cette
+                    # relecture, une alerte ouverte avant l'arret -- ou
+                    # par une regle depuis retiree -- resterait ouverte
+                    # pour toujours, et l'ecran afficherait un probleme
+                    # que plus personne ne surveille.
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT grandeur FROM alertes "
+                                    "WHERE fin IS NULL")
+                        self.ouvertes = {g for (g,) in cur.fetchall()}
             except psycopg.Error as e:
                 self._plaindre(f"lecture de la base impossible : {e}")
                 return None
@@ -285,7 +297,9 @@ class Cerveau:
         # regle retiree fait disparaitre sa grandeur de `franchis`, et
         # son alerte resterait ouverte pour toujours si personne ne
         # venait la fermer.
-        a_examiner = dict.fromkeys(franchis, None) | dict.fromkeys(self.alertes, None)
+        a_examiner = (dict.fromkeys(franchis, None)
+                      | dict.fromkeys(self.alertes, None)
+                      | dict.fromkeys(self.ouvertes, None))
         for grandeur in a_examiner:
             cote = franchis.get(grandeur)
             if self.alertes.get(grandeur, "?") == cote:
