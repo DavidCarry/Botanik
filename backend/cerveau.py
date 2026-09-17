@@ -102,6 +102,11 @@ class Cerveau:
         self.repos_jusqu_a = 0.0
         self.bascule_bip = 0.0
         self.plainte = None
+        # Les actionneurs que le registre lui confie. Un actionneur
+        # retire du registre -- parce qu'il n'est pas encore livre --
+        # ne doit pas continuer a recevoir des ordres que personne
+        # n'ecoute : le journal se remplirait de commandes ignorees.
+        self.pilotes: set[str] = set()
         # Ce qui vient de la base, et l'instant ou il faudra le relire.
         self.contexte_lent = None
         self.prochain_contexte = 0.0
@@ -221,6 +226,8 @@ class Cerveau:
         securite : si la reserve se vide pendant un arrosage manuel, la
         pompe s'arrete quand meme.
         """
+        if actionneur not in self.pilotes:
+            return
         if source != "securite" and actionneur in self.verrous:
             return
         if self.etats.get(actionneur) == valeur:
@@ -344,6 +351,7 @@ def main():
     c = Cerveau()
     pilotes = [a["id"] for a in registre.actionneurs_actifs()
                if a.get("pilote") == "ia"]
+    c.pilotes = set(pilotes)
 
     def on_connect(client, userdata, flags, reason_code, properties):
         if reason_code != 0:
@@ -355,8 +363,11 @@ def main():
         print("Abonne aux mesures, aux etats et aux commandes", flush=True)
 
     print(f"Cerveau : {len(pilotes)} actionneurs pilotes "
-          f"({', '.join(pilotes)}), decision toutes les {DECISION_S}s",
-          flush=True)
+          f"({', '.join(pilotes) or 'aucun'}), decision toutes les "
+          f"{DECISION_S}s", flush=True)
+    if not pilotes:
+        print("  il juge et alerte, mais rien n'est cable pour agir",
+              flush=True)
     service.executer("Cerveau", periode=1, travail=c.tour,
                      on_connect=on_connect, on_message=c.sur_message)
 

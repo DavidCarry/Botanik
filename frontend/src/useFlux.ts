@@ -12,6 +12,8 @@ export type Pousse =
   | {
       genre: 'etat'; actionneur: string; valeur: number; ts: string
       contenu?: unknown; lignes?: string[]
+      /** true : rien ne repond, l'ordre est accepte sans effet. */
+      simule?: boolean
     }
 
 /** S'abonne au flux du serveur.

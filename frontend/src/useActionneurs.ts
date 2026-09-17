@@ -45,6 +45,7 @@ export function useActionneurs() {
             // choix fait dans une fenetre ne se verrait pas dans l'autre.
             ...(p.contenu !== undefined ? { contenu: p.contenu as Contenu } : {}),
             ...(p.lignes !== undefined ? { lignes: p.lignes } : {}),
+            ...(p.simule !== undefined ? { simule: p.simule } : {}),
           }
         : a)),
     )

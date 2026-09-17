@@ -595,9 +595,11 @@ def actionneurs():
             "id": a["id"],
             "libelle": a["libelle"],
             "detail": a["detail"],
-            # Meme distinction que pour les capteurs : un relais qui
-            # n'est pas encore cable accepte les ordres sans rien faire.
-            "simule": resolus.get(a["id"], {}).get("source") == "simule",
+            # Meme distinction que pour les capteurs, et meme priorite :
+            # ce que l'actionneur a REELLEMENT annonce fait foi, le
+            # registre ne sert que tant qu'il n'a rien dit.
+            "simule": connus.get(a["id"], {}).get(
+                "simule", resolus.get(a["id"], {}).get("source") == "simule"),
             "valeur": connus.get(a["id"], {}).get("valeur"),
             "ts": connus.get(a["id"], {}).get("ts"),
             # Un afficheur porte en plus ce qu'on lui a demande de

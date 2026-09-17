@@ -53,6 +53,21 @@ function Etat({ actif, muet }: { actif: boolean; muet: boolean }) {
   )
 }
 
+/** Mention accolee a un actionneur dont rien ne repond.
+ *
+ *  Un interrupteur qui semble marcher alors qu'aucun fil n'est branche
+ *  est pire qu'un interrupteur marque « simule » : il fait croire a une
+ *  serre qui agit. Le materiel arrive par morceaux, l'ecran doit dire
+ *  lesquels sont arrives. */
+function Simule() {
+  return (
+    <span className="shrink-0 rounded-pilule bg-surface px-1.5 py-0.5 text-nano
+                     uppercase tracking-etiquette text-texte-faible">
+      simulé
+    </span>
+  )
+}
+
 /** L'etat se lit a la position du curseur, pas seulement a la couleur. */
 function Interrupteur({ actif, attendu }: { actif: boolean; attendu: boolean }) {
   return (
@@ -96,7 +111,8 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
     <Bloc titre="Pilotage" actions={mention} className="md:min-h-0 md:flex-1">
       <div className="divide-y divide-bordure border-y border-bordure
                       md:h-full md:overflow-y-auto">
-        {liste.map(({ id, libelle, detail, valeur, lignes, contenu: quoi }) => {
+        {liste.map(({ id, libelle, detail, valeur, lignes, simule,
+                      contenu: quoi }) => {
           // Seul un actionneur qui PORTE du texte se regle ; les autres
           // n'ont qu'un etat, et rien a choisir.
           const reglable = quoi !== undefined && quoi !== null || id === 'ecran'
@@ -124,8 +140,11 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
               />
 
               <span className="min-w-0 flex-1 text-left">
-                <span className="block truncate text-menu font-medium text-texte">
-                  {libelle}
+                <span className="flex items-center gap-2">
+                  <span className="truncate text-menu font-medium text-texte">
+                    {libelle}
+                  </span>
+                  {simule && <Simule />}
                 </span>
                 <span className="block truncate text-micro text-texte-faible">
                   {sousTitre}

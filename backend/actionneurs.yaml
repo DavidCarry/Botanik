@@ -14,40 +14,37 @@
 # qui le lit, pour savoir de quoi il a la charge -- ajouter un actionneur
 # en "ia" suffit a le lui confier.
 #
-# Les numeros de broche sont en numerotation BCM, et provisoires tant que
-# la carte de relais n'est pas montee.
+# Les numeros de broche sont en numerotation BCM.
+#
+# `actif: false` retire un element de TOUTE la chaine : il ne parait plus
+# a l'ecran, le cerveau ne lui envoie plus d'ordre, et le service ne le
+# pilote pas. C'est le cas de la pompe et de la ventilation, commandees
+# mais pas encore livrees -- les declarer sans les avoir donnerait un
+# tableau de bord qui promet des actions impossibles. Les remettre a
+# `true` le jour de la livraison suffira.
 
 actionneurs:
   - id: pompe
     libelle: Arrosage
     detail: 20 mL par impulsion
-    actif: true
+    actif: false
     pilote: ia
-    # Rien de cable a ce jour : garde en simulation pour qu'un
-    # ordre ne parte pas sur une broche occupee par autre chose.
-    simuler: true
     reel: {driver: gpio, broche: 23}
     simule: {}
 
   - id: ventilation
     libelle: Ventilation
     detail: Assèche l'air ambiant
-    actif: true
+    actif: false
     pilote: ia
-    # Rien de cable a ce jour : garde en simulation pour qu'un
-    # ordre ne parte pas sur une broche occupee par autre chose.
-    simuler: true
     reel: {driver: gpio, broche: 25}
     simule: {}
 
   - id: lumiere
     libelle: Éclairage
     detail: LED horticole, budget quotidien
-    actif: true
+    actif: false
     pilote: ia
-    # Rien de cable a ce jour : garde en simulation pour qu'un
-    # ordre ne parte pas sur une broche occupee par autre chose.
-    simuler: true
     reel: {driver: gpio, broche: 24}
     simule: {}
 

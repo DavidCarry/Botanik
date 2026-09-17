@@ -41,6 +41,10 @@ _lignes: dict[str, list[str]] = {}
 # Dernier etat applique, pour rafraichir un afficheur sans le rallumer.
 _etats: dict[str, float] = {}
 
+# Actionneurs actuellement pilotes en simulation faute de materiel qui
+# repond, pour n'annoncer que les bascules.
+_en_repli: set[str] = set()
+
 
 def composer(contenu: dict) -> list[str]:
     """Les deux lignes a afficher, d'apres l'intention et les mesures.
@@ -101,15 +105,39 @@ def main():
         contenu = _contenu.get(actionneur)
         lignes = composer(contenu) if contenu else None
 
-        atteint = SORTIES[cible["driver"]].appliquer(
-            actionneur, valeur, cible["params"], lignes,
-        )
+        # Meme principe que pour les capteurs : un materiel qui ne
+        # repond plus ne fait pas disparaitre l'actionneur de l'ecran.
+        # On accepte l'ordre en simulation, et la mention voyage avec
+        # l'etat -- un interrupteur qui semble marcher alors que rien
+        # n'est branche est pire qu'un interrupteur marque « simule ».
+        simule = cible["source"] == "simule"
+        try:
+            atteint = SORTIES[cible["driver"]].appliquer(
+                actionneur, valeur, cible["params"], lignes,
+            )
+            if actionneur in _en_repli:
+                _en_repli.discard(actionneur)
+                print(f"{actionneur} repond de nouveau", flush=True)
+        except Exception as e:
+            repli = cible.get("repli")
+            if repli is None:
+                raise
+            if actionneur not in _en_repli:
+                _en_repli.add(actionneur)
+                print(f"{actionneur} ne repond pas ({e}) -- bascule sur "
+                      f"la simulation", flush=True)
+            atteint = SORTIES[repli["driver"]].appliquer(
+                actionneur, valeur, repli["params"], lignes,
+            )
+            simule = True
+
         _etats[actionneur] = atteint
         if contenu is None:
-            annoncer(client, actionneur, atteint)
+            annoncer(client, actionneur, atteint, simule=simule)
         else:
             _lignes[actionneur] = lignes
-            annoncer(client, actionneur, atteint, contenu=contenu, lignes=lignes)
+            annoncer(client, actionneur, atteint, simule=simule,
+                     contenu=contenu, lignes=lignes)
         return atteint
 
     def on_connect(client, userdata, flags, reason_code, properties):
