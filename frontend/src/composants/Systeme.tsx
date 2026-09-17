@@ -18,6 +18,16 @@ const duree = (s: number) => {
 /** Au-dela, la sauvegarde quotidienne a saute un tour. */
 const SAUVEGARDE_TOLEREE_H = 36
 
+/** Mention accolee a une valeur qu'on n'a pas pu mesurer. */
+function Simule() {
+  return (
+    <span className="rounded-pilule bg-surface px-1.5 py-0.5 text-nano
+                     uppercase tracking-etiquette text-texte-faible">
+      simulé
+    </span>
+  )
+}
+
 export default function Systeme({ sante }: { sante: Sante | null }) {
   const [etat, setEtat] = useState<EtatSysteme | null>(null)
 
@@ -35,6 +45,11 @@ export default function Systeme({ sante }: { sante: Sante | null }) {
   if (!etat) {
     return <p className="text-micro text-texte-faible">Lecture de l’état machine…</p>
   }
+
+  // Une valeur inventee se dit. Sur cette machine tout se lit ; sous
+  // Windows, la temperature du processeur n'existe pas, et l'afficher
+  // sans le mentionner ferait passer une invention pour un releve.
+  const invente = (champ: string) => etat.simules?.includes(champ)
 
   const lignes = [
     {
@@ -69,6 +84,7 @@ export default function Systeme({ sante }: { sante: Sante | null }) {
           {etat.temperature_cpu !== null
             ? <span className="tabular-nums">{etat.temperature_cpu} °C</span>
             : <span className="text-texte-faible">n/d</span>}
+          {invente('temperature_cpu') && <Simule />}
         </span>
         <span className="text-texte-faible">en ligne {duree(etat.en_ligne_s)}</span>
         {/* Une sauvegarde qui echoue ne se voit nulle part ailleurs :

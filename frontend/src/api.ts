@@ -142,6 +142,9 @@ export type EtatSysteme = {
   memoire: { utilisee_go: number; totale_go: number; part: number }
   disque: { utilise_go: number; total_go: number; part: number }
   en_ligne_s: number
+  /** Les champs ci-dessus qui n'ont PAS pu être mesurés et ont été
+   *  remplacés par une valeur plausible. */
+  simules: string[]
 }
 
 export const lireSysteme = () => json<EtatSysteme>('/api/systeme')
