@@ -284,12 +284,23 @@ async def flux():
 # parametres ne coutent rien a garder, et un reentrainement prend effet
 # sans redemarrer l'API.
 RELECTURE_MODELE_S = 300
+
+# Et dix secondes quand il n'y en a pas : le temps d'un entrainement.
+ATTENTE_MODELE_S = 10
 _modele: dict = {"relu": 0.0}
 
 
 def modele_courant():
     """Poids et metadonnees du modele, ou None si aucun n'est entraine."""
-    if time.time() - _modele["relu"] < RELECTURE_MODELE_S and "poids" in _modele:
+    # L'ABSENCE de modele ne se met pas en cache aussi longtemps que sa
+    # presence : un modele entraine ne disparait pas, alors qu'un modele
+    # manquant est un etat transitoire -- on vient de lancer
+    # l'entrainement, il arrivera dans la minute. Garder « aucun modele »
+    # cinq minutes laissait le tableau de bord annoncer une serre sans
+    # cerveau bien apres qu'elle en ait retrouve un.
+    age = time.time() - _modele["relu"]
+    connu = _modele.get("poids") is not None
+    if "poids" in _modele and age < (RELECTURE_MODELE_S if connu else ATTENTE_MODELE_S):
         return _modele.get("poids"), _modele.get("meta"), _modele.get("version")
     try:
         with base() as conn:
