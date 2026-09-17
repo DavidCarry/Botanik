@@ -16,7 +16,10 @@ from datetime import datetime, timezone
 
 import paho.mqtt.client as mqtt
 
+import afficheurs
+import bdd
 import registre
+import schema
 import service
 from config import MODE, TOPIC_COMMANDES, TOPIC_ETAT, TOPIC_MESURES
 from drivers import SORTIES
@@ -45,6 +48,17 @@ _recouvrement: dict[str, dict] = {}
 # leve : lever un recouvrement ne doit pas eteindre un ecran que
 # l'utilisateur avait allume, ni allumer celui qu'il avait eteint.
 _allumage: dict[str, float] = {}
+
+# Faux une fois le reglage relu en base. La base peut n'etre pas encore
+# levee quand ce service demarre : on reessaie a chaque tour, tant que
+# personne n'a rien commande -- apres quoi c'est la commande qui fait
+# foi, et la relire ecraserait un choix tout juste fait.
+_a_relire = True
+_commande_recue = False
+
+# Derniere plainte a propos de la base, pour ne pas la repeter a chaque
+# tour : un journal noye ne se lit plus.
+_plainte_base: str | None = None
 
 # Dernieres mesures recues, pour composer ce texte. Le service s'abonne
 # aux mesures uniquement pour cela.
@@ -91,6 +105,46 @@ def capteurs_choisis(contenu: dict) -> list[str]:
         return [c for c in plusieurs if isinstance(c, str)]
     seul = contenu.get("capteur")
     return [seul] if seul else []
+
+
+def relire_reglages() -> bool:
+    """Retrouve en base ce que les afficheurs montraient. Dit si ca a marche."""
+    global _a_relire, _plainte_base
+    try:
+        with bdd.connexion() as conn:
+            schema.preparer(conn)
+            for actionneur, (contenu, allume) in afficheurs.lire(conn).items():
+                _contenu[actionneur] = contenu
+                _allumage[actionneur] = 1.0 if allume else 0.0
+    except Exception as e:
+        if _plainte_base != str(e):
+            _plainte_base = str(e)
+            print(f"Reglages d'affichage pas encore relus : {e}", flush=True)
+        return False
+    _plainte_base = None
+    _a_relire = False
+    return True
+
+
+def memoriser(actionneur: str) -> None:
+    """Garde le reglage d'un afficheur, AU MIEUX.
+
+    Une base injoignable ne doit jamais empecher un actionneur d'obeir :
+    on se plaint une fois, et la serre continue de fonctionner.
+    """
+    global _plainte_base
+    contenu = _contenu.get(actionneur)
+    if contenu is None:
+        return
+    try:
+        with bdd.connexion() as conn:
+            afficheurs.enregistrer(conn, actionneur, contenu,
+                                   bool(_allumage.get(actionneur)))
+        _plainte_base = None
+    except Exception as e:
+        if _plainte_base != str(e):
+            _plainte_base = str(e)
+            print(f"Reglage d'affichage non garde : {e}", flush=True)
 
 
 def affiche(actionneur: str) -> dict | None:
@@ -155,10 +209,11 @@ def main():
     _libelles.update({c["id"]: c["libelle"] for c in registre.capteurs_actifs()})
     premier = next(iter(_libelles), "")
 
-    # L'afficheur a TOUJOURS un fond. C'est la couche qui reparait quand
-    # aucune regle ne le recouvre : sans elle, la levee d'un
-    # recouvrement rendrait l'ecran au noir au lieu de lui rendre ce
-    # qu'il montrait.
+    # Ce que l'utilisateur avait choisi d'abord ; le defaut ensuite, s'il
+    # n'avait rien choisi. L'afficheur a TOUJOURS un fond : c'est la
+    # couche qui reparait quand aucune regle ne le recouvre, et sans elle
+    # la levee d'un recouvrement rendrait l'ecran au noir.
+    relire_reglages()
     if "ecran" in actionneurs and premier:
         _contenu.setdefault("ecran", {"mode": "mesure", "capteur": premier})
 
@@ -232,8 +287,19 @@ def main():
             fond = _contenu.get(actionneur)
             if fond is None:
                 annoncer(client, actionneur, 0.0)
-            else:
-                annoncer(client, actionneur, 0.0, contenu=fond)
+                continue
+            # Un afficheur reprend le reglage qu'on lui avait donne,
+            # allumage compris. Les autres repartent a l'arret : une
+            # pompe qui redemarrerait seule sur un souvenir d'avant la
+            # coupure pourrait noyer la serre, un ecran ne risque rien.
+            if _allumage.get(actionneur):
+                try:
+                    actionner(client, actionneur, 1.0)
+                    continue
+                except Exception as e:
+                    print(f"Echec du retour a l'etat de {actionneur} : {e}",
+                          flush=True)
+            annoncer(client, actionneur, 0.0, contenu=fond)
 
     def on_message(client, userdata, msg):
         identifiant = msg.topic.rsplit("/", 1)[-1]
@@ -278,6 +344,11 @@ def main():
             if isinstance(charge.get("contenu"), dict):
                 _contenu[actionneur] = charge["contenu"]
             _allumage[actionneur] = valeur
+            # A partir d'ici, c'est la commande qui fait foi : relire la
+            # base ecraserait un choix qu'on vient tout juste de faire.
+            global _commande_recue
+            _commande_recue = True
+            memoriser(actionneur)
 
         try:
             atteint = actionner(client, actionneur, valeur)
@@ -296,6 +367,18 @@ def main():
         pas figer celle de l'instant ou on l'a allume. On recompose donc
         a chaque tour, et on ne reecrit que si le texte differe.
         """
+        # La base n'est peut-etre pas encore levee au demarrage de ce
+        # service : on retente, tant que personne n'a rien commande.
+        if _a_relire and not _commande_recue and relire_reglages():
+            print("Reglages d'affichage retrouves", flush=True)
+            for actionneur in _contenu:
+                if actionneur in actionneurs and _allumage.get(actionneur):
+                    try:
+                        actionner(client, actionneur, 1.0)
+                    except Exception as e:
+                        print(f"Echec du retour a l'etat de {actionneur} : {e}",
+                              flush=True)
+
         for actionneur in set(_contenu) | set(_recouvrement):
             # Un afficheur eteint n'a rien a rafraichir -- et surtout, le
             # rafraichir ne doit jamais le rallumer.

@@ -100,6 +100,20 @@ CREATE TABLE IF NOT EXISTS regles_visages (
     action     JSONB       NOT NULL,
     modifie_le TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Ce que chaque afficheur montre, et s'il etait allume.
+--
+-- Un REGLAGE, et non un etat. Les actionneurs repartent tous a l'arret
+-- au demarrage, par prudence : une pompe qui redemarrerait seule sur un
+-- souvenir d'avant la coupure pourrait noyer la serre. Un ecran ne
+-- risque rien, et le voir revenir noir apres chaque deploiement n'avait
+-- rien de prudent -- c'etait seulement du reglage perdu.
+CREATE TABLE IF NOT EXISTS afficheurs (
+    actionneur TEXT PRIMARY KEY,
+    contenu    JSONB       NOT NULL,
+    allume     BOOLEAN     NOT NULL DEFAULT false,
+    modifie_le TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 """
 
 # Ce qui a change APRES coup sur une table d'`init.sql`, qu'une base deja
