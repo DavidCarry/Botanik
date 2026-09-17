@@ -12,6 +12,7 @@ import FlechesVue from './composants/FlechesVue'
 import Fond from './composants/Fond'
 import InviteDefilement from './composants/InviteDefilement'
 import Mesures from './composants/Mesures'
+import Regles from './composants/Regles'
 import Modale from './composants/Modale'
 import Modele from './composants/Modele'
 import Systeme from './composants/Systeme'
@@ -19,7 +20,7 @@ import { useAuth } from './useAuth'
 import { useAlertes } from './useAlertes'
 import { useCourbes } from './useCourbes'
 import { useSante } from './useSante'
-import { VUES, type Vue } from './vues'
+import { vues as vuesDe, type Vue } from './vues'
 
 // Marges identiques pour les deux vues : elles doivent se superposer
 // exactement pendant le glissement, sinon le contenu semble sauter au
@@ -42,7 +43,15 @@ export default function App() {
 
   // Tant qu'on n'a pas de reponse, on ne crie pas : la premiere lecture
   // est en vol, et un echec basculera l'etat en moins d'une seconde.
-  const rang = VUES.findIndex((v) => v.valeur === vue)
+  // Une seule liste pour la navigation, les fleches et le glissement.
+  const vues = vuesDe(Boolean(auth.compte))
+
+  // Se deconnecter depuis les reglages laisserait sur une page devenue
+  // invisible. On retombe sur la premiere vue en la CALCULANT plutot
+  // qu'en corrigeant l'etat apres coup : un rendu de moins, et pas de
+  // clignotement sur la page qui disparait.
+  const visible = vues.some((v) => v.valeur === vue) ? vue : vues[0].valeur
+  const rang = Math.max(0, vues.findIndex((v) => v.valeur === visible))
 
   // La camera est « en direct » tant qu'elle produit des images. Sans
   // vue recente, l'ecran retombe sur la photo du chassis et le dit.
@@ -62,8 +71,9 @@ export default function App() {
         liaison={liaison}
         alertes={alertes.length}
         onAlertes={() => setAlertesOuvertes(true)}
-        vue={vue}
+        vue={visible}
         onVue={setVue}
+        vues={vues}
         onConnexion={() => setConnexionOuverte(true)}
         onSysteme={() => setSystemeOuvert(true)}
       />
@@ -148,13 +158,25 @@ export default function App() {
               </Bloc>
             </div>
           </section>
+
+          {/* Vue 3 : le reglage de la serre. Reservee aux comptes
+              ouverts -- elle ne se consulte pas, elle agit. */}
+          {auth.compte && (
+            <section className={CADRE}>
+              <div className="mx-auto h-full max-w-page">
+                <div className="h-[calc(100dvh-11.5rem)] md:h-full">
+                  <Regles />
+                </div>
+              </div>
+            </section>
+          )}
         </div>
       </div>
 
       <FlechesVue
         rang={rang}
-        total={VUES.length}
-        onAller={(i) => setVue(VUES[i].valeur)}
+        total={vues.length}
+        onAller={(i) => setVue(vues[i].valeur)}
       />
 
       {cameraOuverte && (

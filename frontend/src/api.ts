@@ -13,6 +13,19 @@ async function json<T>(chemin: string, options?: RequestInit): Promise<T> {
   return r.json() as Promise<T>
 }
 
+/** Meme chose que `poster`, pour les methodes qui ne sont pas POST. */
+function envoyer<T>(chemin: string, methode: string, corps?: unknown): Promise<T> {
+  return json<T>(chemin, {
+    method: methode,
+    ...(corps === undefined
+      ? {}
+      : {
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(corps),
+        }),
+  })
+}
+
 function poster<T>(chemin: string, corps?: unknown): Promise<T> {
   return json<T>(chemin, {
     method: 'POST',
@@ -118,6 +131,48 @@ export type Modele = {
 }
 
 export const lireModele = () => json<Modele>('/api/modele')
+
+// ---------- Règles de l'utilisateur ----------
+
+/** Ce que la serre fait quand une borne est franchie. */
+export type ActionRegle =
+  | { genre: 'actionneur'; cible: string; valeur: number }
+  | { genre: 'ecran'; cible?: string; texte: string }
+
+/** Une borne suit le seuil appris, vaut un nombre fixe, ou est ignorée. */
+export type ModeBorne = 'ia' | 'manuel' | 'aucun'
+
+export type BorneRegle = {
+  mode: ModeBorne
+  valeur: number | null
+  action: ActionRegle | null
+}
+
+export type Regle = { grandeur: string; bas: BorneRegle; haut: BorneRegle }
+
+export type GrandeurReglee = {
+  id: string
+  libelle: string
+  unite: string
+  echelle: { min: number; max: number } | null
+  /** Ce que le réseau a appris, aux conditions du moment. Null : pas de
+   *  modèle entraîné, les bornes « ia » n'ont alors rien à suivre. */
+  seuil_ia: { bas: number | null; haut: number | null } | null
+  regle: Regle | null
+}
+
+export type Reglages = {
+  grandeurs: GrandeurReglee[]
+  actionneurs: { id: string; libelle: string }[]
+}
+
+export const lireReglages = () => json<Reglages>('/api/regles')
+
+export const poserRegle = (grandeur: string, bas: BorneRegle, haut: BorneRegle) =>
+  envoyer<{ ok: boolean }>(`/api/regles/${grandeur}`, 'PUT', { bas, haut })
+
+export const retirerRegle = (grandeur: string) =>
+  envoyer<{ ok: boolean }>(`/api/regles/${grandeur}`, 'DELETE')
 
 // ---------- Santé de la chaîne ----------
 

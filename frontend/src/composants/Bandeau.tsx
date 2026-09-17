@@ -4,7 +4,7 @@ import {
 } from 'react-icons/lu'
 import type { IconType } from 'react-icons'
 import type { Auth } from '../useAuth'
-import { VUES, type Vue } from '../vues'
+import { type Vue } from '../vues'
 import Logo from './Logo'
 
 /** Trois etats, et non deux : « l'API repond » ne veut pas dire « tout va
@@ -55,7 +55,11 @@ const ROND_NEUTRE = `${ROND_FOND} text-texte-faible hover:text-texte`
  *  Le changement de vue se fait par les fleches posees aux bords de la
  *  page, pas ici : la barre dit ou l'on est, la page sert a naviguer.
  */
-function Navigation({ vue, onVue }: { vue: Vue; onVue: (v: Vue) => void }) {
+function Navigation({ vues, vue, onVue }: {
+  vues: { valeur: Vue; libelle: string; icone: IconType }[]
+  vue: Vue
+  onVue: (v: Vue) => void
+}) {
   return (
     <nav
       aria-label="Vue affichée"
@@ -66,7 +70,7 @@ function Navigation({ vue, onVue }: { vue: Vue; onVue: (v: Vue) => void }) {
       className="absolute left-1/2 hidden -translate-x-1/2 items-center md:flex"
     >
       <ol className="flex items-center">
-        {VUES.map((v, i) => {
+        {vues.map((v, i) => {
           const Icone = v.icone
           return (
             <Fragment key={v.valeur}>
@@ -102,7 +106,7 @@ function Navigation({ vue, onVue }: { vue: Vue; onVue: (v: Vue) => void }) {
  *  qui defile dessous : c'est ce qui la fait lire comme une plaque de
  *  verre posee sur la page, et non comme un bandeau opaque. */
 export default function Bandeau({
-  auth, onConnexion, onSysteme, onAlertes, liaison, alertes, vue, onVue,
+  auth, onConnexion, onSysteme, onAlertes, liaison, alertes, vue, onVue, vues,
 }: {
   auth: Auth
   onConnexion: () => void
@@ -113,6 +117,7 @@ export default function Bandeau({
   alertes: number
   vue: Vue
   onVue: (v: Vue) => void
+  vues: { valeur: Vue; libelle: string; icone: IconType }[]
 }) {
   const [heure, setHeure] = useState(() =>
     new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))
@@ -156,7 +161,7 @@ export default function Bandeau({
           </span>
         </span>
 
-        <Navigation vue={vue} onVue={onVue} />
+        <Navigation vues={vues} vue={vue} onVue={onVue} />
 
         <span className={`ml-auto ${ENTRE_RONDS}`}>
           {/* L'heure sort des boutons : elle ne se clique pas, elle n'a
