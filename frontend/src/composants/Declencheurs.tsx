@@ -45,7 +45,10 @@ function Ligne({
     && (action.genre !== 'ecran' || action.texte.trim() !== '')
 
   return (
-    <div className="space-y-2.5 border-t border-bordure pt-4 first:border-0 first:pt-0">
+    // Une carte par sujet, et non des lignes filetées : la page est
+    // large, et une liste pleine largeur étirait chaque sélecteur
+    // d'action sur tout l'écran pour trois mots.
+    <div className="space-y-2.5 rounded-carte border border-bordure p-3">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {sujet.references === undefined
           ? <LuUsers size={14} className="shrink-0 text-texte-faible" />
@@ -159,7 +162,8 @@ export default function Declencheurs() {
           </span>}
       className="h-full md:min-h-0"
     >
-      <div className="h-full space-y-4 overflow-y-auto pr-1">
+      <div className="grid h-full content-start gap-3 overflow-y-auto pr-1
+                      sm:grid-cols-2 xl:grid-cols-3">
         {sujets.length === 0 ? (
           <p className="text-micro text-texte-faible">Lecture des visages…</p>
         ) : sujets.map((s) => (

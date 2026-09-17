@@ -161,20 +161,24 @@ export default function App() {
           </section>
 
           {/* Vue 3 : le reglage de la serre. Reservee aux comptes
-              ouverts -- elle ne se consulte pas, elle agit.
-
-              Deux colonnes pour deux declencheurs : une mesure qui passe
-              une borne, et une personne devant la camera. Cote a cote
-              parce qu'ils aboutissent aux MEMES actions et se disputent
-              les memes actionneurs -- les separer en deux pages ferait
-              oublier qu'ils peuvent se contredire. */}
+              ouverts -- elle ne se consulte pas, elle agit. */}
           {auth.compte && (
             <section className={CADRE}>
-              <div className="mx-auto grid h-full max-w-page gap-9 sm:gap-11
-                              md:grid-cols-2 md:gap-x-8">
+              <div className="mx-auto h-full max-w-page">
                 <div className="h-[calc(100dvh-11.5rem)] md:h-full">
                   <Regles />
                 </div>
+              </div>
+            </section>
+          )}
+
+          {/* Vue 4 : les visages, et ce qu'ils declenchent.
+              Sa propre page plutot qu'une colonne des reglages : les deux
+              listes sont longues, et les mettre cote a cote enfermait
+              chacune dans un demi-ecran qui defilait pour son compte. */}
+          {auth.compte && (
+            <section className={CADRE}>
+              <div className="mx-auto h-full max-w-page">
                 <div className="h-[calc(100dvh-11.5rem)] md:h-full">
                   <Declencheurs />
                 </div>
