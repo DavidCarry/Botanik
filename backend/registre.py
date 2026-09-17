@@ -65,10 +65,17 @@ def resoudre(elements, drivers) -> dict[str, dict]:
         params = bloc
         source = "reel"
 
-        if MODE == "faux" or driver not in drivers:
+        # `simuler: true` garde un element en simulation meme en mode reel.
+        # C'est l'interrupteur du branchement progressif : on valide une
+        # sonde a la fois, sans toucher au reste du registre ni devoir
+        # inventer un faux driver pour les autres.
+        retenu_simule = bool(e.get("simuler"))
+
+        if MODE == "faux" or retenu_simule or driver not in drivers:
             if MODE != "faux":
-                print(f"{e['id']} : driver '{driver}' absent, repli sur la "
-                      f"simulation", flush=True)
+                raison = ("garde en simulation par le registre" if retenu_simule
+                          else f"driver '{driver}' absent, repli sur la simulation")
+                print(f"{e['id']} : {raison}", flush=True)
             driver, source = "simule", "simule"
             params = dict(e.get("simule") or {})
 

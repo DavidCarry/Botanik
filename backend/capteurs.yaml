@@ -30,6 +30,9 @@ capteurs:
     actif: true
     ideal: {min: 50, max: 70}
     echelle: {min: 0, max: 100}
+    # Cablee et lue, mais gardee en simulation le temps de valider
+    # la temperature seule. Retirer cette ligne pour la brancher.
+    simuler: true
     reel:
       # Sonde resistive sur la voie 2. Elle MONTE en tension quand la
       # terre seche, d'ou les bornes inversees.
@@ -51,6 +54,9 @@ capteurs:
     actif: true
     ideal: {min: 4000, max: 10000}
     echelle: {min: 0, max: 12000}
+    # Cablee et lue, mais gardee en simulation le temps de valider
+    # la temperature seule. Retirer cette ligne pour la brancher.
+    simuler: true
     reel:
       # Photoresistance sur la voie 1. Une LDR ne mesure pas des lux :
       # elle dit « plus clair » ou « moins clair ». L'echelle 0-12000
@@ -69,6 +75,9 @@ capteurs:
     actif: true
     ideal: {min: 20, max: 100}     # sous 20 %, il faut remplir la reserve
     echelle: {min: 0, max: 100}
+    # Cablee et lue, mais gardee en simulation le temps de valider
+    # la temperature seule. Retirer cette ligne pour la brancher.
+    simuler: true
     reel:
       # Sonde de niveau sur la voie 3. Elle ne parcourt qu'environ la
       # moitie de l'echelle electrique une fois immergee, d'ou la borne
