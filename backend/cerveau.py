@@ -36,9 +36,24 @@ from config import (
     TOPIC_ALERTES, TOPIC_COMMANDES, TOPIC_ETAT, TOPIC_MESURES,
 )
 
-# Cadence de decision. L'humidite d'un sol ne change pas en cinq secondes ;
-# decider plus souvent ne ferait qu'agiter les actionneurs.
-DECISION_S = 30
+# Cadence de decision.
+#
+# Elle etait a trente secondes, au motif que l'humidite d'un sol ne
+# change pas en cinq secondes. C'est vrai du sol -- et faux de la reserve
+# d'eau, qu'on vide ou qu'on remplit en un geste. Le bipeur mettait
+# jusqu'a une demi-minute a se declencher, puis autant a se taire, alors
+# que l'ecran, lui, montrait le changement dans la demi-seconde.
+#
+# Decider vite ne fait plus battre les actionneurs depuis que les
+# jugements ont une hysteresis : c'est elle qui empeche l'agitation, pas
+# la lenteur.
+DECISION_S = 2
+
+# Le budget de lumiere du jour et les verrous poses a la main se lisent
+# en BASE, et ils bougent lentement -- le cumul avance d'une seconde par
+# seconde, un verrou dure cinq minutes. Les relire a chaque decision
+# ouvrirait une connexion toutes les deux secondes pour rien.
+CONTEXTE_LENT_S = 30
 
 # Arrosage par impulsion, comme l'annonce le registre : 20 mL par
 # impulsion. Une pompe maintenue allumee autour du seuil de decision
@@ -87,6 +102,9 @@ class Cerveau:
         self.repos_jusqu_a = 0.0
         self.bascule_bip = 0.0
         self.plainte = None
+        # Ce qui vient de la base, et l'instant ou il faudra le relire.
+        self.contexte_lent = None
+        self.prochain_contexte = 0.0
 
     # ---- modele ----
 
@@ -158,14 +176,22 @@ class Cerveau:
             contexte[capteur] = connue[0]
 
         # Une seule connexion pour les deux lectures : l'eclairement du
-        # jour et les verrous posees par la main.
-        try:
-            with bdd.connexion() as conn:
-                contexte["eclairement_jour"] = eclairement.heures_du_jour(conn)
-                journal = verrous.actifs(conn)
-        except psycopg.Error as e:
-            self._plaindre(f"lecture de la base impossible : {e}")
-            return None
+        # jour et les verrous poses par la main. Elle n'est rouverte que
+        # toutes les CONTEXTE_LENT_S -- entre-temps on reutilise ce qu'on
+        # a lu, qui n'a pas eu le temps de changer de sens.
+        instant = time.monotonic()
+        if self.contexte_lent is None or instant >= self.prochain_contexte:
+            try:
+                with bdd.connexion() as conn:
+                    self.contexte_lent = (eclairement.heures_du_jour(conn),
+                                          verrous.actifs(conn))
+            except psycopg.Error as e:
+                self._plaindre(f"lecture de la base impossible : {e}")
+                return None
+            self.prochain_contexte = instant + CONTEXTE_LENT_S
+
+        eclaire, journal = self.contexte_lent
+        contexte["eclairement_jour"] = eclaire
 
         # Le journal fait foi, mais une commande a peine emise peut ne
         # pas encore y figurer : on garde le plus tardif des deux, et on
