@@ -71,7 +71,33 @@ SUJETS_RESERVES = (QUICONQUE, INCONNU, ANONYME.lower())
 # des yeux. Sans ce delai, un actionneur commande par un visage
 # clignoterait -- exactement le probleme que l'hysteresis regle pour les
 # bornes, et pour la meme raison.
-PRESENCE_S = 3.0
+#
+# Une seconde et non trois : le service de detection amortit DEJA une
+# demi-seconde de son cote, et trois secondes de plus se voyaient a
+# l'oeil -- on s'ecarte de la camera, et la LED reste allumee un temps
+# qu'on ne s'explique pas.
+PRESENCE_S = 1.0
+
+# ---------------------------------------------------------------
+# Qui l'emporte sur l'afficheur
+# ---------------------------------------------------------------
+#
+# Plusieurs messages peuvent se presenter en meme temps. L'ordre est :
+#
+#   une personne reconnue   passe devant tout
+#   une borne franchie      passe devant l'ordinaire
+#   l'ordinaire             ce qui reste quand rien d'autre ne parle
+#
+# Les deux premiers sont des RECOUVREMENTS : ils se posent par-dessus, et
+# l'ecran retrouve l'ordinaire des qu'ils se levent. L'ordinaire n'est
+# pas connu ici -- c'est le choix de l'utilisateur, garde par le service
+# qui pilote l'afficheur.
+RANG_BORNE = 1
+RANG_VISAGE = 2
+
+# Marque une commande d'afficheur comme un recouvrement temporaire, par
+# opposition au choix de l'utilisateur.
+RECOUVREMENT = "regle"
 
 class Jugement(NamedTuple):
     """Ce que le reseau pense d'une grandeur."""
@@ -86,6 +112,9 @@ class Commande(NamedTuple):
     source: str
     # Texte a afficher, pour le seul afficheur.
     texte: str | None = None
+    # Afficheurs seulement : marque un recouvrement, qu'on pose ou qu'on
+    # leve. Le lever ne l'eteint pas -- il lui rend ce qu'il montrait.
+    priorite: str | None = None
 
 
 # ---------------------------------------------------------------
@@ -258,7 +287,7 @@ def devant(sujet: str, presents: set[str]) -> bool:
 
 
 def _appliquer(ordres: dict, affichages: dict, action: Action | None,
-               actif: bool) -> None:
+               actif: bool, rang: int) -> None:
     """Traduit une action, et l'etat de son declencheur, en ordre.
 
     Le SEUL endroit qui sache ce que declencher veut dire. Les bornes et
@@ -270,8 +299,16 @@ def _appliquer(ordres: dict, affichages: dict, action: Action | None,
         return
 
     if action.genre == "ecran":
-        if actif and (action.cible or "ecran") not in affichages:
-            affichages[action.cible or "ecran"] = action
+        cible = action.cible or "ecran"
+        gagnant = affichages.get(cible, (0, None))
+        if actif and rang > gagnant[0]:
+            affichages[cible] = (rang, action)
+        elif cible not in affichages:
+            # L'afficheur est cite par une regle sans que rien ne le
+            # demande : on le note quand meme, pour penser a LEVER le
+            # recouvrement. Sans cela l'ecran garderait pour toujours le
+            # dernier message d'une regle depuis relachee.
+            affichages[cible] = gagnant
         return
 
     if action.genre == "actionneur" and action.cible:
@@ -300,11 +337,11 @@ def _declenchements(regles: dict[str, Regle],
         regle = regles.get(grandeur)
         if regle is None:
             continue
-        yield regle.action_bas, franchis.get(grandeur) == "bas"
-        yield regle.action_haut, franchis.get(grandeur) == "haut"
+        yield regle.action_bas, franchis.get(grandeur) == "bas", RANG_BORNE
+        yield regle.action_haut, franchis.get(grandeur) == "haut", RANG_BORNE
 
     for sujet, action in regles_visages.items():
-        yield action, devant(sujet, presents)
+        yield action, devant(sujet, presents), RANG_VISAGE
 
 
 def decider(regles: dict[str, Regle],
@@ -320,14 +357,20 @@ def decider(regles: dict[str, Regle],
     deux regles commandent la meme LED chacune de leur cote.
     """
     ordres: dict[str, Commande] = {}
-    affichages: dict[str, Action] = {}
+    # Par afficheur : le message qui l'emporte, et son rang. Un rang de
+    # zero signifie qu'aucune regle ne demande rien en ce moment.
+    affichages: dict[str, tuple[int, Action | None]] = {}
 
-    for action, actif in _declenchements(regles, franchis,
-                                         regles_visages or {},
-                                         presents or set()):
-        _appliquer(ordres, affichages, action, actif)
+    for action, actif, rang in _declenchements(regles, franchis,
+                                               regles_visages or {},
+                                               presents or set()):
+        _appliquer(ordres, affichages, action, actif, rang)
 
-    for cible, action in affichages.items():
-        ordres[cible] = Commande(1.0, "regle", action.texte)
+    for cible, (_, action) in affichages.items():
+        # Poser le recouvrement, ou le lever. Le lever n'eteint pas
+        # l'ecran : il lui rend ce qu'il montrait avant.
+        ordres[cible] = (Commande(1.0, "regle", action.texte, RECOUVREMENT)
+                         if action is not None
+                         else Commande(0.0, "regle", None, RECOUVREMENT))
 
     return ordres

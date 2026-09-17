@@ -686,24 +686,6 @@ def retirer_regle_visage(sujet: str,
     return {"ok": efface}
 
 
-@app.delete("/api/visages/personnes/{nom}")
-def oublier_personne(nom: str,
-                     botanik_session: str | None = Cookie(default=None)):
-    """Oublie quelqu'un : ses references, et la regle qui le visait.
-
-    La regle part avec la personne. La garder laisserait dans l'interface
-    un declencheur qui ne peut plus se produire, sans rien pour dire
-    pourquoi.
-    """
-    if not compte_ouvert(botanik_session):
-        raise HTTPException(401, "connexion requise")
-    with base() as conn:
-        efface = empreintes.retirer(conn, nom)
-        regles_visages.retirer(conn, nom)
-    bus.publier(TOPIC_REGLES, {"visage": nom})
-    return {"ok": efface > 0, "references": efface}
-
-
 @app.get("/api/sante")
 def sante():
     """Sante de la chaine d'archivage.

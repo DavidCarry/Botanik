@@ -102,6 +102,12 @@ class Cerveau:
         # derniere fois que chaque personne a ete apercue.
         self.regles_visages: dict[str, decision.Action] = {}
         self.vus: dict[str, float] = {}
+        # Les noms de la derniere annonce, pour reagir a une arrivee ou
+        # a un depart sans attendre le prochain tour de garde.
+        self.derniers_visages: set[str] = set()
+        # Dernier message pose sur chaque afficheur. None : recouvrement
+        # leve. Sert a n'emettre que les changements.
+        self.recouvrements: dict[str, str | None] = {}
         self.etendues: dict[str, float] = {}
         self.seuils_ia: dict[str, dict] = {}
         # Cote franchi au tour precedent, pour l'hysteresis des bornes.
@@ -164,8 +170,16 @@ class Cerveau:
             # une detection saute une image des qu'on tourne la tete,
             # et un actionneur commande par une presence clignoterait.
             instant = time.monotonic()
-            for visage in charge.get("visages", []):
-                self.vus[visage.get("nom", decision.ANONYME)] = instant
+            noms = {v.get("nom", decision.ANONYME)
+                    for v in charge.get("visages", [])}
+            # Une arrivee ne doit pas attendre la prochaine decision :
+            # entre deux tours de garde, l'action se faisait attendre
+            # assez pour qu'on la croie cassee.
+            if noms != self.derniers_visages:
+                self.derniers_visages = noms
+                self.prochaine_decision = 0.0
+            for nom in noms:
+                self.vus[nom] = instant
         elif msg.topic.startswith(TOPIC_ETAT):
             self.etats[identifiant] = float(charge.get("valeur", 0))
         elif msg.topic.startswith(TOPIC_COMMANDES):
@@ -269,7 +283,7 @@ class Cerveau:
     # ---- sortie ----
 
     def ordonner(self, client, actionneur, valeur, source, texte=None,
-                 journal=True, insister=False):
+                 journal=True, insister=False, priorite=None):
         """N'emet que si l'actionneur n'est pas deja dans cet etat.
 
         L'etat vient de l'actionneur lui-meme, pas d'un souvenir local :
@@ -288,10 +302,23 @@ class Cerveau:
             return
         if actionneur in self.verrous:
             return
-        if not insister and self.etats.get(actionneur) == valeur:
-            return
+
+        if priorite is None:
+            if not insister and self.etats.get(actionneur) == valeur:
+                return
+        else:
+            # Un afficheur ne se resume pas a allume ou eteint : deux
+            # messages differents valent tous deux 1.0, et se comparer a
+            # son etat empechait le second de passer. On se compare donc
+            # a ce qu'on a demande en dernier.
+            if not insister and self.recouvrements.get(actionneur) == texte:
+                return
+            self.recouvrements[actionneur] = texte
+
         charge = {"valeur": valeur, "source": source,
                   "ts": datetime.now(timezone.utc).isoformat()}
+        if priorite is not None:
+            charge["priorite"] = priorite
         if texte is not None:
             charge["contenu"] = {"mode": "texte", "texte": texte}
         if not journal:
@@ -376,6 +403,11 @@ class Cerveau:
     def tour(self, client):
         maintenant = time.monotonic()
 
+        # Un depart merite une decision immediate autant qu'une arrivee :
+        # sans cela, l'actionneur restait actif jusqu'au prochain tour.
+        if self.vus and min(self.vus.values()) + decision.PRESENCE_S <= maintenant:
+            self.prochaine_decision = 0.0
+
         if maintenant >= self.prochaine_relecture:
             self.relire_modele()
             self.prochaine_relecture = maintenant + RELECTURE_MODELE_S
@@ -397,7 +429,8 @@ class Cerveau:
                 # garderait un « active » sans jamais son « arrete ».
                 sortie = self.bascules.pop(actionneur, None) is not None
                 self.ordonner(client, actionneur, ordre.valeur, ordre.source,
-                              ordre.texte, insister=sortie)
+                              ordre.texte, insister=sortie,
+                              priorite=ordre.priorite)
 
     def _salve(self, client, actionneur, salve, maintenant):
         """Alterne allume et eteint tant que l'ordre tient.
@@ -465,7 +498,11 @@ def main():
           f"les {DECISION_S}s", flush=True)
     print("  aucune regle n'est ecrite ici : tout vient de l'interface",
           flush=True)
-    service.executer("Cerveau", periode=1, travail=c.tour,
+    # Un quart de seconde, et non une : la boucle ne DECIDE pas a chaque
+    # tour -- elle ne fait qu'entretenir ce qui est deja voulu. Mais une
+    # decision avancee par une arrivee devant la camera doit pouvoir
+    # partir tout de suite, et non attendre jusqu'a une seconde.
+    service.executer("Cerveau", periode=0.25, travail=c.tour,
                      on_connect=on_connect, on_message=c.sur_message)
 
 

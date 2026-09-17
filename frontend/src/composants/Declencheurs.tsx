@@ -1,7 +1,5 @@
 import { useEffect, useState } from 'react'
-import {
-  LuCheck, LuRotateCcw, LuScanFace, LuTrash2, LuUserMinus, LuUsers,
-} from 'react-icons/lu'
+import { LuCheck, LuRotateCcw, LuScanFace, LuTrash2, LuUsers } from 'react-icons/lu'
 import type { ActionRegle, Sujet } from '../api'
 import { useReglagesVisages } from '../useVisages'
 import Bloc from './Bloc'
@@ -9,7 +7,7 @@ import EditeurAction from './EditeurAction'
 
 /** Un sujet, et ce que la serre fait en le voyant. */
 function Ligne({
-  sujet, regle, actionneurs, occupe, onEnregistrer, onRetirer, onOublier,
+  sujet, regle, actionneurs, occupe, onEnregistrer, onRetirer,
 }: {
   sujet: Sujet
   regle: ActionRegle | null
@@ -17,12 +15,8 @@ function Ligne({
   occupe: boolean
   onEnregistrer: (a: ActionRegle) => void
   onRetirer: () => void
-  onOublier?: () => void
 }) {
   const [action, setAction] = useState<ActionRegle | null>(regle)
-  // Oublier quelqu'un ne se défait pas : il faudrait lui reprendre une
-  // photo. Le premier clic arme, le second exécute.
-  const [arme, setArme] = useState(false)
 
   // La version du serveur fait foi : dès qu'elle change, on reprend la
   // sienne plutôt que de garder une saisie devenue fausse.
@@ -31,14 +25,6 @@ function Ligne({
     setAction(regle)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [signature])
-
-  // L'armement retombe tout seul : un bouton laissé rouge finirait par
-  // être cliqué sans qu'on se souvienne de ce qu'il allait faire.
-  useEffect(() => {
-    if (!arme) return
-    const t = setTimeout(() => setArme(false), 4000)
-    return () => clearTimeout(t)
-  }, [arme])
 
   const modifie = JSON.stringify(action) !== signature
   const complet = action !== null
@@ -84,25 +70,6 @@ function Ligne({
               <LuTrash2 size={14} />
             </button>
           )}
-          {onOublier && (
-            <button
-              type="button"
-              onClick={() => (arme ? onOublier() : setArme(true))}
-              disabled={occupe}
-              aria-label={arme
-                ? `Confirmer l’oubli de ${sujet.libelle}`
-                : `Faire oublier ${sujet.libelle} à la serre`}
-              className={`flex items-center gap-1 rounded-pilule p-1.5 text-micro
-                          transition-colors duration-200 disabled:opacity-40 ${
-                arme
-                  ? 'bg-critique/15 text-critique'
-                  : 'text-texte-faible hover:bg-survol hover:text-critique'
-              }`}
-            >
-              <LuUserMinus size={14} />
-              {arme && <span className="pr-0.5">Oublier ?</span>}
-            </button>
-          )}
           <button
             type="button"
             disabled={!modifie || !complet || occupe}
@@ -138,13 +105,12 @@ function Ligne({
  *  Seul le déclencheur change.
  *
  *  Les deux premiers sujets ne désignent personne en particulier et sont
- *  toujours là ; les suivants sont les personnes apprises, qu'on peut
- *  aussi faire oublier d'ici.
+ *  toujours là ; les suivants sont les personnes apprises. On les ajoute
+ *  et on les retire avec `apprendre_visages.py`, pas d'ici : effacer un
+ *  visage d'un clic obligerait à en reprendre une photo.
  */
 export default function Declencheurs() {
-  const {
-    reglages, occupe, erreur, enregistrer, retirer, oublier,
-  } = useReglagesVisages()
+  const { reglages, occupe, erreur, enregistrer, retirer } = useReglagesVisages()
 
   const sujets = [...reglages.speciaux, ...reglages.personnes]
 
@@ -175,9 +141,6 @@ export default function Declencheurs() {
             occupe={occupe === s.id}
             onEnregistrer={(a) => enregistrer(s.id, a)}
             onRetirer={() => retirer(s.id)}
-            onOublier={s.references === undefined
-              ? undefined
-              : () => oublier(s.id)}
           />
         ))}
       </div>

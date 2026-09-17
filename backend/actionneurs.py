@@ -27,7 +27,24 @@ COLONNES = 16
 # Ce que chaque actionneur porteur de texte doit montrer, tel que
 # l'utilisateur l'a demande. C'est une INTENTION -- « la temperature » --
 # et non un texte fige : la valeur affichee doit suivre la mesure.
+#
+# C'est le fond, celui qui reste quand rien d'autre ne parle.
 _contenu: dict[str, dict] = {}
+
+# Ce qu'une regle pose PAR-DESSUS, le temps qu'elle dure : un reservoir
+# vide, quelqu'un devant la camera. Une couche a part, et non un
+# remplacement -- c'est elle qui permet a l'ecran de retrouver tout seul
+# ce qu'il montrait quand la regle se releve.
+#
+# Le classement entre plusieurs messages -- une personne passe avant une
+# alarme -- est fait en amont, par le cerveau. Ici il n'y a que
+# « recouvert » ou « pas recouvert ».
+_recouvrement: dict[str, dict] = {}
+
+# L'allumage demande hors recouvrement, a retrouver quand celui-ci se
+# leve : lever un recouvrement ne doit pas eteindre un ecran que
+# l'utilisateur avait allume, ni allumer celui qu'il avait eteint.
+_allumage: dict[str, float] = {}
 
 # Dernieres mesures recues, pour composer ce texte. Le service s'abonne
 # aux mesures uniquement pour cela.
@@ -74,6 +91,12 @@ def capteurs_choisis(contenu: dict) -> list[str]:
         return [c for c in plusieurs if isinstance(c, str)]
     seul = contenu.get("capteur")
     return [seul] if seul else []
+
+
+def affiche(actionneur: str) -> dict | None:
+    """Ce qui doit etre a l'ecran : le recouvrement s'il y en a un, le
+    choix de l'utilisateur sinon."""
+    return _recouvrement.get(actionneur) or _contenu.get(actionneur)
 
 
 def composer(contenu: dict) -> list[str]:
@@ -139,8 +162,8 @@ def main():
         actionneur dont l'etat ne se resume pas a allume ou eteint.
         """
         cible = actionneurs[actionneur]
-        contenu = _contenu.get(actionneur)
-        lignes = composer(contenu) if contenu else None
+        montre = affiche(actionneur)
+        lignes = composer(montre) if montre else None
 
         # Meme principe que pour les capteurs : un materiel qui ne
         # repond plus ne fait pas disparaitre l'actionneur de l'ecran.
@@ -169,12 +192,16 @@ def main():
             simule = True
 
         _etats[actionneur] = atteint
-        if contenu is None:
+        if montre is None:
             annoncer(client, actionneur, atteint, simule=simule)
         else:
             _lignes[actionneur] = lignes
+            # On annonce le contenu de FOND, pas le recouvrement : la page
+            # de pilotage doit continuer a montrer ce que l'utilisateur a
+            # choisi, qui ne change pas parce que quelqu'un passe devant
+            # la camera. Les lignes, elles, disent ce qui est ecrit.
             annoncer(client, actionneur, atteint, simule=simule,
-                     contenu=contenu, lignes=lignes)
+                     contenu=_contenu.get(actionneur), lignes=lignes)
         return atteint
 
     def on_connect(client, userdata, flags, reason_code, properties):
@@ -222,10 +249,24 @@ def main():
         # Une commande peut porter ce qu'il faut afficher. On le retient :
         # l'intention survit a une extinction, et rallumer l'ecran le
         # remet sur la meme chose.
-        if isinstance(charge.get("contenu"), dict):
-            _contenu[actionneur] = charge["contenu"]
-        elif actionneur == "ecran" and actionneur not in _contenu:
-            _contenu[actionneur] = {"mode": "mesure", "capteur": premier}
+        if charge.get("priorite"):
+            # Une regle pose ou leve un recouvrement. Elle ne touche pas
+            # au choix de l'utilisateur, qui reparait dessous.
+            nouveau = charge.get("contenu")
+            if isinstance(nouveau, dict):
+                _recouvrement[actionneur] = nouveau
+            else:
+                _recouvrement.pop(actionneur, None)
+            # Un recouvrement allume ; sa levee rend l'ecran a l'etat
+            # que l'utilisateur lui avait donne.
+            valeur = (1.0 if actionneur in _recouvrement
+                      else _allumage.get(actionneur, valeur))
+        else:
+            if isinstance(charge.get("contenu"), dict):
+                _contenu[actionneur] = charge["contenu"]
+            elif actionneur == "ecran" and actionneur not in _contenu:
+                _contenu[actionneur] = {"mode": "mesure", "capteur": premier}
+            _allumage[actionneur] = valeur
 
         try:
             atteint = actionner(client, actionneur, valeur)
@@ -244,12 +285,13 @@ def main():
         pas figer celle de l'instant ou on l'a allume. On recompose donc
         a chaque tour, et on ne reecrit que si le texte differe.
         """
-        for actionneur, contenu in _contenu.items():
+        for actionneur in set(_contenu) | set(_recouvrement):
             # Un afficheur eteint n'a rien a rafraichir -- et surtout, le
             # rafraichir ne doit jamais le rallumer.
             if actionneur not in actionneurs or not _etats.get(actionneur):
                 continue
-            if composer(contenu) == _lignes.get(actionneur):
+            montre = affiche(actionneur)
+            if montre is None or composer(montre) == _lignes.get(actionneur):
                 continue
             try:
                 actionner(client, actionneur, _etats[actionneur])

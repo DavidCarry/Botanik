@@ -281,7 +281,7 @@ export type Sujet = {
   /** Sujets spéciaux seulement : ce qu'ils recouvrent. */
   detail?: string
   /** Personnes seulement : combien de photos la serre a d'elles. Sa
-   *  présence marque aussi celles qu'on peut faire oublier. */
+   *  présence distingue une personne d'un sujet général. */
   references?: number
 }
 
@@ -300,7 +300,3 @@ export const poserRegleVisage = (sujet: string, action: ActionRegle) =>
 
 export const retirerRegleVisage = (sujet: string) =>
   envoyer<{ ok: boolean }>(`/api/visages/regles/${sujet}`, 'DELETE')
-
-/** Efface les références d'une personne, et la règle qui la visait. */
-export const oublierPersonne = (nom: string) =>
-  envoyer<{ ok: boolean }>(`/api/visages/personnes/${nom}`, 'DELETE')

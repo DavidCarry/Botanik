@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  lireReglagesVisages, oublierPersonne, poserRegleVisage, retirerRegleVisage,
+  lireReglagesVisages, poserRegleVisage, retirerRegleVisage,
   type ActionRegle, type ReglagesVisages,
 } from './api'
 import { useFlux, type Pousse, type Visage } from './useFlux'
@@ -81,10 +81,5 @@ export function useReglagesVisages() {
     [agir],
   )
 
-  const oublier = useCallback(
-    (nom: string) => agir(nom, () => oublierPersonne(nom)),
-    [agir],
-  )
-
-  return { reglages, occupe, erreur, enregistrer, retirer, oublier }
+  return { reglages, occupe, erreur, enregistrer, retirer }
 }
