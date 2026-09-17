@@ -926,7 +926,21 @@ if DIST.is_dir():
         fichier = DIST / chemin
         if chemin and fichier.is_file():
             return FileResponse(fichier)
-        return FileResponse(DIST / "index.html")
+
+        # `index.html` ne se met JAMAIS en cache.
+        #
+        # Il ne pese rien, et c'est lui qui nomme les fichiers de
+        # l'application -- dont le nom porte une empreinte qui change a
+        # chaque compilation. Servi sans en-tete, le navigateur lui
+        # appliquait sa propre heuristique et pouvait continuer a charger
+        # la version precedente apres un deploiement : l'ecran semblait
+        # alors ignorer des corrections pourtant en place, et on cherchait
+        # le defaut dans le serveur.
+        #
+        # Les fichiers d'assets, eux, se mettent en cache sans risque :
+        # leur nom change des que leur contenu change.
+        return FileResponse(DIST / "index.html",
+                            headers={"Cache-Control": "no-store"})
 else:
     # Pas bloquant : en developpement le front est servi par Vite sur :5173,
     # et l'API doit pouvoir tourner seule.

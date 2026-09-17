@@ -95,11 +95,11 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
   // Un battement par seconde, et seulement tant qu'un verrou court : le
   // compte a rebours se lit a la seconde sans faire travailler la page
   // le reste du temps.
-  const [, battre] = useState(0)
+  const [maintenant, setMaintenant] = useState(() => Date.now())
   const verrouille = Object.keys(fins).length > 0
   useEffect(() => {
     if (!verrouille) return
-    const t = setInterval(() => battre((n) => n + 1), 1000)
+    const t = setInterval(() => setMaintenant(Date.now()), 1000)
     return () => clearInterval(t)
   }, [verrouille])
   const regle = liste.find((a) => a.id === reglage)
@@ -140,7 +140,7 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
           // Un verrou manuel se DIT : sinon la serre semble ignorer une
           // regle qu'on vient de poser, et on la croit cassee.
           const restant = fins[id]
-            ? Math.max(0, Math.round((fins[id] - Date.now()) / 1000))
+            ? Math.max(0, Math.round((fins[id] - maintenant) / 1000))
             : 0
           const sousTitre = muet ? 'Sans réponse'
             : restant > 0 ? `Repris en main — la règle reprend dans ${restant} s`
