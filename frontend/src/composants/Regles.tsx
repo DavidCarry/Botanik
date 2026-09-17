@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { LuBrain, LuCheck, LuTrash2 } from 'react-icons/lu'
+import { LuBrain, LuCheck, LuRotateCcw, LuTrash2 } from 'react-icons/lu'
 import type { BorneRegle, GrandeurReglee, ModeBorne } from '../api'
 import { useRegles } from '../useRegles'
 import Bloc from './Bloc'
@@ -110,10 +110,17 @@ function Cote({
             etiquette={`Action quand ${titre.toLowerCase()}`}
             choisi={surActionneur ? surActionneur.cible : genre}
             onChange={changerAction}
+            // L'afficheur n'apparait PAS parmi les actionneurs : le
+            // mettre en marche sans lui dire quoi montrer n'a pas de
+            // sens, et deux entrees pour le meme materiel -- « Écran »
+            // et « Afficher un message » -- obligeaient a deviner
+            // laquelle fait quoi.
             options={[
               { valeur: 'aucun', libelle: 'Ne rien faire (alerter seulement)' },
-              ...actionneurs.map((a) => ({ valeur: a.id, libelle: a.libelle })),
-              { valeur: 'ecran', libelle: 'Afficher un message' },
+              ...actionneurs
+                .filter((a) => a.id !== 'ecran')
+                .map((a) => ({ valeur: a.id, libelle: a.libelle })),
+              { valeur: 'ecran', libelle: 'Afficher un message à l’écran' },
             ]}
           />
 
@@ -198,6 +205,24 @@ function Carte({
         <span className="text-micro text-texte-faible">{grandeur.unite}</span>
 
         <span className="ml-auto flex items-center gap-2">
+          {/* Revenir a ce qui est enregistre. Sans cela, une saisie
+              qu'on regrette ne se defaisait qu'en rechargeant la page
+              -- et on ne savait plus ce qui s'appliquait vraiment. */}
+          {modifie && (
+            <button
+              type="button"
+              onClick={() => {
+                const [b, h] = depuisServeur()
+                setBas(b)
+                setHaut(h)
+              }}
+              aria-label={`Abandonner les modifications de ${grandeur.libelle}`}
+              className="rounded-pilule p-1.5 text-texte-faible transition-colors
+                         duration-200 hover:bg-survol hover:text-texte"
+            >
+              <LuRotateCcw size={14} />
+            </button>
+          )}
           {grandeur.regle && (
             <button
               type="button"

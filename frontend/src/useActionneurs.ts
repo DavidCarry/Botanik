@@ -28,6 +28,14 @@ export function useActionneurs() {
   const [attendus, setAttendus] = useState<Record<string, Attendu>>({})
   const [erreur, setErreur] = useState<string | null>(null)
 
+  /** Instant de LIBERATION de chaque verrou, et non sa duree restante.
+   *
+   *  Le serveur envoie « 24 secondes » toutes les cinq secondes : affiche
+   *  tel quel, le compte a rebours sautait de cinq en cinq. En gardant
+   *  l'instant d'arrivee, l'ecran peut decompter lui-meme, a la seconde,
+   *  entre deux lectures. */
+  const [fins, setFins] = useState<Record<string, number>>({})
+
   /** Le battement vit dans l'effet ; `basculer` a besoin de le declencher
    *  hors du battement, d'ou ce relais. */
   const relire = useRef<() => Promise<void>>(async () => {})
@@ -78,6 +86,11 @@ export function useActionneurs() {
       }
       if (!vivant) return
       setListe(recu)
+      const maintenant = Date.now()
+      setFins(Object.fromEntries(
+        recu.filter((a) => a.verrou_s > 0)
+          .map((a) => [a.id, maintenant + a.verrou_s * 1000]),
+      ))
 
       // Une attente prend fin quand l'actionneur confirme -- ou quand on
       // a trop patiente, auquel cas on le dit plutot que de laisser
@@ -139,5 +152,5 @@ export function useActionneurs() {
     await relire.current()
   }, [])
 
-  return { liste, attendus, erreur, basculer }
+  return { liste, attendus, erreur, basculer, fins }
 }

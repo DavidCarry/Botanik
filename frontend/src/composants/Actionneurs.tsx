@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   LuBellRing, LuDroplet, LuFan, LuLightbulb, LuLock, LuMonitor, LuPencil,
   LuSun, LuZap,
@@ -89,8 +89,19 @@ function Interrupteur({ actif, attendu }: { actif: boolean; attendu: boolean }) 
 }
 
 export default function Actionneurs({ connecte }: { connecte: boolean }) {
-  const { liste, attendus, erreur, basculer } = useActionneurs()
+  const { liste, attendus, erreur, basculer, fins } = useActionneurs()
   const [reglage, setReglage] = useState<string | null>(null)
+
+  // Un battement par seconde, et seulement tant qu'un verrou court : le
+  // compte a rebours se lit a la seconde sans faire travailler la page
+  // le reste du temps.
+  const [, battre] = useState(0)
+  const verrouille = Object.keys(fins).length > 0
+  useEffect(() => {
+    if (!verrouille) return
+    const t = setInterval(() => battre((n) => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [verrouille])
   const regle = liste.find((a) => a.id === reglage)
 
   const mention = erreur ? (
@@ -111,7 +122,7 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
     <Bloc titre="Pilotage" actions={mention} className="md:min-h-0 md:flex-1">
       <div className="divide-y divide-bordure border-y border-bordure
                       md:h-full md:overflow-y-auto">
-        {liste.map(({ id, libelle, detail, valeur, lignes, simule, verrou_s,
+        {liste.map(({ id, libelle, detail, valeur, lignes, simule,
                       contenu: quoi }) => {
           // Seul un actionneur qui PORTE du texte se regle ; les autres
           // n'ont qu'un etat, et rien a choisir.
@@ -128,8 +139,11 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
           // description : c'est l'information du moment.
           // Un verrou manuel se DIT : sinon la serre semble ignorer une
           // regle qu'on vient de poser, et on la croit cassee.
+          const restant = fins[id]
+            ? Math.max(0, Math.round((fins[id] - Date.now()) / 1000))
+            : 0
           const sousTitre = muet ? 'Sans réponse'
-            : verrou_s > 0 ? `Repris en main — la règle reprend dans ${verrou_s} s`
+            : restant > 0 ? `Repris en main — la règle reprend dans ${restant} s`
               : actif && lignes?.some(Boolean) ? lignes.filter(Boolean).join(' · ')
                 : detail
 
