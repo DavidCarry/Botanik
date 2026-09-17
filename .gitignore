@@ -34,3 +34,7 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+
+# Modèle de reconnaissance faciale : 37 Mo, trop lourd pour le dépôt.
+# Il est téléchargé au déploiement — voir deployer.sh.
+backend/modeles/visages-sface.onnx

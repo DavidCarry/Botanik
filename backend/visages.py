@@ -27,6 +27,8 @@ import json
 import os
 import time
 
+import bdd
+import empreintes
 import service
 from config import (
     CAMERA_FICHIER,
@@ -35,8 +37,12 @@ from config import (
     VISAGES_LARGEUR,
     VISAGES_MEMOIRE_S,
     VISAGES_MODELE,
+    VISAGES_RECONNAISSANCE_S,
     VISAGES_S,
     VISAGES_SCORE,
+    VISAGES_SFACE,
+    VISAGES_SIMILARITE,
+    VISAGES_SUIVI,
 )
 
 try:
@@ -54,6 +60,11 @@ ANONYME = "Personne"
 # Une image de serre ne contient pas dix personnes : une limite protege
 # d'une detection qui s'emballerait sur un feuillage.
 MAXIMUM = 8
+
+# Relecture des references. Assez souvent pour qu'un visage tout juste
+# appris soit reconnu presque tout de suite, assez rare pour ne pas
+# interroger la base cinq fois par seconde.
+RELECTURE_S = 10
 
 
 def drapeau_lecture() -> int:
@@ -78,9 +89,19 @@ def drapeau_lecture() -> int:
 class Regard:
     """Le detecteur, et ce qu'il a vu en dernier."""
 
-    def __init__(self, detecteur):
+    def __init__(self, detecteur, reconnaisseur=None):
         self.detecteur = detecteur
+        # Absent, les visages sont encadres sans etre nommes : degrade,
+        # pas casse.
+        self.reconnaisseur = reconnaisseur
         self.lecture = drapeau_lecture()
+        # Qui la serre sait nommer, relu de temps en temps.
+        self.references: list = []
+        self.prochaine_relecture = 0.0
+        self.plainte: str | None = None
+        # Les visages de l'image PRECEDENTE, avec leur nom : c'est ce qui
+        # evite de redemander son identite a une tete qui n'a pas bouge.
+        self.suivis: list[dict] = []
         # Les visages affiches en ce moment, et l'instant ou on en a
         # reellement vu pour la derniere fois.
         self.vus: list[dict] = []
@@ -93,37 +114,136 @@ class Regard:
         # par seconde.
         self.publie: list[dict] | None = None
 
-    def regarder(self, image) -> list[dict]:
-        """Les visages d'une image, en coordonnees de 0 a 1."""
-        haut, large = image.shape[:2]
-        # Le decodage a deja fait le gros du chemin : il ne reste a
-        # redimensionner que si la camera ne tombe pas juste.
-        if large > VISAGES_LARGEUR:
-            image = cv2.resize(
-                image, (VISAGES_LARGEUR, round(haut * VISAGES_LARGEUR / large)))
+    def reduire(self, image):
+        """L'image ramenee a la largeur de travail.
 
+        Le decodage a deja fait le gros du chemin : il ne reste a
+        redimensionner que si la camera ne tombe pas juste.
+        """
+        haut, large = image.shape[:2]
+        if large <= VISAGES_LARGEUR:
+            return image
+        return cv2.resize(
+            image, (VISAGES_LARGEUR, round(haut * VISAGES_LARGEUR / large)))
+
+    def herite(self, cx: float, cy: float, pris: set) -> dict | None:
+        """Le visage de l'image precedente qui se trouvait la.
+
+        Sans ce rapprochement, chaque image reposerait la question « qui
+        est-ce ? » a une tete qui n'a pas bouge -- soixante-quatre
+        millisecondes, cinq fois par seconde, pour reapprendre ce qu'on
+        savait deja.
+
+        Un seul cadre precedent par cadre courant : deux personnes qui se
+        croisent ne doivent pas se voir attribuer le meme nom.
+        """
+        meilleur, distance = None, VISAGES_SUIVI
+        for i, s in enumerate(self.suivis):
+            if i in pris:
+                continue
+            d = ((s["cx"] - cx) ** 2 + (s["cy"] - cy) ** 2) ** 0.5
+            if d < distance:
+                meilleur, distance = i, d
+        if meilleur is None:
+            return None
+        pris.add(meilleur)
+        return self.suivis[meilleur]
+
+    def identifier(self, image, visage) -> str:
+        """Le nom de ce visage, ou « Personne » s'il n'est pas connu.
+
+        Le modele redresse d'abord la tete a partir des cinq reperes
+        donnes par le detecteur -- yeux, nez, coins de la bouche -- puis
+        la reduit a 128 nombres. Comparer deux visages, c'est comparer
+        ces nombres.
+
+        La MEILLEURE ressemblance l'emporte, et seulement si elle passe
+        le seuil : en partant du seuil, un inconnu ne peut pas gagner par
+        defaut.
+        """
+        if self.reconnaisseur is None or not self.references:
+            return ANONYME
+        try:
+            empreinte = self.reconnaisseur.feature(
+                self.reconnaisseur.alignCrop(image, visage))
+        except cv2.error:
+            # Visage au bord de l'image : le redressement sort du cadre.
+            return ANONYME
+
+        nom, ressemblance = ANONYME, VISAGES_SIMILARITE
+        for candidat, reference in self.references:
+            s = self.reconnaisseur.match(empreinte, reference,
+                                         cv2.FaceRecognizerSF_FR_COSINE)
+            if s > ressemblance:
+                nom, ressemblance = candidat, s
+        return nom
+
+    def regarder(self, image, maintenant: float) -> list[dict]:
+        """Les visages d'une image, nommes, en coordonnees de 0 a 1."""
+        image = self.reduire(image)
         rh, rl = image.shape[:2]
         self.detecteur.setInputSize((rl, rh))
         _, trouves = self.detecteur.detect(image)
         if trouves is None:
+            self.suivis = []
             return []
 
-        # Chaque ligne donne le cadre, puis cinq reperes du visage --
-        # yeux, nez, coins de la bouche -- et son score en dernier. Seuls
-        # le cadre et le score nous servent ; les reperes attendront la
-        # reconnaissance, qui s'en sert pour redresser le visage.
-        visages = []
+        # Chaque ligne donne le cadre, puis cinq reperes du visage, et
+        # son score en dernier.
+        visages, suivis, pris = [], [], set()
         for v in trouves[:MAXIMUM]:
             x, y, l, h = (float(n) for n in v[:4])
+            cx, cy = (x + l / 2) / rl, (y + h / 2) / rh
+
+            precedent = self.herite(cx, cy, pris)
+            nom = precedent["nom"] if precedent else ANONYME
+            identifie_a = precedent["identifie_a"] if precedent else 0.0
+            # Un visage qui arrive est identifie tout de suite ; celui
+            # qui reste l'est de temps en temps, au cas ou la premiere
+            # lecture serait tombee sur un mauvais angle.
+            if maintenant - identifie_a > VISAGES_RECONNAISSANCE_S:
+                nom = self.identifier(image, v)
+                identifie_a = maintenant
+
+            suivis.append({"cx": cx, "cy": cy, "nom": nom,
+                           "identifie_a": identifie_a})
             visages.append({
                 "x": round(max(0.0, x / rl), 4),
                 "y": round(max(0.0, y / rh), 4),
                 "l": round(min(1.0, l / rl), 4),
                 "h": round(min(1.0, h / rh), 4),
-                "nom": ANONYME,
+                "nom": nom,
                 "score": round(float(v[14]), 3),
             })
+
+        self.suivis = suivis
         return visages
+
+    def relire_references(self) -> None:
+        """Relit qui la serre sait nommer.
+
+        Periodiquement, et non une fois pour toutes : une reference
+        ajoutee doit prendre effet sans redemarrer le service.
+
+        Une base injoignable ne fait rien perdre -- on garde la liste
+        precedente. Oublier les noms parce que la base tousse serait pire
+        que de les garder un peu trop longtemps.
+        """
+        try:
+            with bdd.connexion() as conn:
+                references = empreintes.lire(conn)
+        except Exception as e:
+            if self.plainte != str(e):
+                print(f"References illisibles : {e}", flush=True)
+                self.plainte = str(e)
+            return
+
+        self.plainte = None
+        if len(references) != len(self.references):
+            noms = sorted({nom for nom, _ in references})
+            print(f"{len(references)} reference(s) : "
+                  f"{', '.join(noms) or 'aucune'}", flush=True)
+        self.references = references
 
     def oublier(self, maintenant: float) -> bool:
         """Vrai quand plus rien n'a ete vu depuis assez longtemps.
@@ -137,6 +257,11 @@ class Regard:
 
     def tour(self, client) -> None:
         maintenant = time.monotonic()
+
+        if maintenant >= self.prochaine_relecture:
+            self.relire_references()
+            self.prochaine_relecture = maintenant + RELECTURE_S
+
         try:
             datee = os.path.getmtime(CAMERA_FICHIER)
         except OSError:
@@ -147,7 +272,7 @@ class Regard:
             self.image_datee = datee
             image = cv2.imread(CAMERA_FICHIER, self.lecture)
             if image is not None:
-                trouves = self.regarder(image)
+                trouves = self.regarder(image, maintenant)
                 if trouves:
                     self.vus = trouves
                     self.vus_a = maintenant
@@ -187,12 +312,33 @@ class Regard:
                        qos=0, retain=True)
 
 
-def modele() -> str:
-    """Le chemin du detecteur, relatif au dossier du backend."""
-    if os.path.isabs(VISAGES_MODELE):
-        return VISAGES_MODELE
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        VISAGES_MODELE)
+def chemin(modele: str) -> str:
+    """Le chemin d'un modele, relatif au dossier du backend."""
+    if os.path.isabs(modele):
+        return modele
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), modele)
+
+
+def detecteur():
+    """Celui qui trouve les visages. Sans lui, il n'y a rien a faire.
+
+    La taille donnee ici est redefinie a chaque image par
+    `setInputSize` : le constructeur l'exige, mais elle ne sert a rien.
+    """
+    return cv2.FaceDetectorYN.create(
+        chemin(VISAGES_MODELE), "", (VISAGES_LARGEUR, VISAGES_LARGEUR),
+        score_threshold=VISAGES_SCORE,
+    )
+
+
+def reconnaisseur():
+    """Celui qui les nomme, ou None s'il n'est pas installe.
+
+    Ses 37 Mo ne sont pas dans le depot : sans eux, la serre encadre les
+    visages sans les nommer, ce qui reste utilisable.
+    """
+    voie = chemin(VISAGES_SFACE)
+    return cv2.FaceRecognizerSF.create(voie, "") if os.path.exists(voie) else None
 
 
 def main() -> int:
@@ -200,9 +346,8 @@ def main() -> int:
         print("OpenCV absent : pip install opencv-python-headless", flush=True)
         return 1
 
-    chemin = modele()
-    if not os.path.exists(chemin):
-        print(f"Modele introuvable : {chemin}", flush=True)
+    if not os.path.exists(chemin(VISAGES_MODELE)):
+        print(f"Modele introuvable : {chemin(VISAGES_MODELE)}", flush=True)
         return 1
 
     # UN SEUL fil. Laisse a lui-meme, OpenCV etale la detection sur les
@@ -212,16 +357,15 @@ def main() -> int:
     # pour gagner douze millisecondes que personne ne verra.
     cv2.setNumThreads(1)
 
-    # La taille donnee ici est redefinie a chaque image par
-    # `setInputSize` : le constructeur l'exige, mais elle ne sert a rien.
-    detecteur = cv2.FaceDetectorYN.create(
-        chemin, "", (VISAGES_LARGEUR, VISAGES_LARGEUR),
-        score_threshold=VISAGES_SCORE,
-    )
+    nommeur = reconnaisseur()
+    regard = Regard(detecteur(), nommeur)
 
-    print(f"Visages : {os.path.basename(chemin)} sur {CAMERA_FICHIER}, "
-          f"toutes les {VISAGES_S}s", flush=True)
-    service.executer("Visages", periode=VISAGES_S, travail=Regard(detecteur).tour)
+    print(f"Visages : lecture de {CAMERA_FICHIER} toutes les {VISAGES_S}s",
+          flush=True)
+    print("  reconnaissance active" if nommeur else
+          "  sans reconnaissance : modele absent, tout le monde reste "
+          f"« {ANONYME} »", flush=True)
+    service.executer("Visages", periode=VISAGES_S, travail=regard.tour)
     return 0
 
 

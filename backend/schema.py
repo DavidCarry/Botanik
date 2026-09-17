@@ -65,6 +65,26 @@ CREATE TABLE IF NOT EXISTS regles (
     action_haut JSONB,
     modifie_le  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- Les visages que la serre sait nommer.
+--
+-- Ce qui est garde n'est PAS une photo mais une empreinte : les 128
+-- nombres que le modele tire d'un visage. On ne remonte pas d'une
+-- empreinte au visage, et reconnaitre quelqu'un revient a comparer deux
+-- series de nombres -- rien n'est reappris, jamais.
+--
+-- Plusieurs lignes par personne, et c'est voulu : un visage de face et
+-- un de trois quarts se ressemblent moins qu'on ne croit, et la
+-- reconnaissance retient la MEILLEURE des ressemblances.
+CREATE TABLE IF NOT EXISTS visages (
+    id        BIGSERIAL PRIMARY KEY,
+    nom       TEXT        NOT NULL,
+    empreinte BYTEA       NOT NULL,   -- 128 flottants, soit 512 octets
+    origine   TEXT        NOT NULL,   -- d'ou vient cette reference
+    cree_le   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_visages_nom ON visages (nom);
 """
 
 # Ce qui a change APRES coup sur une table d'`init.sql`, qu'une base deja

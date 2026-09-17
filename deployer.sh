@@ -39,6 +39,23 @@ if [ ! -d frontend/dist ] || echo "$MODIFIES" | grep -q '^frontend/'; then
   (cd frontend && npm run build 2>&1 | tail -4 | sed 's/^/  /')
 fi
 
+# Le modele de reconnaissance faciale pese 37 Mo : trop pour le depot,
+# on le recupere ici. Telecharge a cote puis renomme, pour qu'une
+# coupure de reseau ne laisse jamais un fichier a moitie ecrit que le
+# service prendrait pour un modele.
+SFACE="backend/modeles/visages-sface.onnx"
+if [ ! -f "$SFACE" ]; then
+  echo "== modele de reconnaissance =="
+  URL="https://github.com/opencv/opencv_zoo/raw/main/models/face_recognition_sface/face_recognition_sface_2021dec.onnx"
+  if curl -sfL -o "$SFACE.part" "$URL"; then
+    mv "$SFACE.part" "$SFACE"
+    echo "  telecharge ($(du -h "$SFACE" | cut -f1))"
+  else
+    rm -f "$SFACE.part"
+    echo "  echec du telechargement : les visages seront encadres sans etre nommes"
+  fi
+fi
+
 echo "== secrets =="
 ./infra/initialiser-secrets.sh
 

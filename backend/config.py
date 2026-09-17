@@ -94,6 +94,12 @@ CAMERA_FRAICHEUR_S = float(os.getenv("CAMERA_FRAICHEUR_S", "10"))
 # vue reste, et rien d'autre ne s'en apercoit.
 VISAGES_MODELE = os.getenv("VISAGES_MODELE", "modeles/visages-yunet.onnx")
 
+# Le modele qui RECONNAIT, par opposition a celui qui detecte. Absent,
+# la serre encadre les visages sans les nommer -- c'est degrade, pas
+# casse. Il pese 37 Mo : trop pour le depot, il est telecharge au
+# deploiement.
+VISAGES_SFACE = os.getenv("VISAGES_SFACE", "modeles/visages-sface.onnx")
+
 # Une image sur deux parmi celles de la camera. Les regarder toutes
 # doublerait le cout pour un cadre qui suivrait les tetes vingt
 # centiemes de seconde plus tot -- ce que personne ne remarque, alors
@@ -113,6 +119,29 @@ VISAGES_SCORE = float(os.getenv("VISAGES_SCORE", "0.8"))
 # tete -- reste affiche ce laps de temps. Sans cela le cadre papillote
 # en permanence, ce qui se remarque bien plus qu'un leger retard.
 VISAGES_MEMOIRE_S = float(os.getenv("VISAGES_MEMOIRE_S", "0.5"))
+
+# Une photo de reference est choisie exprès et relue par un humain, qui
+# voit tout de suite si le mauvais visage a ete retenu. On peut donc y
+# etre moins severe que sur la vue en direct, ou un seuil bas ferait
+# encadrer un feuillage sans que personne ne le corrige.
+VISAGES_SCORE_REFERENCE = float(os.getenv("VISAGES_SCORE_REFERENCE", "0.5"))
+
+# Au-dessus de cette ressemblance, on met un nom ; en dessous, la
+# personne reste « Personne ». C'est le point de fonctionnement publie
+# pour SFace -- le descendre ferait porter le blaze d'un camarade a
+# n'importe quel visage de passage.
+VISAGES_SIMILARITE = float(os.getenv("VISAGES_SIMILARITE", "0.363"))
+
+# Reconnaitre coute 64 ms, detecter n'en coute que 30 : hors de question
+# de le refaire a chaque image. Un visage est identifie quand il ARRIVE,
+# puis revu de temps en temps -- une identite ne change pas pendant que
+# son proprietaire reste devant la camera.
+VISAGES_RECONNAISSANCE_S = float(os.getenv("VISAGES_RECONNAISSANCE_S", "3"))
+
+# Deux cadres d'images successives sont tenus pour le meme visage si
+# leurs centres sont plus proches que cette fraction de l'image. C'est
+# ce qui permet a un nom de rester colle a une tete qui bouge.
+VISAGES_SUIVI = float(os.getenv("VISAGES_SUIVI", "0.12"))
 
 # Garde-fou de stockage. Sous ce seuil d'espace libre, le collecteur
 # efface les mesures les plus anciennes : perdre l'histoire vaut mieux
