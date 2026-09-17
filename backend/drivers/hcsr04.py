@@ -18,7 +18,16 @@ avant d'atteindre la broche, qui n'accepte que 3,3 V. C'est une affaire
 de cablage, pas de code, mais elle se rappelle mal apres coup.
 """
 
+import time
+
 _capteurs = {}
+
+# Dernier signalement d'une mesure hors etalonnage, par capteur.
+_plainte = {}
+
+# On ne se plaint qu'une fois par periode : sinon la trace serait emise
+# deux fois par seconde.
+SIGNALEMENT_S = 10.0
 
 
 def _capteur(params):
@@ -49,4 +58,17 @@ def lire(capteur_id, params):
 
     # Plus c'est proche, plus c'est plein : la pente est negative.
     part = (vide - distance_cm) / (vide - plein)
+
+    # Une valeur collee a 0 ou a 100 ne veut rien dire : ou le reservoir
+    # est vraiment a fond, ou l'etalonnage ne correspond pas au montage.
+    # On donne alors la distance brute, qui est la seule chose utile pour
+    # corriger -- et une seule fois par periode, pour ne pas noyer le
+    # journal.
+    if not 0.0 < part < 1.0:
+        maintenant = time.monotonic()
+        if maintenant - _plainte.get(capteur_id, 0.0) > SIGNALEMENT_S:
+            _plainte[capteur_id] = maintenant
+            print(f"{capteur_id} : {distance_cm:.1f} cm mesures, hors de "
+                  f"l'etalonnage {plein}-{vide} cm", flush=True)
+
     return round(min(max(part, 0.0), 1.0) * 100, 2)
