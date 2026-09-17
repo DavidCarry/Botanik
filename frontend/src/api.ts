@@ -128,6 +128,8 @@ export type Sante = {
   archivage_ok: boolean
   /** Age de la derniere sauvegarde, en heures. Null : aucune. */
   sauvegarde_h: number | null
+  /** Age de la derniere prise de vue, en secondes. Null : pas de camera. */
+  camera_s: number | null
 }
 
 export const lireSante = () => json<Sante>('/api/sante')

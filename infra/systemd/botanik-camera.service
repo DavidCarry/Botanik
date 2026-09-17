@@ -1,0 +1,20 @@
+[Unit]
+Description=Botanik - prises de vue de la serre
+# Ne depend ni du broker ni de la base : ce service n'ecrit qu'un fichier
+# en memoire, et l'API le sert. Il peut donc tourner seul.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__RACINE__/backend
+# Le PYTHON DU SYSTEME, et non celui du projet : picamera2 s'appuie sur
+# les liaisons libcamera, installees par le systeme et absentes de pip.
+# C'est le seul service dans ce cas, et c'est voulu plutot que subi.
+ExecStart=/usr/bin/python3 camera.py
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

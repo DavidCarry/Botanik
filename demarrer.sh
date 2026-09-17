@@ -7,7 +7,7 @@ set -uo pipefail
 
 RACINE="$(cd "$(dirname "$0")" && pwd)"
 LOGS="$RACINE/logs"
-SERVICES='collecteur.py|publisher.py|actionneurs.py|cerveau.py|main.py'
+SERVICES='collecteur.py|publisher.py|actionneurs.py|cerveau.py|camera.py|main.py'
 
 arreter() {
   pkill -f "$SERVICES" 2>/dev/null || true
@@ -42,6 +42,10 @@ case "${1:-demarrer}" in
     setsid nohup .venv/bin/python publisher.py > "$LOGS/publisher.log" 2>&1 < /dev/null &
     setsid nohup .venv/bin/python actionneurs.py > "$LOGS/actionneurs.log" 2>&1 < /dev/null &
     setsid nohup .venv/bin/python cerveau.py > "$LOGS/cerveau.log" 2>&1 < /dev/null &
+    # La camera tourne avec le python du systeme : picamera2 ne
+    # s'installe pas dans un venv. Absente, le service se plaint et
+    # s'arrete -- ce qui est sans consequence sur le reste.
+    setsid nohup python3 camera.py > "$LOGS/camera.log" 2>&1 < /dev/null &
     setsid nohup .venv/bin/python main.py > "$LOGS/api.log" 2>&1 < /dev/null &
     sleep 3
 

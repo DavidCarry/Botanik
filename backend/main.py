@@ -34,7 +34,9 @@ import schema
 import seuils
 import systeme
 import verrous
-from config import ARCHIVAGE_S, TOPIC_COMMANDES
+from config import (
+    ARCHIVAGE_S, CAMERA_FICHIER, CAMERA_FRAICHEUR_S, TOPIC_COMMANDES,
+)
 from drivers import DRIVERS, SORTIES
 
 RACINE = Path(__file__).parent.parent
@@ -415,7 +417,38 @@ def sante():
         "archivage_s": archivage_s,
         "archivage_ok": archivage_s is not None and archivage_s <= RETARD_TOLERE_S,
         "sauvegarde_h": sauvegarde_h,
+        # Age de la derniere prise de vue. None : aucune camera ne
+        # produit d'image, l'ecran retombe sur la photo du chassis.
+        "camera_s": age_de_la_vue(),
     }
+
+
+def age_de_la_vue() -> float | None:
+    """Secondes depuis la derniere prise de vue, ou None s'il n'y en a pas."""
+    try:
+        return round(time.time() - Path(CAMERA_FICHIER).stat().st_mtime, 1)
+    except OSError:
+        return None
+
+
+@app.get("/api/camera.jpg")
+def vue_camera():
+    """La derniere image prise par la camera de la serre.
+
+    Une image fixe renouvelee, pas un flux : le navigateur la redemande
+    quand il veut. `no-store` est indispensable -- sans lui, le
+    navigateur servirait indefiniment la premiere.
+
+    Le fichier est remplace de facon atomique par le service de prise de
+    vue : on ne sert donc jamais une image a moitie ecrite.
+    """
+    age = age_de_la_vue()
+    if age is None:
+        raise HTTPException(404, "aucune prise de vue")
+    if age > CAMERA_FRAICHEUR_S:
+        raise HTTPException(503, f"derniere vue il y a {age} s")
+    return FileResponse(CAMERA_FICHIER, media_type="image/jpeg",
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/systeme")

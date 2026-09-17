@@ -44,6 +44,10 @@ export default function App() {
   // est en vol, et un echec basculera l'etat en moins d'une seconde.
   const rang = VUES.findIndex((v) => v.valeur === vue)
 
+  // La camera est « en direct » tant qu'elle produit des images. Sans
+  // vue recente, l'ecran retombe sur la photo du chassis et le dit.
+  const cameraEnDirect = sante?.camera_s != null
+
   const liaison: EtatLiaison = !joignable
     ? 'hors_ligne'
     : sante && !sante.archivage_ok
@@ -112,7 +116,8 @@ export default function App() {
                 <Actionneurs connecte={Boolean(auth.compte)} />
                 <Bloc titre="Caméra"
                       className="md:h-[42%] md:max-h-[calc(100cqw+1.8rem)] md:shrink-0">
-                  <Camera onAgrandir={() => setCameraOuverte(true)} />
+                  <Camera onAgrandir={() => setCameraOuverte(true)}
+                          enDirect={cameraEnDirect} />
                 </Bloc>
               </div>
             </div>
@@ -152,7 +157,10 @@ export default function App() {
         onAller={(i) => setVue(VUES[i].valeur)}
       />
 
-      {cameraOuverte && <CameraPleine onFermer={() => setCameraOuverte(false)} />}
+      {cameraOuverte && (
+        <CameraPleine onFermer={() => setCameraOuverte(false)}
+                      enDirect={cameraEnDirect} />
+      )}
 
       {alertesOuvertes && (
         <Modale

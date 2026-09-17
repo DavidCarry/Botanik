@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { LuExpand, LuVideoOff, LuX } from 'react-icons/lu'
 
 /** Vue de la serre.
@@ -15,6 +15,30 @@ import { LuExpand, LuVideoOff, LuX } from 'react-icons/lu'
 const PRISE_DE_VUE = '16/09/2026'
 const SOURCE = '/serre.jpg'
 
+/** Cadence de renouvellement de la vue.
+ *
+ *  Une image fixe redemandee chaque seconde, et non un flux video : la
+ *  germination se regarde en heures, pas en images par seconde. Le
+ *  sentiment de direct est le meme, le cout est vingt fois moindre. */
+const RENOUVELLEMENT_MS = 1000
+
+/** L'adresse de la vue a afficher, renouvelee tant que la camera produit.
+ *
+ *  L'horodatage dans l'adresse est indispensable : sans lui le
+ *  navigateur garderait la premiere image pour toujours, quoi que dise
+ *  le serveur. */
+function useVue(enDirect: boolean) {
+  const [tic, setTic] = useState(() => Date.now())
+
+  useEffect(() => {
+    if (!enDirect) return
+    const t = setInterval(() => setTic(Date.now()), RENOUVELLEMENT_MS)
+    return () => clearInterval(t)
+  }, [enDirect])
+
+  return enDirect ? `/api/camera.jpg?t=${tic}` : SOURCE
+}
+
 /** Equerres de cadrage, la signature d'un moniteur de surveillance. */
 const COINS = [
   'left-2 top-2 border-l border-t',
@@ -23,7 +47,7 @@ const COINS = [
   'right-2 bottom-2 border-b border-r',
 ]
 
-function Habillage({ compact }: { compact: boolean }) {
+function Habillage({ compact, enDirect }: { compact: boolean; enDirect: boolean }) {
   return (
     <>
       {/* Lignes de balayage et vignettage, obtenus sans image
@@ -47,19 +71,29 @@ function Habillage({ compact }: { compact: boolean }) {
       ))}
 
       <div className="pointer-events-none absolute left-3 top-3 flex items-center gap-1.5 rounded-carte bg-black/55 px-2 py-1 backdrop-blur-sm">
-        <LuVideoOff size={11} className="shrink-0 text-texte-faible" />
+        {/* La pastille rouge n'apparait QUE si la camera produit
+            vraiment des images. Sur une photo fixe, elle ferait croire a
+            un direct -- et se retournerait contre nous a la premiere
+            question du jury. */}
+        {enDirect ? (
+          <span aria-hidden className="size-2 shrink-0 rounded-pilule bg-critique" />
+        ) : (
+          <LuVideoOff size={11} className="shrink-0 text-texte-faible" />
+        )}
         <span className="text-nano font-medium tracking-etiquette text-texte-doux">
           LENTILLE CAM
         </span>
-        {/* En vignette, la mention « hors ligne » ne tiendrait pas. */}
+        {/* En vignette, la mention ne tiendrait pas. */}
         {!compact && (
-          <span className="text-nano tracking-etiquette text-texte-faible">
-            · HORS LIGNE
+          <span className={`text-nano tracking-etiquette ${
+            enDirect ? 'text-critique' : 'text-texte-faible'
+          }`}>
+            {enDirect ? '· EN DIRECT' : '· HORS LIGNE'}
           </span>
         )}
       </div>
 
-      {!compact && (
+      {!compact && !enDirect && (
         <span className="pointer-events-none absolute bottom-3 right-3 rounded-carte bg-black/55 px-2 py-1 text-nano tabular-nums tracking-etiquette text-texte-faible backdrop-blur-sm">
           {PRISE_DE_VUE}
         </span>
@@ -75,7 +109,10 @@ function Habillage({ compact }: { compact: boolean }) {
  *  et l'image le remplit sans se deformer, quitte a etre rognee.
  *  Sur mobile, ou rien ne contraint la hauteur, elle reprend le format
  *  d'un moniteur. */
-export default function Camera({ onAgrandir }: { onAgrandir: () => void }) {
+export default function Camera({
+  onAgrandir, enDirect,
+}: { onAgrandir: () => void; enDirect: boolean }) {
+  const vue = useVue(enDirect)
   return (
     <button
       type="button"
@@ -87,11 +124,12 @@ export default function Camera({ onAgrandir }: { onAgrandir: () => void }) {
                  md:aspect-auto md:h-full"
     >
       <img
-        src={SOURCE}
-        alt="Le châssis de la serre, photographié en salle"
+        src={vue}
+        alt={enDirect ? 'Vue en direct de la serre'
+          : 'Le châssis de la serre, photographié en salle'}
         className="size-full object-cover opacity-80"
       />
-      <Habillage compact />
+      <Habillage compact enDirect={enDirect} />
 
       {/* L'invitation n'apparait qu'au survol : en permanence, elle
           encombrerait une image deja chargee. */}
@@ -111,7 +149,11 @@ export default function Camera({ onAgrandir }: { onAgrandir: () => void }) {
  *  proportions sont conservees -- on perd un peu de champ, jamais la
  *  geometrie.
  */
-export function CameraPleine({ onFermer }: { onFermer: () => void }) {
+export function CameraPleine({
+  onFermer, enDirect,
+}: { onFermer: () => void; enDirect: boolean }) {
+  const vue = useVue(enDirect)
+
   // Echap ferme : une vue qu'on ne peut quitter qu'a la souris est un
   // piege au clavier.
   useEffect(() => {
@@ -135,11 +177,12 @@ export function CameraPleine({ onFermer }: { onFermer: () => void }) {
         aria-label="Vue de la caméra"
       >
         <img
-          src={SOURCE}
-          alt="Le châssis de la serre, photographié en salle"
+          src={vue}
+          alt={enDirect ? 'Vue en direct de la serre'
+            : 'Le châssis de la serre, photographié en salle'}
           className="size-full object-cover opacity-90"
         />
-        <Habillage compact={false} />
+        <Habillage compact={false} enDirect={enDirect} />
 
         <button
           type="button"

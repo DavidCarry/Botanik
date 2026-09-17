@@ -66,6 +66,19 @@ INTERVALLE_S = float(os.getenv("INTERVALLE_S", "0.5"))
 # une journee sans trou, pour environ trois megaoctets par mois.
 ARCHIVAGE_S = float(os.getenv("ARCHIVAGE_S", "300"))
 
+# ---- Camera ----
+#
+# En memoire et non sur la carte SD : soixante-dix kilo-octets par
+# seconde useraient la carte en quelques mois, pour des images que
+# personne ne relit.
+CAMERA_FICHIER = os.getenv("CAMERA_FICHIER", "/dev/shm/botanik/vue.jpg")
+CAMERA_S = float(os.getenv("CAMERA_S", "1"))
+CAMERA_TAILLE = (1280, 720)
+
+# Au-dela, la derniere vue est consideree comme perimee et l'ecran le
+# dit plutot que de la faire passer pour du direct.
+CAMERA_FRAICHEUR_S = float(os.getenv("CAMERA_FRAICHEUR_S", "10"))
+
 # Garde-fou de stockage. Sous ce seuil d'espace libre, le collecteur
 # efface les mesures les plus anciennes : perdre l'histoire vaut mieux
 # que de ne plus pouvoir enregistrer le present.

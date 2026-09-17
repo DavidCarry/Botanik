@@ -63,7 +63,7 @@ fi
 docker compose ps --format '  {{.Name}}  {{.Status}}'
 
 echo "== redemarrage =="
-UNITES="botanik-collecteur botanik-publisher botanik-actionneurs botanik-cerveau botanik-api"
+UNITES="botanik-collecteur botanik-publisher botanik-actionneurs botanik-cerveau botanik-camera botanik-api"
 if systemctl list-unit-files 'botanik-*.service' --no-legend 2>/dev/null | grep -q .; then
   for U in $UNITES; do sudo systemctl restart "$U.service"; done
   sleep 3
