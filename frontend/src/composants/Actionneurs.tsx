@@ -199,7 +199,13 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
                   aria-busy={Boolean(attendu)}
                   disabled={muet}
                   onClick={() => basculer(id, actif ? 0 : 1)}
-                  className={muet ? 'cursor-not-allowed opacity-40' : ''}
+                  // `flex` et non l'affichage par defaut : un bouton
+                  // laisse ici de la place a rien du tout -- il mesurait
+                  // zero pixel de large, et l'interrupteur de l'ecran se
+                  // retrouvait decale de ceux des autres lignes.
+                  className={`flex shrink-0 items-center ${
+                    muet ? 'cursor-not-allowed opacity-40' : ''
+                  }`}
                 >
                   <Interrupteur actif={actif} attendu={Boolean(attendu)} />
                 </button>
