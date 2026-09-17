@@ -40,7 +40,7 @@ def actionneurs_actifs():
 
 def resoudre(elements, drivers) -> dict[str, dict]:
     """A chaque element du registre, le driver qui le sert et ses
-    parametres -- selon MODE.
+    parametres -- plus la mention de ce qu'on a reellement obtenu.
 
     Le publisher et le service des actionneurs faisaient ce travail
     chacun de leur cote, a l'identique : choisir le bloc `simule` ou
@@ -48,28 +48,41 @@ def resoudre(elements, drivers) -> dict[str, dict]:
     implemente. Deux copies d'une meme regle, c'est une regle qui finit
     par differer d'un service a l'autre.
 
-    Un element dont le driver manque est ecarte avec un message plutot
-    qu'en silence : le materiel arrive par morceaux, et il faut savoir
-    lequel n'est pas encore branche.
+    Le repli est par ELEMENT, et c'est ce qui rend le branchement
+    progressif possible : en MODE=reel, un capteur dont le driver
+    n'existe pas encore retombe en simulation au lieu de disparaitre de
+    l'ecran. On peut donc cabler les sondes une par une sans perdre la
+    moitie du tableau de bord a chaque etape.
+
+    `source` dit lequel des deux on a obtenu. Il remonte jusqu'a
+    l'interface : afficher une valeur inventee sans le dire vaudrait
+    mieux ne rien afficher du tout.
     """
     retenus: dict[str, dict] = {}
     for e in elements:
-        if MODE == "faux":
-            driver = "simule"
+        bloc = dict(e.get("reel") or {})
+        driver = bloc.pop("driver", None)
+        params = bloc
+        source = "reel"
+
+        if MODE == "faux" or driver not in drivers:
+            if MODE != "faux":
+                print(f"{e['id']} : driver '{driver}' absent, repli sur la "
+                      f"simulation", flush=True)
+            driver, source = "simule", "simule"
             params = dict(e.get("simule") or {})
-            # Le simulateur borne ses valeurs au domaine declare, la ou il
-            # y en a un : du bruit ajoute a une valeur deja au plancher
-            # produisait des lux negatifs.
-            if "echelle" in e:
-                params["echelle"] = e["echelle"]
-        else:
-            bloc = dict(e["reel"])
-            driver, params = bloc.pop("driver"), bloc
 
         if driver not in drivers:
-            print(f"{e['id']} ignore : driver '{driver}' non implemente",
+            print(f"{e['id']} ignore : aucun driver, pas meme simule",
                   flush=True)
             continue
 
-        retenus[e["id"]] = {"driver": driver, "params": params}
+        # L'echelle appartient au capteur, pas au driver : elle sert au
+        # simulateur pour borner son bruit comme au convertisseur pour
+        # etendre une mesure brute. On la transmet dans les deux cas.
+        if "echelle" in e:
+            params["echelle"] = e["echelle"]
+
+        retenus[e["id"]] = {"driver": driver, "params": params,
+                            "source": source}
     return retenus

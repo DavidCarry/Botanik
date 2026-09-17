@@ -61,6 +61,7 @@ export default function Mesures() {
                 : { bas: 0, haut: 0 }}
               dansLaPlage={dedans}
               muet={muet}
+              simule={Boolean(c?.simule)}
               taille={taille}
               x={cx - taille / 2}
               y={cy - taille / 2}

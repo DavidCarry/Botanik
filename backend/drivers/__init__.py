@@ -10,15 +10,13 @@ table correspondante ; ni les services ni le reste de la chaine n'ont a
 changer. Un meme module peut figurer dans les deux, comme `simule`.
 """
 
-from . import simule
+from . import mcp3004, simule
 
 DRIVERS = {
     "simule": simule,
-    # a venir, quand le materiel arrivera :
-    # "ads1115": ads1115,   analogique (humidite du sol)
-    # "bme280":  bme280,    I2C (temperature / humidite de l'air)
-    # "ds18b20": ds18b20,   1-Wire (temperature du sol)
-    # "bh1750":  bh1750,    I2C (luminosite)
+    # Les quatre capteurs de la serre sont analogiques et partagent le
+    # meme convertisseur : une seule entree ici, quatre voies au registre.
+    "mcp3004": mcp3004,
 }
 
 SORTIES = {

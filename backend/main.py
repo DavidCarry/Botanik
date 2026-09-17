@@ -35,6 +35,7 @@ import seuils
 import systeme
 import verrous
 from config import INTERVALLE_S, TOPIC_COMMANDES
+from drivers import DRIVERS, SORTIES
 
 RACINE = Path(__file__).parent.parent
 DIST = RACINE / "frontend" / "dist"
@@ -126,11 +127,20 @@ app = FastAPI(title="Botanik", lifespan=cycle_de_vie)
 
 @app.get("/api/capteurs")
 def capteurs():
-    """Les capteurs actifs, chacun avec sa derniere mesure si elle existe."""
+    """Les capteurs actifs, chacun avec sa derniere mesure si elle existe.
+
+    `simule` distingue une vraie sonde d'une valeur inventee. Le materiel
+    arrive par morceaux : tant que tout n'est pas cable, l'ecran melange
+    les deux, et il doit le dire. Le calcul passe par le MEME resolveur
+    que le publisher, donc l'ecran ne peut pas annoncer une sonde reelle
+    la ou le service lit du simule.
+    """
     dernieres = {
         capteur: {"valeur": valeur, "unite": unite, "ts": ts.isoformat()}
         for capteur, valeur, unite, ts in interroger(DERNIERES)
     }
+    actifs = registre.capteurs_actifs()
+    resolus = registre.resoudre(actifs, DRIVERS)
 
     return [
         {
@@ -139,10 +149,11 @@ def capteurs():
             "unite": c["unite"],
             "ideal": c["ideal"],
             "echelle": c["echelle"],
+            "simule": resolus.get(c["id"], {}).get("source") == "simule",
             # None tant qu'aucune mesure n'est arrivee pour ce capteur
             "mesure": dernieres.get(c["id"]),
         }
-        for c in registre.capteurs_actifs()
+        for c in actifs
     ]
 
 
@@ -455,18 +466,24 @@ def actionneurs():
     except HTTPException:
         fins = {}
 
+    actifs = registre.actionneurs_actifs()
+    resolus = registre.resoudre(actifs, SORTIES)
+
     return [
         {
             "id": a["id"],
             "libelle": a["libelle"],
             "detail": a["detail"],
+            # Meme distinction que pour les capteurs : un relais qui
+            # n'est pas encore cable accepte les ordres sans rien faire.
+            "simule": resolus.get(a["id"], {}).get("source") == "simule",
             "valeur": connus.get(a["id"], {}).get("valeur"),
             "ts": connus.get(a["id"], {}).get("ts"),
             # Secondes pendant lesquelles le modele s'abstient, apres
             # une reprise en main. Zero : il commande a nouveau.
             "verrou_s": verrous.restant(fins.get(a["id"])),
         }
-        for a in registre.actionneurs_actifs()
+        for a in actifs
     ]
 
 

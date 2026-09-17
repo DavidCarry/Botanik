@@ -9,6 +9,8 @@ type Props = {
   dansLaPlage: boolean
   /** plus aucune mesure recue : la valeur affichee est figee */
   muet?: boolean
+  /** aucune sonde derriere : la valeur est inventee, et on le dit */
+  simule?: boolean
   /** diametre et coin superieur gauche, en % du carre de reference */
   taille: number
   x: number
@@ -32,7 +34,8 @@ const VAGUE_HAUTE = vague(2.6)
 const VAGUE_BASSE = vague(1.8)
 
 export default function SphereLiquide({
-  libelle, valeur, unite, niveau, ideal, dansLaPlage, muet, taille, x, y, retard,
+  libelle, valeur, unite, niveau, ideal, dansLaPlage, muet, simule,
+  taille, x, y, retard,
 }: Props) {
   const id = libelle.replace(/[^a-z]/gi, '') || 'x'
   const rempli = Math.max(0, Math.min(1, niveau))
@@ -84,6 +87,19 @@ export default function SphereLiquide({
           <tspan fontSize={corps * 0.42} fontWeight="500" dx="1">{unite}</tspan>
         )}
       </text>
+
+      {/* Une valeur sans sonde derriere le dit, en toutes lettres et
+          dans la bille. Le materiel arrive par morceaux : pendant tout
+          ce temps l'ecran melange des mesures et des inventions, et
+          rien ne doit laisser croire l'une pour l'autre. */}
+      {simule && (
+        <text
+          x="50" y={78} textAnchor="middle" fill={couleurLibelle}
+          fontSize="4.6" fontWeight="500" letterSpacing="0.9" opacity="0.75"
+        >
+          SIMULÉ
+        </text>
+      )}
     </>
   )
 
@@ -93,7 +109,11 @@ export default function SphereLiquide({
       // valeur connue reste lisible, mais on voit qu'elle n'est plus
       // rafraichie. Le titre dit pourquoi a qui s'y attarde.
       className={`sphere absolute overflow-hidden${muet ? ' opacity-40' : ''}`}
-      title={muet ? `${libelle} : aucune mesure depuis plus d’une minute` : undefined}
+      title={
+        muet ? `${libelle} : aucune mesure depuis plus d’une minute`
+          : simule ? `${libelle} : valeur simulée, aucune sonde n’est câblée`
+            : undefined
+      }
       style={{
         width: `${taille}%`, height: `${taille}%`,
         left: `${x}%`, top: `${y}%`,

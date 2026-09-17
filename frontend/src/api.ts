@@ -35,6 +35,8 @@ export type Capteur = {
   unite: string
   ideal: { min: number; max: number }
   echelle: { min: number; max: number }
+  /** true : aucune sonde derrière cette valeur, elle est inventée. */
+  simule: boolean
   mesure: Mesure | null
 }
 
@@ -181,6 +183,8 @@ export type Actionneur = {
   /** Secondes pendant lesquelles le modèle s'abstient, après une reprise
    *  en main. Zéro : il commande à nouveau. Pas encore affiché. */
   verrou_s: number
+  /** true : rien n'est câblé derrière, l'ordre est accepté sans effet. */
+  simule: boolean
   /** Etat annonce par l'actionneur lui-meme. Null : il ne s'est pas
    *  manifeste -- son service est peut-etre arrete. Ne pas savoir n'est
    *  pas la meme chose qu'etre a l'arret. */

@@ -17,9 +17,11 @@ capteurs:
     ideal: {min: 18, max: 24}      # plage favorable a la germination
     echelle: {min: 10, max: 35}    # bornes de la jauge affichee
     reel:
-      driver: bme280
-      adresse: 0x76
-      grandeur: temperature
+      # LM35 sur la voie 0 du convertisseur. 10 mV par degre : la
+      # conversion est une equivalence physique, rien a etalonner.
+      driver: mcp3004
+      canal: 0
+      conversion: lm35
     simule: {profil: cycle_jour, base: 21, amplitude: 3, bruit: 0.2}
 
   - id: humidite_sol_a
@@ -29,10 +31,18 @@ capteurs:
     ideal: {min: 50, max: 70}
     echelle: {min: 0, max: 100}
     reel:
-      driver: ads1115
-      adresse: 0x48
-      canal: 0
-      calibration: {sec_v: 3.0, mouille_v: 1.5}
+      # Sonde resistive sur la voie 2. Elle MONTE en tension quand la
+      # terre seche, d'ou les bornes inversees.
+      #
+      # ETALONNAGE PROVISOIRE : 0 et 1 sont les bornes electriques, pas
+      # celles de la sonde. A refaire en deux mesures -- sonde a l'air
+      # libre (0 %) puis plongee dans l'eau (100 %) -- et reporter les
+      # deux valeurs brutes ici. Tant que ce n'est pas fait, le
+      # pourcentage affiche est une tendance, pas une mesure.
+      driver: mcp3004
+      canal: 2
+      conversion: lineaire
+      etalonnage: {brut_bas: 1.0, brut_haut: 0.0}
     simule: {profil: decroissant, depart: 62, vitesse: 0.05, plancher: 12, bruit: 0.3}
 
   - id: luminosite
@@ -42,8 +52,15 @@ capteurs:
     ideal: {min: 4000, max: 10000}
     echelle: {min: 0, max: 12000}
     reel:
-      driver: bh1750
-      adresse: 0x23
+      # Photoresistance sur la voie 1. Une LDR ne mesure pas des lux :
+      # elle dit « plus clair » ou « moins clair ». L'echelle 0-12000
+      # est donc une convention d'affichage, retenue pour rester
+      # coherente avec ce sur quoi le reseau a ete entraine.
+      # A etalonner au luxmetre si l'occasion se presente.
+      driver: mcp3004
+      canal: 1
+      conversion: lineaire
+      etalonnage: {brut_bas: 0.0, brut_haut: 1.0}
     simule: {profil: lumiere, maximum: 7000, bruit: 150}
 
   - id: niveau_eau
@@ -53,8 +70,13 @@ capteurs:
     ideal: {min: 20, max: 100}     # sous 20 %, il faut remplir la reserve
     echelle: {min: 0, max: 100}
     reel:
-      driver: flotteur
-      broche: 17
+      # Sonde de niveau sur la voie 3. Elle ne parcourt qu'environ la
+      # moitie de l'echelle electrique une fois immergee, d'ou la borne
+      # haute a 0.5 -- a confirmer reservoir plein.
+      driver: mcp3004
+      canal: 3
+      conversion: lineaire
+      etalonnage: {brut_bas: 0.0, brut_haut: 0.5}
     simule: {profil: decroissant, depart: 85, vitesse: 0.02, plancher: 0, bruit: 0.1}
 
   # ---- non achetes pour l'instant : declares mais inactifs ----

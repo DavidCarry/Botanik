@@ -5,3 +5,17 @@ psycopg[binary]==3.2.3
 pyyaml==6.0.2
 psutil==6.1.1
 numpy==2.2.1
+
+# Materiel -- utiles seulement sur la Raspberry Pi, en MODE=reel.
+# Sur un poste de developpement elles s'installent sans servir : les
+# drivers ne les importent qu'a la premiere lecture, donc MODE=faux
+# fonctionne meme si elles manquent.
+#
+# PREREQUIS SYSTEME : lgpio se compile a l'installation et reclame swig.
+#     sudo apt install -y swig python3-dev
+# Sans lui, pip echoue sur lgpio -- et sans lgpio, gpiozero ne trouve
+# aucune fabrique de broches sur une Pi 5 : ni RPi.GPIO ni la fabrique
+# native ne savent parler au RP1.
+gpiozero==2.0.1.post3
+lgpio==0.2.2.0
+spidev==3.8
