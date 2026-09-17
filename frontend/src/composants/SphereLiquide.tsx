@@ -154,7 +154,7 @@ export default function SphereLiquide({
 
           {/* Deux vagues de periodes differentes : leur dephasage continu
               evite le battement mecanique d'une seule. */}
-          <g transform={glisse} style={{ transition: 'transform 900ms var(--ease-doux)' }}>
+          <g transform={glisse} style={{ transition: 'transform 520ms var(--ease-doux)' }}>
             <path d={VAGUE_BASSE} fill={`url(#liquide-${id})`} opacity="0.5">
               {houle(6.7, retard, 0)}
             </path>

@@ -16,10 +16,14 @@ from config import INTERVALLE_S
 # la lumiere est trop faible pour compter dans son budget.
 LUX_UTILE = 3000.0
 
-# Chaque mesure vaut pour l'intervalle qui la separe de la suivante. Un
-# trou plus long qu'une poignee d'intervalles signale un service arrete :
-# on ne compte pas ce temps-la, faute de savoir ce qui s'est passe.
-TROU_MAXIMAL_S = INTERVALLE_S * 6
+# Au-dela de ce silence, on considere que la serre etait ARRETEE et on
+# ne compte pas le temps ecoule : sinon une coupure d'une nuit passerait
+# pour une nuit d'eclairage.
+#
+# Six cycles, mais jamais moins d'une demi-minute : la cadence de lecture
+# se regle librement, et a une mesure par seconde, six secondes de
+# hoquet auraient suffi a tronquer le budget du jour.
+TROU_MAXIMAL_S = max(30.0, INTERVALLE_S * 6)
 
 REQUETE = """
     WITH eclairee AS (
