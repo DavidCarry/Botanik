@@ -69,24 +69,16 @@ actionneurs:
   - id: led_rouge
     libelle: LED rouge
     detail: Témoin d'alerte
-    actif: false
+    actif: true
     pilote: manuel
-    # Broche 17 reprise par le telemetre a ultrasons du niveau
-    # d'eau. Deux services ne peuvent pas tenir la meme broche : le
-    # second a demarrer echouerait sur « GPIO busy ». A remettre en
-    # service des que cette LED aura une broche a elle.
     reel: {driver: gpio, broche: 17}
     simule: {}
 
   - id: led_jaune
     libelle: LED jaune
     detail: Témoin d'attention
-    actif: false
+    actif: true
     pilote: manuel
-    # Broche 27 reprise par le telemetre a ultrasons du niveau
-    # d'eau. Deux services ne peuvent pas tenir la meme broche : le
-    # second a demarrer echouerait sur « GPIO busy ». A remettre en
-    # service des que cette LED aura une broche a elle.
     reel: {driver: gpio, broche: 27}
     simule: {}
 

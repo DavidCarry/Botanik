@@ -80,8 +80,8 @@ capteurs:
       # puis reservoir vide, et reporter les chiffres ici. Tant que ce
       # n'est pas fait, le pourcentage est une tendance, pas un niveau.
       driver: hcsr04
-      trigger: 17
-      echo: 27
+      trigger: 5
+      echo: 6
       portee_m: 1.0
       etalonnage: {plein_cm: 5, vide_cm: 25}
     simule: {profil: decroissant, depart: 85, vitesse: 0.02, plancher: 0, bruit: 0.1}
