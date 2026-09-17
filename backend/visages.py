@@ -138,12 +138,25 @@ class Regard:
         self.annoncer(client)
 
     def annoncer(self, client) -> None:
-        """Publie, sauf si c'est exactement ce qui est deja affiche.
+        """Publie a chaque image, sauf quand il n'y a personne.
 
-        Message RETENU : un navigateur qui arrive trouve les cadres tout
-        de suite, au lieu d'une vue nue jusqu'a la prochaine detection.
+        Se taire des que rien ne CHANGE serait plus economique, mais un
+        navigateur ouvert pendant qu'une personne se tient immobile
+        n'aurait alors jamais son cadre : le flux ne pousse que ce qui
+        arrive apres la connexion, et rien n'arriverait plus.
+
+        On republie donc tant qu'il y a quelqu'un -- dix petits messages
+        par seconde, le temps du passage -- et on se tait des que la vue
+        est vide, ce qui est l'immense majorite du temps.
+
+        Message RETENU : au demarrage de l'API, le broker lui redonne
+        immediatement le dernier etat connu.
         """
-        if self.vus == self.publie:
+        # `publie` vaut None tant qu'on n'a rien dit : le tout premier
+        # tour annonce donc une vue vide, ce qui efface le message retenu
+        # d'une execution precedente. Sans cela, un redemarrage laisserait
+        # sur le broker des visages partis depuis longtemps.
+        if not self.vus and self.publie == []:
             return
         self.publie = self.vus
         client.publish(TOPIC_VISAGES, json.dumps({"visages": self.vus}),
