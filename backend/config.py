@@ -94,9 +94,11 @@ CAMERA_FRAICHEUR_S = float(os.getenv("CAMERA_FRAICHEUR_S", "10"))
 # vue reste, et rien d'autre ne s'en apercoit.
 VISAGES_MODELE = os.getenv("VISAGES_MODELE", "modeles/visages-yunet.onnx")
 
-# On regarde chaque image produite par la camera, pas plus souvent : en
-# demander davantage ferait relire le meme fichier pour rien.
-VISAGES_S = float(os.getenv("VISAGES_S", "0.1"))
+# Une image sur deux parmi celles de la camera. Les regarder toutes
+# doublerait le cout pour un cadre qui suivrait les tetes vingt
+# centiemes de seconde plus tot -- ce que personne ne remarque, alors
+# qu'un demi-coeur pris en permanence, si.
+VISAGES_S = float(os.getenv("VISAGES_S", "0.2"))
 
 # La detection travaille sur une image REDUITE a cette largeur. A 1280
 # elle coute quatre fois plus cher pour ne rien voir de plus : un visage

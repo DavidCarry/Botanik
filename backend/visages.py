@@ -30,6 +30,7 @@ import time
 import service
 from config import (
     CAMERA_FICHIER,
+    CAMERA_TAILLE,
     TOPIC_VISAGES,
     VISAGES_LARGEUR,
     VISAGES_MEMOIRE_S,
@@ -55,11 +56,31 @@ ANONYME = "Personne"
 MAXIMUM = 8
 
 
+def drapeau_lecture() -> int:
+    """Comment decoder le JPEG : deja reduit, si possible.
+
+    Le decodeur sait rendre directement une image de moitie, de quart ou
+    de huitieme, pour une fraction du travail. Decoder 1280 de large
+    pour reduire ensuite a 640 revenait a payer deux fois le meme
+    pixel -- et c'etait la moitie du cout de ce service.
+
+    On prend la plus petite reduction qui reste au-dessus de la largeur
+    de travail ; `regarder` se charge du reste s'il en reste.
+    """
+    for facteur, drapeau in ((8, cv2.IMREAD_REDUCED_COLOR_8),
+                             (4, cv2.IMREAD_REDUCED_COLOR_4),
+                             (2, cv2.IMREAD_REDUCED_COLOR_2)):
+        if CAMERA_TAILLE[0] / facteur >= VISAGES_LARGEUR:
+            return drapeau
+    return cv2.IMREAD_COLOR
+
+
 class Regard:
     """Le detecteur, et ce qu'il a vu en dernier."""
 
     def __init__(self, detecteur):
         self.detecteur = detecteur
+        self.lecture = drapeau_lecture()
         # Les visages affiches en ce moment, et l'instant ou on en a
         # reellement vu pour la derniere fois.
         self.vus: list[dict] = []
@@ -75,12 +96,15 @@ class Regard:
     def regarder(self, image) -> list[dict]:
         """Les visages d'une image, en coordonnees de 0 a 1."""
         haut, large = image.shape[:2]
-        reduite = cv2.resize(
-            image, (VISAGES_LARGEUR, round(haut * VISAGES_LARGEUR / large)))
+        # Le decodage a deja fait le gros du chemin : il ne reste a
+        # redimensionner que si la camera ne tombe pas juste.
+        if large > VISAGES_LARGEUR:
+            image = cv2.resize(
+                image, (VISAGES_LARGEUR, round(haut * VISAGES_LARGEUR / large)))
 
-        rh, rl = reduite.shape[:2]
+        rh, rl = image.shape[:2]
         self.detecteur.setInputSize((rl, rh))
-        _, trouves = self.detecteur.detect(reduite)
+        _, trouves = self.detecteur.detect(image)
         if trouves is None:
             return []
 
@@ -121,7 +145,7 @@ class Regard:
         nouvelle = bool(datee) and datee != self.image_datee
         if nouvelle:
             self.image_datee = datee
-            image = cv2.imread(CAMERA_FICHIER)
+            image = cv2.imread(CAMERA_FICHIER, self.lecture)
             if image is not None:
                 trouves = self.regarder(image)
                 if trouves:
@@ -180,6 +204,13 @@ def main() -> int:
     if not os.path.exists(chemin):
         print(f"Modele introuvable : {chemin}", flush=True)
         return 1
+
+    # UN SEUL fil. Laisse a lui-meme, OpenCV etale la detection sur les
+    # quatre coeurs : 30 ms au lieu de 42, mais pres du double de temps
+    # processeur, pris aux services qui mesurent et qui decident. Un
+    # agrement n'a pas a reveiller toute la machine dix fois par seconde
+    # pour gagner douze millisecondes que personne ne verra.
+    cv2.setNumThreads(1)
 
     # La taille donnee ici est redefinie a chaque image par
     # `setInputSize` : le constructeur l'exige, mais elle ne sert a rien.

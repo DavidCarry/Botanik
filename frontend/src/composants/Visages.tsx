@@ -82,8 +82,11 @@ export default function Visages({
           // au meme cadre de GLISSER d'une image a la suivante plutot
           // que de disparaitre et reapparaitre ailleurs.
           key={i}
+          // La duree du glissement est celle qui separe deux detections :
+          // le cadre est alors toujours en train de rejoindre la derniere
+          // position connue, et ne saute jamais.
           className="absolute rounded-carte border border-accent-vif/85
-                     transition-all duration-100 ease-linear"
+                     transition-all duration-200 ease-linear"
           style={{
             left: cadrage.x + v.x * cadrage.l,
             top: cadrage.y + v.y * cadrage.h,
