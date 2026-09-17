@@ -43,7 +43,7 @@ export const LIBELLE_GRANDEUR: Record<string, string> = {
 export const UNITE_GRANDEUR: Record<string, string> = {
   humidite_sol_a: '%',
   temperature_air: '°C',
-  luminosite: 'lux',
+  luminosite: '%',
   niveau_eau: '%',
   eclairement_jour: 'h',
 }

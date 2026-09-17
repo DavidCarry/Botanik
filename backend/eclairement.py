@@ -11,10 +11,8 @@ de zero et de rallumer la lampe pour rien.
 """
 
 from config import ARCHIVAGE_S
+from donnees import ECLAIREMENT_UTILE
 
-# Au-dela de ce niveau, la plante est consideree eclairee. En dessous,
-# la lumiere est trop faible pour compter dans son budget.
-LUX_UTILE = 3000.0
 
 # Au-dela de ce silence, on considere que la serre etait ARRETEE et on
 # ne compte pas le temps ecoule : sinon une coupure d'une nuit passerait
@@ -43,6 +41,6 @@ REQUETE = """
 def heures_du_jour(conn, capteur: str = "luminosite") -> float:
     """Heures d'eclairement utile accumulees depuis minuit."""
     with conn.cursor() as cur:
-        cur.execute(REQUETE, (LUX_UTILE, capteur, TROU_MAXIMAL_S))
+        cur.execute(REQUETE, (ECLAIREMENT_UTILE, capteur, TROU_MAXIMAL_S))
         ligne = cur.fetchone()
     return round(float(ligne[0]) if ligne and ligne[0] is not None else 0.0, 3)

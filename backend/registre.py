@@ -92,4 +92,14 @@ def resoudre(elements, drivers) -> dict[str, dict]:
 
         retenus[e["id"]] = {"driver": driver, "params": params,
                             "source": source}
+
+        # Un element reel emporte de quoi se rabattre sur la simulation
+        # si la sonde ne repond plus. Le choix du driver se fait au
+        # demarrage, mais une nappe qui se debranche, elle, n'attend pas
+        # le redemarrage pour arriver.
+        if source == "reel":
+            replis = dict(e.get("simule") or {})
+            if "echelle" in e:
+                replis["echelle"] = e["echelle"]
+            retenus[e["id"]]["repli"] = {"driver": "simule", "params": replis}
     return retenus

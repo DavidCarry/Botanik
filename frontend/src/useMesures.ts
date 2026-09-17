@@ -57,7 +57,14 @@ export function useMesures() {
     setCapteurs((liste) =>
       liste?.map((c) =>
         c.id === p.capteur
-          ? { ...c, mesure: { valeur: p.valeur, unite: p.unite, ts: p.ts } }
+          ? {
+              ...c,
+              mesure: { valeur: p.valeur, unite: p.unite, ts: p.ts },
+              // La provenance voyage AVEC la mesure : une sonde qui
+              // lache en cours de route se voit dans la seconde, sans
+              // attendre la relecture du registre.
+              simule: p.simule ?? c.simule,
+            }
           : c,
       ) ?? liste,
     )

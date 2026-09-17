@@ -147,9 +147,26 @@ def capteurs():
         capteur: {"valeur": valeur, "unite": unite, "ts": ts.isoformat()}
         for capteur, valeur, unite, ts in interroger(DERNIERES)
     }
-    dernieres.update(bus.mesures())
+    vivantes = bus.mesures()
+    dernieres.update({
+        capteur: {"valeur": m["valeur"], "unite": m.get("unite"), "ts": m["ts"]}
+        for capteur, m in vivantes.items()
+    })
+
     actifs = registre.capteurs_actifs()
     resolus = registre.resoudre(actifs, DRIVERS)
+
+    def simulee(identifiant: str) -> bool:
+        """La mesure en cours fait foi, le registre ne sert que d'attente.
+
+        Le registre dit ce qu'on a DECIDE de lire ; la mesure dit ce
+        qu'on a REUSSI a lire. Une sonde debranchee en cours de route
+        n'apparait que dans la seconde.
+        """
+        vivante = vivantes.get(identifiant)
+        if vivante is not None and "simule" in vivante:
+            return bool(vivante["simule"])
+        return resolus.get(identifiant, {}).get("source") == "simule"
 
     return [
         {
@@ -158,7 +175,7 @@ def capteurs():
             "unite": c["unite"],
             "ideal": c["ideal"],
             "echelle": c["echelle"],
-            "simule": resolus.get(c["id"], {}).get("source") == "simule",
+            "simule": simulee(c["id"]),
             # None tant qu'aucune mesure n'est arrivee pour ce capteur
             "mesure": dernieres.get(c["id"]),
         }

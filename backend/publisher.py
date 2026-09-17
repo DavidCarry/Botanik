@@ -27,14 +27,50 @@ def charger_capteurs():
     ]
 
 
+# Capteurs actuellement en repli, pour n'annoncer que les bascules.
+# Sans cela, une sonde debranchee remplirait le journal de deux lignes
+# par seconde et noierait tout le reste.
+_en_repli: set[str] = set()
+
+
 def lire_capteurs(capteurs):
-    """Un capteur illisible est signale, les autres continuent d'etre lus."""
+    """La valeur de chaque capteur, et si elle vient d'une vraie sonde.
+
+    Une sonde qui ne repond plus ne fait pas disparaitre sa mesure : on
+    bascule sur la valeur simulee, et la mesure emporte la mention. Un
+    ecran qui se vide en cours de demonstration ne dit rien de ce qui se
+    passe ; un ecran qui affiche « simule » le dit exactement.
+
+    Le repli est tente a CHAQUE cycle : une nappe qu'on rebranche reprend
+    donc d'elle-meme, sans redemarrage.
+    """
     valeurs = {}
     for c in capteurs:
+        identifiant = c["id"]
         try:
-            valeurs[c["id"]] = DRIVERS[c["driver"]].lire(c["id"], c["params"])
+            valeurs[identifiant] = (DRIVERS[c["driver"]].lire(identifiant, c["params"]),
+                                    c["source"] == "simule")
+            if identifiant in _en_repli:
+                _en_repli.discard(identifiant)
+                print(f"{identifiant} repond de nouveau, retour a la sonde reelle",
+                      flush=True)
+            continue
         except Exception as e:
-            print(f"Capteur {c['id']} illisible : {e}", flush=True)
+            repli = c.get("repli")
+            if repli is None:
+                print(f"Capteur {identifiant} illisible : {e}", flush=True)
+                continue
+            if identifiant not in _en_repli:
+                _en_repli.add(identifiant)
+                print(f"{identifiant} illisible ({e}) -- bascule sur la simulation",
+                      flush=True)
+
+        try:
+            valeurs[identifiant] = (
+                DRIVERS[repli["driver"]].lire(identifiant, repli["params"]), True)
+        except Exception as e:
+            print(f"Capteur {identifiant} : repli impossible non plus ({e})",
+                  flush=True)
     return valeurs
 
 
@@ -48,8 +84,11 @@ def main():
     def publier(client: mqtt.Client):
         ts = datetime.now(timezone.utc).isoformat()
         valeurs = lire_capteurs(capteurs)
-        for capteur, valeur in valeurs.items():
-            payload = {"valeur": valeur, "unite": unites[capteur], "ts": ts}
+        for capteur, (valeur, simule) in valeurs.items():
+            payload = {"valeur": valeur, "unite": unites[capteur], "ts": ts,
+                       # La mesure dit d'ou elle vient : c'est elle qui
+                       # voyage jusqu'a l'ecran, pas le registre.
+                       "simule": simule}
             client.publish(f"{TOPIC_MESURES}/{capteur}", json.dumps(payload))
         print(f"{ts} -- {len(valeurs)} mesures publiees", flush=True)
 

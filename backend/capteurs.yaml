@@ -42,24 +42,20 @@ capteurs:
 
   - id: luminosite
     libelle: Luminosité
-    unite: lux
+    # Pourcentage et non lux : une photoresistance ne mesure pas un
+    # eclairement absolu, elle dit « plus clair » ou « moins clair ».
+    # Afficher des lux aurait ete une precision inventee.
+    unite: "%"
     actif: true
-    ideal: {min: 4000, max: 10000}
-    echelle: {min: 0, max: 12000}
-    # Cablee et lue, mais gardee en simulation le temps de valider
-    # la temperature seule. Retirer cette ligne pour la brancher.
-    simuler: true
+    ideal: {min: 33, max: 83}
+    echelle: {min: 0, max: 100}
     reel:
-      # Photoresistance sur la voie 1. Une LDR ne mesure pas des lux :
-      # elle dit « plus clair » ou « moins clair ». L'echelle 0-12000
-      # est donc une convention d'affichage, retenue pour rester
-      # coherente avec ce sur quoi le reseau a ete entraine.
-      # A etalonner au luxmetre si l'occasion se presente.
+      # Photoresistance sur la voie 1, pleine echelle du convertisseur.
       driver: mcp3004
       canal: 1
       conversion: lineaire
       etalonnage: {brut_bas: 0.0, brut_haut: 1.0}
-    simule: {profil: lumiere, maximum: 7000, bruit: 150}
+    simule: {profil: lumiere, maximum: 58, bruit: 1.2}
 
   - id: niveau_eau
     libelle: Niveau d'eau

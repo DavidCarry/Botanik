@@ -4,7 +4,11 @@ import { useEffect } from 'react'
  *  actionneur. Le `genre` les distingue -- sans lui, « lumiere » serait
  *  ambigu, puisque c'est a la fois un actionneur et une grandeur. */
 export type Pousse =
-  | { genre: 'mesure'; capteur: string; valeur: number; unite: string; ts: string }
+  | {
+      genre: 'mesure'; capteur: string; valeur: number; unite: string; ts: string
+      /** true : la sonde n'a pas répondu, la valeur vient du simulateur. */
+      simule?: boolean
+    }
   | { genre: 'etat'; actionneur: string; valeur: number; ts: string }
 
 /** S'abonne au flux du serveur.

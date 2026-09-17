@@ -51,8 +51,16 @@ MARGE_LUMIERE_H = 1.0
 # un retard de lumiere a trois heures du matin desorganiserait la plante.
 FENETRE_ECLAIRAGE = (6.0, 22.0)
 
-# Seuil a partir duquel l'eclairement compte comme « suffisant ».
-LUX_UTILE = 3000.0
+# Seuil a partir duquel l'eclairement compte comme « suffisant », dans
+# l'unite du capteur -- un pourcentage de clarte, pas des lux.
+#
+# Defini ICI et nulle part ailleurs : le calcul du budget quotidien s'en
+# sert aussi, et deux constantes qui doivent rester egales finissent
+# toujours par diverger.
+ECLAIREMENT_UTILE = 25.0
+
+# Au-dela, la lumiere brule les jeunes pousses.
+ECLAIREMENT_EXCESSIF = 92.0
 
 
 def bornes() -> np.ndarray:
@@ -91,7 +99,7 @@ def _demande(temperature: np.ndarray, luminosite: np.ndarray) -> np.ndarray:
     c'est tout l'interet d'un reseau plutot que de deux constantes.
     """
     t = np.clip((temperature - 10) / 25, 0, 1)
-    l = np.clip(luminosite / 9000, 0, 1)
+    l = np.clip(luminosite / 75, 0, 1)
     return 0.6 * t + 0.4 * l
 
 
@@ -111,8 +119,8 @@ def etiqueter(X: np.ndarray) -> np.ndarray:
         temperature > 24,
         # Luminosite instantanee : trop faible pour compter, ou assez
         # forte pour bruler les jeunes pousses.
-        luminosite < LUX_UTILE,
-        luminosite > 11000,
+        luminosite < ECLAIREMENT_UTILE,
+        luminosite > ECLAIREMENT_EXCESSIF,
         # Reserve d'eau : a remplir, ou au bord du debordement.
         eau < 20,
         eau > 95,
@@ -170,25 +178,32 @@ def generer(n: int = 9000, graine: int = 0) -> tuple[np.ndarray, np.ndarray]:
     n_bords = n // 4
     n_uniforme = n - n_cycle - n_bords
 
+    # L'etendue de la luminosite se lit au registre plutot que de
+    # s'ecrire en clair : le jour ou l'echelle du capteur change -- des
+    # lux vers un pourcentage, par exemple -- le jeu de donnees suit tout
+    # seul. Ecrite en dur, elle produisait un ciel perpetuellement
+    # aveuglant et un jugement « lumiere excessive » toujours vrai.
+    lum_min, lum_max = b[ENTREES.index("luminosite")]
+    lum_etendue = lum_max - lum_min
+
     heure_c = r.uniform(0, 24, n_cycle)
     cycle = np.sin((heure_c - 6) / 24 * 2 * np.pi)
     reel = np.column_stack([
         r.uniform(0, 100, n_cycle),
         21 + 6 * cycle + r.normal(0, 3, n_cycle),
-        np.maximum(0, 9000 * cycle + r.normal(0, 400, n_cycle)),
+        np.maximum(lum_min,
+                   0.75 * lum_etendue * cycle
+                   + r.normal(0, 0.033 * lum_etendue, n_cycle)),
         r.uniform(0, 100, n_cycle),
         np.zeros(n_cycle),          # rempli plus bas
         heure_c,
     ])
 
-    uniforme = np.column_stack([
-        r.uniform(0, 100, n_uniforme),
-        r.uniform(10, 35, n_uniforme),
-        r.uniform(0, 12000, n_uniforme),
-        r.uniform(0, 100, n_uniforme),
-        np.zeros(n_uniforme),
-        r.uniform(0, 24, n_uniforme),
-    ])
+    # Meme raison : le lot uniforme couvre l'etendue declaree de chaque
+    # entree, quelle qu'elle soit.
+    uniforme = np.column_stack(
+        [r.uniform(b[j, 0], b[j, 1], n_uniforme) for j in range(len(ENTREES))]
+    )
 
     X = np.vstack([reel, uniforme, _bords(r, n_bords, b)])
 
