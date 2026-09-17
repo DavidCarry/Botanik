@@ -126,12 +126,18 @@ MIGRATIONS = """
 -- ordres des regles -- et le journal resterait muet sur tout ce que la
 -- serre fait d'elle-meme.
 --
+-- L'ORDRE COMPTE, et il a deja mordu : la contrainte tombe d'ABORD.
+-- Reecrire les lignes avant de la lever les faisait refuser par
+-- l'ancienne contrainte, l'ordre entier echouait, et les services qui
+-- preparent le schema au demarrage ne demarraient plus du tout.
+ALTER TABLE IF EXISTS commandes
+    DROP CONSTRAINT IF EXISTS commandes_source_check;
+
 -- Les lignes ecrites quand les deux causes automatiques n'en faisaient
 -- qu'une sont versees aux seuils : les regles de visages n'existaient
 -- pas encore quand elles ont ete enregistrees.
 UPDATE commandes SET source = 'seuil' WHERE source = 'regle';
-ALTER TABLE IF EXISTS commandes
-    DROP CONSTRAINT IF EXISTS commandes_source_check;
+
 ALTER TABLE IF EXISTS commandes
     ADD CONSTRAINT commandes_source_check
     CHECK (source IN ('manuel', 'seuil', 'visage'));
