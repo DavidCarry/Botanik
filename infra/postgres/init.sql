@@ -20,7 +20,7 @@ CREATE TABLE commandes (
     actionneur TEXT             NOT NULL,
     valeur     DOUBLE PRECISION NOT NULL,
     source     TEXT             NOT NULL
-               CHECK (source IN ('manuel', 'ia', 'securite'))
+               CHECK (source IN ('manuel', 'regle'))
 );
 
 CREATE INDEX idx_commandes_ts ON commandes (ts DESC);

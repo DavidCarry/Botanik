@@ -67,7 +67,23 @@ CREATE TABLE IF NOT EXISTS regles (
 );
 """
 
+# Ce qui a change APRES coup sur une table d'`init.sql`, qu'une base deja
+# installee ne reverra jamais autrement. On defait avant de reposer :
+# rejouer ces ordres a chaque demarrage ne coute rien et ne casse rien.
+MIGRATIONS = """
+-- `commandes` date du temps ou le reseau decidait. Depuis, il n'y a plus
+-- que deux sources : un clic, ou une regle de l'utilisateur. Sans cette
+-- reprise, la contrainte refuse les ordres des regles -- et le journal
+-- resterait muet sur tout ce que la serre fait d'elle-meme.
+ALTER TABLE IF EXISTS commandes
+    DROP CONSTRAINT IF EXISTS commandes_source_check;
+ALTER TABLE IF EXISTS commandes
+    ADD CONSTRAINT commandes_source_check
+    CHECK (source IN ('manuel', 'regle'));
+"""
+
 
 def preparer(conn):
     with conn.cursor() as cur:
         cur.execute(TABLES)
+        cur.execute(MIGRATIONS)

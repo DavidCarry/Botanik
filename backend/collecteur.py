@@ -36,7 +36,11 @@ JOURNAL = (
 # La colonne porte une contrainte : une source inconnue ferait echouer
 # l'insertion. On la verifie ici pour signaler l'emetteur fautif plutot
 # que de laisser remonter une erreur SQL opaque.
-SOURCES = {"manuel", "ia", "securite"}
+#
+# Deux sources, et deux seulement : un clic, ou une regle de
+# l'utilisateur. « ia » et « securite » sont partis avec les regles
+# ecrites en dur -- plus personne ne les emet.
+SOURCES = {"manuel", "regle"}
 
 # Derniere mesure REELLEMENT ecrite pour chaque capteur.
 #
@@ -203,6 +207,11 @@ def on_message(client, conn, msg):
         if source not in SOURCES:
             print(f"Commande ignoree sur {msg.topic} : source '{source}' inconnue",
                   flush=True)
+            return
+        # Une salve fait clignoter l'avertisseur toutes les secondes.
+        # L'ordre est deja au journal ; ses battements n'y ajoutent rien
+        # et noieraient tout le reste.
+        if not data.get("journal", True):
             return
         requete = (JOURNAL, (_horodatage(data.get("ts")), identifiant, valeur, source))
         trace = f"commande {identifiant} = {valeur} ({source})"

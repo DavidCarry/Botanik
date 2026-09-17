@@ -1,6 +1,6 @@
 import {
   LuBellRing, LuCircleDot, LuDroplet, LuFan, LuLightbulb, LuMonitor,
-  LuShieldAlert, LuSun, LuTriangleAlert, LuZap,
+  LuSun, LuTriangleAlert, LuZap,
 } from 'react-icons/lu'
 import type { IconType } from 'react-icons'
 import { depuis } from '../format'
@@ -29,11 +29,11 @@ const NOMS: Record<string, string> = {
 }
 
 /** Qui a decide. La distinction est le seul moyen de relire apres coup
- *  ce qu'a fait le reseau, et de le separer de ce qu'on a fait soi-meme. */
+ *  ce que la serre a fait seule, et de le separer de ce qu'on a fait
+ *  soi-meme. */
 const ORIGINES: Record<string, { libelle: string; classe: string }> = {
   manuel: { libelle: 'manuel', classe: 'text-texte-faible' },
-  ia: { libelle: 'IA', classe: 'text-accent-vif' },
-  securite: { libelle: 'sécurité', classe: 'text-attention' },
+  regle: { libelle: 'règle', classe: 'text-accent-vif' },
 }
 
 /** Journal melant les alertes et les commandes.
@@ -88,21 +88,17 @@ export default function Evenements() {
             </>
           ) : (
             <>
-              {e.source === 'securite' ? (
-                <LuShieldAlert size={14} className="shrink-0 text-attention" />
-              ) : (
-                (() => {
-                  const Icone = ICONES[e.sujet] ?? LuZap
-                  return (
-                    <Icone
-                      size={14}
-                      className={`shrink-0 ${
-                        e.valeur > 0 ? 'text-accent-vif' : 'text-texte-faible'
-                      }`}
-                    />
-                  )
-                })()
-              )}
+              {(() => {
+                const Icone = ICONES[e.sujet] ?? LuZap
+                return (
+                  <Icone
+                    size={14}
+                    className={`shrink-0 ${
+                      e.valeur > 0 ? 'text-accent-vif' : 'text-texte-faible'
+                    }`}
+                  />
+                )
+              })()}
               <span className="min-w-0 flex-1 truncate text-micro text-texte">
                 {NOMS[e.sujet] ?? e.sujet}
                 {/* Le point marque la transition : allume ou eteint. */}

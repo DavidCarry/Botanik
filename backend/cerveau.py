@@ -2,7 +2,7 @@
 
 Ecoute les mesures sur MQTT, fait juger la situation au reseau, en deduit
 les commandes par les regles de decision.py, et les publie sur le meme
-topic que le pilotage manuel -- avec `source: "ia"` au lieu de
+topic que le pilotage manuel -- avec `source: "regle"` au lieu de
 `"manuel"`. Rien d'autre dans la chaine ne sait qui a decide.
 
 Trois responsabilites, trois modules :
@@ -239,27 +239,34 @@ class Cerveau:
 
     # ---- sortie ----
 
-    def ordonner(self, client, actionneur, valeur, source, texte=None):
+    def ordonner(self, client, actionneur, valeur, source, texte=None,
+                 journal=True, insister=False):
         """N'emet que si l'actionneur n'est pas deja dans cet etat.
 
         L'etat vient de l'actionneur lui-meme, pas d'un souvenir local :
         si son service redemarre et repart a zero, la divergence est vue
         au tour suivant et corrigee.
 
-        Un actionneur repris en main est laisse tranquille, SAUF par la
-        securite : si la reserve se vide pendant un arrosage manuel, la
-        pompe s'arrete quand meme.
+        Un actionneur repris en main est laisse tranquille : le temps du
+        verrou, la main prime sur la regle.
+
+        `journal` a faux marque un battement de salve, que le collecteur
+        execute sans l'ecrire. `insister` emet meme quand l'etat est deja
+        le bon : c'est ce qui inscrit « arrete » quand une salve prend
+        fin pendant un temps de repos.
         """
         if actionneur not in self.pilotes:
             return
-        if source != "securite" and actionneur in self.verrous:
+        if actionneur in self.verrous:
             return
-        if self.etats.get(actionneur) == valeur:
+        if not insister and self.etats.get(actionneur) == valeur:
             return
         charge = {"valeur": valeur, "source": source,
                   "ts": datetime.now(timezone.utc).isoformat()}
         if texte is not None:
             charge["contenu"] = {"mode": "texte", "texte": texte}
+        if not journal:
+            charge["journal"] = False
         client.publish(f"{TOPIC_COMMANDES}/{actionneur}", json.dumps(charge), qos=1)
         print(f"{source} -> {actionneur} = {valeur}", flush=True)
 
@@ -355,9 +362,12 @@ class Cerveau:
             if salve and ordre.valeur > 0:
                 self._salve(client, actionneur, salve, maintenant)
             else:
-                self.bascules.pop(actionneur, None)
+                # Une salve qui s'arrete pendant un temps de repos laisse
+                # l'actionneur deja eteint : sans insister, le journal
+                # garderait un « active » sans jamais son « arrete ».
+                sortie = self.bascules.pop(actionneur, None) is not None
                 self.ordonner(client, actionneur, ordre.valeur, ordre.source,
-                              ordre.texte)
+                              ordre.texte, insister=sortie)
 
     def _salve(self, client, actionneur, salve, maintenant):
         """Alterne allume et eteint tant que l'ordre tient.
@@ -369,8 +379,12 @@ class Cerveau:
         """
         if maintenant < self.bascules.get(actionneur, 0.0):
             return
+        # Seul le premier battement va au journal : les suivants sont la
+        # meme decision, exprimee en clignotant.
+        premier = actionneur not in self.bascules
         actif = self.etats.get(actionneur, 0.0) > 0
-        self.ordonner(client, actionneur, 0.0 if actif else 1.0, "regle")
+        self.ordonner(client, actionneur, 0.0 if actif else 1.0, "regle",
+                      journal=premier)
         repos = salve.get("repos_s", 8.0) if actif else salve.get("actif_s", 1.0)
         self.bascules[actionneur] = maintenant + float(repos)
 

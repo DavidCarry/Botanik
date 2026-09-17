@@ -385,8 +385,8 @@ def evenements(limite: int = 40):
     trop sec detecte », puis « arrosage active », puis « sol trop sec
     leve ». Separes en deux listes, la causalite disparaitrait.
 
-    `source` dit qui a decide d'une commande : la main de l'utilisateur,
-    le modele, ou le garde-fou de securite.
+    `source` dit qui a decide d'une commande : un clic de l'utilisateur,
+    ou une des regles qu'il a posees.
     """
     limite = max(1, min(limite, 200))
 
