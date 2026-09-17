@@ -122,6 +122,9 @@ def main():
             client.publish(f"{TOPIC_MESURES}/{capteur}", json.dumps(payload))
         print(f"{ts} -- {len(valeurs)} mesures publiees", flush=True)
 
+    for plainte in registre.collisions():
+        print(f"ATTENTION cablage : {plainte}", flush=True)
+
     print(f"Publisher connecte a {MQTT_HOST}:{MQTT_PORT} -- mode {MODE}, "
           f"{len(capteurs)} capteurs, toutes les {INTERVALLE_S}s", flush=True)
     service.executer("Publisher", periode=INTERVALLE_S, travail=publier)

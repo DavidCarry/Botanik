@@ -14,7 +14,6 @@ capteurs:
     libelle: Température
     unite: "°C"
     actif: true
-    ideal: {min: 18, max: 24}      # plage favorable a la germination
     echelle: {min: 10, max: 35}    # bornes de la jauge affichee
     reel:
       # DS18B20 sur le bus 1-Wire, en remplacement du LM35 analogique
@@ -31,7 +30,6 @@ capteurs:
     libelle: Humidité du sol
     unite: "%"
     actif: true
-    ideal: {min: 50, max: 70}
     echelle: {min: 0, max: 100}
     reel:
       # Sonde d'humidite sur la voie 2. Elle parcourt toute l'echelle du
@@ -50,7 +48,6 @@ capteurs:
     # Afficher des lux aurait ete une precision inventee.
     unite: "%"
     actif: true
-    ideal: {min: 33, max: 83}
     echelle: {min: 0, max: 100}
     reel:
       # Photoresistance sur la voie 1, pleine echelle du convertisseur.
@@ -64,7 +61,6 @@ capteurs:
     libelle: Niveau d'eau
     unite: "%"
     actif: true
-    ideal: {min: 20, max: 100}     # sous 20 %, il faut remplir la reserve
     echelle: {min: 0, max: 100}
     reel:
       # Telemetre a ultrasons au-dessus du reservoir, en remplacement de
@@ -92,7 +88,6 @@ capteurs:
     libelle: Humidité du sol (2)
     unite: "%"
     actif: false
-    ideal: {min: 50, max: 70}
     echelle: {min: 0, max: 100}
     reel:
       driver: ads1115
@@ -105,7 +100,6 @@ capteurs:
     libelle: Humidité de l'air
     unite: "%"
     actif: false
-    ideal: {min: 50, max: 70}
     echelle: {min: 0, max: 100}
     reel:
       driver: bme280
@@ -117,7 +111,6 @@ capteurs:
     libelle: Température du sol
     unite: "°C"
     actif: false
-    ideal: {min: 15, max: 22}
     echelle: {min: 10, max: 35}
     reel:
       driver: ds18b20

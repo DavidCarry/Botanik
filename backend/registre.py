@@ -38,6 +38,46 @@ def actionneurs_actifs():
     return _actifs(ACTIONNEURS, "actionneurs")
 
 
+# Broches occupees par les bus, quel que soit le registre. Les declarer
+# permet de refuser une collision avec l'I2C ou le SPI, qu'aucun fichier
+# du projet ne mentionne mais qui sont bien cablees.
+BROCHES_RESERVEES = {
+    2: "I2C (SDA)", 3: "I2C (SCL)",
+    4: "1-Wire",
+    8: "SPI (CE0)", 9: "SPI (MISO)", 10: "SPI (MOSI)", 11: "SPI (SCLK)",
+}
+
+
+def collisions() -> list[str]:
+    """Les broches revendiquees par deux elements actifs a la fois.
+
+    Ce controle a ete ecrit apres coup, et deux fois plutot qu'une : un
+    telemetre pose sur les broches de deux LED les faisait clignoter au
+    rythme de ses impulsions, et une lampe declaree sur la broche du
+    buzzer attendait tranquillement qu'on l'active. Rien ne protestait --
+    c'est le premier service demarre qui gagnait la broche, et le second
+    echouait sur un « GPIO busy » incomprehensible.
+
+    On regarde tout ce qui est ACTIF, capteurs et actionneurs ensemble :
+    une broche ne sait pas qui la tient.
+    """
+    pris: dict[int, list[str]] = {}
+    for element in capteurs_actifs() + actionneurs_actifs():
+        bloc = element.get("reel") or {}
+        for cle, valeur in bloc.items():
+            if cle in ("broche", "trigger", "echo") and isinstance(valeur, int):
+                pris.setdefault(valeur, []).append(f"{element['id']}.{cle}")
+
+    plaintes = []
+    for broche, porteurs in sorted(pris.items()):
+        if len(porteurs) > 1:
+            plaintes.append(f"GPIO {broche} revendiquee par {' et '.join(porteurs)}")
+        elif broche in BROCHES_RESERVEES:
+            plaintes.append(f"GPIO {broche} ({porteurs[0]}) est deja "
+                            f"{BROCHES_RESERVEES[broche]}")
+    return plaintes
+
+
 def resoudre(elements, drivers) -> dict[str, dict]:
     """A chaque element du registre, le driver qui le sert et ses
     parametres -- plus la mention de ce qu'on a reellement obtenu.

@@ -256,6 +256,9 @@ def main():
             except Exception as e:
                 print(f"Echec de rafraichissement sur {actionneur} : {e}", flush=True)
 
+    for plainte in registre.collisions():
+        print(f"ATTENTION cablage : {plainte}", flush=True)
+
     print(f"Actionneurs : mode {MODE}, {len(actionneurs)} pilotes", flush=True)
     service.executer(
         "Actionneurs", periode=1,

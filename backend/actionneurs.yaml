@@ -9,12 +9,16 @@
 #   simule : rien a piloter, l'ordre est simplement accepte
 # La variable d'environnement MODE (faux|reel) choisit laquelle s'applique.
 #
-# `pilote` dit qui commande : "ia" pour ceux que le modele decide,
-# "manuel" pour ceux qui n'obeissent qu'a l'interface. C'est le cerveau
-# qui le lit, pour savoir de quoi il a la charge -- ajouter un actionneur
-# en "ia" suffit a le lui confier.
+# Il n'y a plus de distinction entre actionneurs « du modele » et
+# actionneurs « manuels » : tout ce qui est actif peut etre commande a la
+# main, et tout peut etre designe par une regle. C'est l'utilisateur qui
+# choisit, regle par regle, depuis la page des reglages.
 #
 # Les numeros de broche sont en numerotation BCM.
+#
+# Les broches des elements inactifs sont PROVISOIRES : elles ne
+# designent que des GPIO libres, pour qu'activer un element ne le fasse
+# pas entrer en conflit avec un autre. A confirmer au cablage.
 #
 # `actif: false` retire un element de TOUTE la chaine : il ne parait plus
 # a l'ecran, le cerveau ne lui envoie plus d'ordre, et le service ne le
@@ -28,31 +32,27 @@ actionneurs:
     libelle: Arrosage
     detail: 20 mL par impulsion
     actif: false
-    pilote: ia
-    reel: {driver: gpio, broche: 23}
+    reel: {driver: gpio, broche: 12}
     simule: {}
 
   - id: ventilation
     libelle: Ventilation
     detail: Assèche l'air ambiant
     actif: false
-    pilote: ia
-    reel: {driver: gpio, broche: 25}
+    reel: {driver: gpio, broche: 13}
     simule: {}
 
   - id: lumiere
     libelle: Éclairage
     detail: LED horticole, budget quotidien
     actif: false
-    pilote: ia
-    reel: {driver: gpio, broche: 24}
+    reel: {driver: gpio, broche: 16}
     simule: {}
 
   - id: bipeur
     libelle: Alerte sonore
     detail: Avertisseur sonore
     actif: true
-    pilote: ia
     # Un avertisseur continu devient vite insupportable et plus personne
     # n'y reagit : une seconde toutes les huit se remarque sans s'imposer.
     # C'est une propriete du materiel, pas une regle de la serre -- elle
@@ -70,7 +70,6 @@ actionneurs:
     libelle: LED rouge
     detail: Témoin d'alerte
     actif: true
-    pilote: manuel
     reel: {driver: gpio, broche: 17}
     simule: {}
 
@@ -78,7 +77,6 @@ actionneurs:
     libelle: LED jaune
     detail: Témoin d'attention
     actif: true
-    pilote: manuel
     reel: {driver: gpio, broche: 27}
     simule: {}
 
@@ -86,7 +84,6 @@ actionneurs:
     libelle: LED verte
     detail: Témoin de bon fonctionnement
     actif: true
-    pilote: manuel
     reel: {driver: gpio, broche: 22}
     simule: {}
 
@@ -94,6 +91,5 @@ actionneurs:
     libelle: Écran
     detail: Afficheur de la serre
     actif: true
-    pilote: manuel
     reel: {driver: ecran, adresse: 0x27, port: 1, extenseur: PCF8574}
     simule: {}

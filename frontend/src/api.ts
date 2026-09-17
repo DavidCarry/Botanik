@@ -46,7 +46,6 @@ export type Capteur = {
   id: string
   libelle: string
   unite: string
-  ideal: { min: number; max: number }
   echelle: { min: number; max: number }
   /** La plage voulue par l'utilisateur, ou null s'il n'en a défini
    *  aucune. Une borne à null veut dire « ce côté est infini » :

@@ -209,7 +209,6 @@ def capteurs():
             "id": c["id"],
             "libelle": c["libelle"],
             "unite": c["unite"],
-            "ideal": c["ideal"],
             "echelle": c["echelle"],
             # La plage voulue par l'utilisateur, ou None s'il n'en a
             # defini aucune. Une borne a None : ce cote est infini.
