@@ -57,19 +57,6 @@ DECISION_S = 2
 # ouvrirait une connexion toutes les deux secondes pour rien.
 CONTEXTE_LENT_S = 30
 
-# Arrosage par impulsion, comme l'annonce le registre : 20 mL par
-# impulsion. Une pompe maintenue allumee autour du seuil de decision
-# battrait sans arret et noierait les graines. La duree correspond au
-# debit de la pompe reelle, a recalibrer quand elle sera branchee.
-IMPULSION_S = 4
-REPOS_S = 180
-
-# Alerte sonore par salves : un bipeur continu devient vite insupportable
-# et plus personne n'y reagit. Une seconde toutes les huit se remarque
-# sans s'imposer.
-BIP_S = 1
-SILENCE_BIP_S = 8
-
 # Sans mesure fraiche, on ne decide pas : mieux vaut ne rien faire que
 # d'agir sur une valeur d'il y a une heure.
 FRAICHEUR_S = 120
@@ -100,9 +87,6 @@ class Cerveau:
         self.alertes: dict[str, str | None] = {}
         self.prochaine_decision = 0.0
         self.prochaine_relecture = 0.0
-        self.fin_impulsion = None
-        self.repos_jusqu_a = 0.0
-        self.bascule_bip = 0.0
         self.plainte = None
         # Les actionneurs que le registre lui confie. Un actionneur
         # retire du registre -- parce qu'il n'est pas encore livre --
