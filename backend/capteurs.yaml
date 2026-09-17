@@ -17,11 +17,14 @@ capteurs:
     ideal: {min: 18, max: 24}      # plage favorable a la germination
     echelle: {min: 10, max: 35}    # bornes de la jauge affichee
     reel:
-      # LM35 sur la voie 0 du convertisseur. 10 mV par degre : la
-      # conversion est une equivalence physique, rien a etalonner.
-      driver: mcp3004
-      canal: 0
-      conversion: lm35
+      # DS18B20 sur le bus 1-Wire, en remplacement du LM35 analogique
+      # qui ne repondait plus. Sonde numerique : elle rend des degres,
+      # pas une tension a convertir, et sa trame porte un CRC.
+      #
+      # L'identifiant est grave dans la sonde : en changer une impose de
+      # relever le nouveau dans /sys/bus/w1/devices.
+      driver: ds18b20
+      identifiant: 28-0b23448831d9
     simule: {profil: cycle_jour, base: 21, amplitude: 3, bruit: 0.2}
 
   - id: humidite_sol_a

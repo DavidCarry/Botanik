@@ -10,13 +10,15 @@ table correspondante ; ni les services ni le reste de la chaine n'ont a
 changer. Un meme module peut figurer dans les deux, comme `simule`.
 """
 
-from . import ecran, gpio, mcp3004, simule
+from . import ds18b20, ecran, gpio, mcp3004, simule
 
 DRIVERS = {
     "simule": simule,
-    # Les quatre capteurs de la serre sont analogiques et partagent le
-    # meme convertisseur : une seule entree ici, quatre voies au registre.
+    # Les capteurs analogiques partagent le meme convertisseur : une
+    # seule entree ici, une voie par capteur au registre.
     "mcp3004": mcp3004,
+    # Sonde numerique sur bus 1-Wire, lue dans un fil separe.
+    "ds18b20": ds18b20,
 }
 
 SORTIES = {
