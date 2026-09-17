@@ -270,10 +270,40 @@ def modele_courant():
     return p, meta, version
 
 
-def _nom_alerte(grandeur: str, cote: str) -> dict:
-    """Libelle et gravite d'une alerte, depuis les regles du domaine."""
-    return decision.ALERTES.get((grandeur, cote),
-                                {"libelle": f"{grandeur} {cote}", "humaine": False})
+COTES = {"bas": "trop bas", "haut": "trop haut"}
+
+
+def noms_alertes() -> dict:
+    """Comment nommer chaque alerte, et laquelle demande quelqu'un.
+
+    Plus de table ecrite en dur : le libelle vient du registre -- c'est
+    le capteur qui se nomme -- et la gravite se deduit de la regle.
+    Si l'utilisateur a prevu une action pour ce cote, la serre s'en
+    occupe ; s'il n'en a prevu aucune, personne d'autre qu'un humain ne
+    peut y remedier, et l'alerte le dit.
+    """
+    capteurs = {c["id"]: c["libelle"] for c in registre.capteurs_actifs()}
+    try:
+        with base() as conn:
+            posees = regles.lire(conn)
+    except HTTPException:
+        posees = {}
+
+    noms = {}
+    for grandeur, libelle in capteurs.items():
+        regle = posees.get(grandeur)
+        for cote, mention in COTES.items():
+            action = getattr(regle, f"action_{cote}", None) if regle else None
+            noms[(grandeur, cote)] = {
+                "libelle": f"{libelle} {mention}",
+                "humaine": action is None or action.genre == "aucun",
+            }
+    return noms
+
+
+def _nom_alerte(noms: dict, grandeur: str, cote: str) -> dict:
+    return noms.get((grandeur, cote),
+                    {"libelle": f"{grandeur} {cote}", "humaine": True})
 
 
 @app.get("/api/alertes")
@@ -289,9 +319,10 @@ def alertes():
         "SELECT grandeur, cote, debut FROM alertes WHERE fin IS NULL "
         "ORDER BY debut"
     )
+    noms = noms_alertes()
     return [
         {"grandeur": grandeur, "cote": cote, "depuis": debut.isoformat(),
-         **_nom_alerte(grandeur, cote)}
+         **_nom_alerte(noms, grandeur, cote)}
         for grandeur, cote, debut in lignes
     ]
 
@@ -332,9 +363,11 @@ def evenements(limite: int = 40):
         """,
         (limite,),
     )
+    noms = noms_alertes()
     evenements_alertes = [
         {"genre": "alerte", "ts": ts.isoformat(), "sujet": grandeur,
-         "cote": cote, "ouverture": ouverture, **_nom_alerte(grandeur, cote)}
+         "cote": cote, "ouverture": ouverture,
+         **_nom_alerte(noms, grandeur, cote)}
         for ts, grandeur, cote, ouverture in alertes_brutes
     ]
 
