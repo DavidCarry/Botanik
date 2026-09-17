@@ -260,6 +260,18 @@ export default function Graphique({ points, unite, ideal, echelle }: Props) {
                   en couleur d'alerte, decoupee a ces deux bandes : on voit
                   d'un coup d'oeil QUAND la mesure a derive, pas seulement
                   qu'elle a derive. */}
+              {/* Le cadre de trace. Le lissage passe des Beziers par les
+                  points mesures, et sur une pointe brutale les tangentes
+                  poussent la courbe SOUS son propre minimum -- de quoi la
+                  faire passer derriere les dates de l'axe. Plutot que
+                  d'adoucir le lissage, ce qui deformerait toutes les
+                  courbes pour un cas rare, on borne ce qui est peint. */}
+              <clipPath id="cadre-trace">
+                <rect x={MARGE.gauche} y={MARGE.haut}
+                      width={Math.max(l - MARGE.gauche - MARGE.droite, 0)}
+                      height={Math.max(h - MARGE.haut - MARGE.bas, 0)} />
+              </clipPath>
+
               <clipPath id="hors-plage">
                 <rect ref={rHorsHaut} x={MARGE.gauche} y={MARGE.haut}
                       width={l - MARGE.gauche - MARGE.droite}
@@ -288,23 +300,25 @@ export default function Graphique({ points, unite, ideal, echelle }: Props) {
               stroke="var(--attention)" strokeOpacity="0.75" strokeWidth="1.25"
               strokeDasharray="5 4" />
 
-            <path ref={rAire} d={g.aire} fill="url(#sous-courbe)" />
-            <path
-              ref={rLigne} d={g.ligne} fill="none"
-              stroke="var(--accent-vif)" strokeWidth="2"
-              strokeLinecap="round" strokeLinejoin="round" filter="url(#neon)"
-            />
+            <g clipPath="url(#cadre-trace)">
+              <path ref={rAire} d={g.aire} fill="url(#sous-courbe)" />
+              <path
+                ref={rLigne} d={g.ligne} fill="none"
+                stroke="var(--accent-vif)" strokeWidth="2"
+                strokeLinecap="round" strokeLinejoin="round" filter="url(#neon)"
+              />
 
             {/* La meme courbe, en alerte, mais visible seulement hors
                 plage. Deux traces superposes plutot qu'un chemin decoupe
                 en segments : le decoupage suit exactement les seuils,
                 meme au milieu d'un pas. */}
-            <path
-              ref={rLigneHors} d={g.ligne} fill="none"
-              clipPath="url(#hors-plage)"
-              stroke="var(--attention)" strokeWidth="2.25"
-              strokeLinecap="round" strokeLinejoin="round" filter="url(#neon)"
-            />
+              <path
+                ref={rLigneHors} d={g.ligne} fill="none"
+                clipPath="url(#hors-plage)"
+                stroke="var(--attention)" strokeWidth="2.25"
+                strokeLinecap="round" strokeLinejoin="round" filter="url(#neon)"
+              />
+            </g>
 
             {iSurvol !== null && g.coords[iSurvol] && (
               <>
