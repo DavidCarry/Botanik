@@ -2,21 +2,16 @@ import { useEffect, useRef, useState } from 'react'
 import { LuExpand, LuVideoOff, LuX } from 'react-icons/lu'
 import Visages from './Visages'
 
-/** Vue de la serre.
+/* Vue de la serre.
  *
- *  La camera n'est pas encore installee : ce qui s'affiche est une photo
- *  du chassis, et l'habillage le dit -- pastille eteinte, mention « hors
- *  ligne », date de la prise de vue. Un point rouge clignotant sur une
- *  image fixe laisserait croire a un direct, ce qui se retournerait
- *  contre nous a la premiere question du jury.
- *
- *  Le jour ou la camera arrivera, seule la source de l'image changera :
- *  l'habillage, lui, est deja a sa place.
+ * Quand la camera ne produit rien, le cadre reste VIDE et le dit. On y
+ * affichait auparavant une photo du chassis prise en salle : elle
+ * remplissait le cadre de quelque chose de plausible, et on finissait
+ * par commenter une image vieille d'un jour en la croyant vivante. Un
+ * cadre qui annonce la panne est plus utile qu'une belle image qui ment.
  */
-const PRISE_DE_VUE = '16/09/2026'
-const SOURCE = '/serre.jpg'
 
-/** L'adresse de la vue a afficher.
+/** L'adresse du flux a afficher.
  *
  *  Un FLUX et non des images redemandees une par une. Redemander une
  *  image toutes les cent millisecondes plafonne a la cadence des
@@ -30,30 +25,49 @@ const SOURCE = '/serre.jpg'
  *  L'horodatage ne sert qu'a l'ouverture : il garantit une connexion
  *  neuve quand la camera revient apres une coupure, plutot qu'une
  *  reprise d'un flux que le navigateur croit encore valide. */
-function useVue(enDirect: boolean) {
+function useVue() {
   const [depuis] = useState(() => Date.now())
-  return enDirect ? `/api/camera.mjpg?t=${depuis}` : SOURCE
+  return `/api/camera.mjpg?t=${depuis}`
 }
 
-/** L'image elle-meme, et les visages poses dessus.
- *
- *  Les cadres ne s'affichent qu'EN DIRECT : sur la photo de secours, ils
- *  encadreraient des visages qui ne sont plus la depuis longtemps.
- */
-function Vue({ enDirect, opacite }: { enDirect: boolean; opacite: string }) {
-  const vue = useVue(enDirect)
+/** Ce qui remplace la vue quand la camera ne repond pas. */
+function HorsLigne({ compact }: { compact: boolean }) {
+  return (
+    <div className="flex size-full flex-col items-center justify-center gap-2
+                    px-4 text-center">
+      <LuVideoOff size={compact ? 20 : 28} className="text-texte-faible" />
+      <p className="text-micro font-medium text-texte-doux">
+        Aucune image
+      </p>
+      {/* En vignette, la seconde ligne ne tiendrait pas. */}
+      {!compact && (
+        <p className="max-w-64 text-nano leading-relaxed text-texte-faible">
+          La caméra ne répond pas. Rien n’est affiché plutôt qu’une vue
+          qui ne serait plus d’actualité.
+        </p>
+      )}
+    </div>
+  )
+}
+
+/** L'image elle-meme, et les visages poses dessus. */
+function Vue({
+  enDirect, opacite, compact,
+}: { enDirect: boolean; opacite: string; compact: boolean }) {
+  const vue = useVue()
   const image = useRef<HTMLImageElement>(null)
+
+  if (!enDirect) return <HorsLigne compact={compact} />
 
   return (
     <>
       <img
         ref={image}
         src={vue}
-        alt={enDirect ? 'Vue en direct de la serre'
-          : 'Le châssis de la serre, photographié en salle'}
+        alt="Vue en direct de la serre"
         className={`size-full object-cover ${opacite}`}
       />
-      {enDirect && <Visages image={image} />}
+      <Visages image={image} />
     </>
   )
 }
@@ -111,12 +125,6 @@ function Habillage({ compact, enDirect }: { compact: boolean; enDirect: boolean 
           </span>
         )}
       </div>
-
-      {!compact && !enDirect && (
-        <span className="pointer-events-none absolute bottom-3 right-3 rounded-carte bg-black/55 px-2 py-1 text-nano tabular-nums tracking-etiquette text-texte-faible backdrop-blur-sm">
-          {PRISE_DE_VUE}
-        </span>
-      )}
     </>
   )
 }
@@ -141,7 +149,7 @@ export default function Camera({
                  hover:border-bordure-forte
                  md:aspect-auto md:h-full"
     >
-      <Vue enDirect={enDirect} opacite="opacity-80" />
+      <Vue enDirect={enDirect} opacite="opacity-80" compact />
       <Habillage compact enDirect={enDirect} />
 
       {/* L'invitation n'apparait qu'au survol : en permanence, elle
@@ -187,7 +195,7 @@ export function CameraPleine({
         aria-modal="true"
         aria-label="Vue de la caméra"
       >
-        <Vue enDirect={enDirect} opacite="opacity-90" />
+        <Vue enDirect={enDirect} opacite="opacity-90" compact={false} />
         <Habillage compact={false} enDirect={enDirect} />
 
         <button
