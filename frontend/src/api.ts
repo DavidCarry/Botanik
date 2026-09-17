@@ -176,6 +176,12 @@ export const seDeconnecter = () => poster<{ ok: boolean }>('/api/deconnexion')
 
 // ---------- Actionneurs ----------
 
+/** Ce qu'un afficheur doit montrer : une intention, pas un texte figé.
+ *  « la température » suit la mesure ; « 23.6 °C » resterait figé. */
+export type Contenu =
+  | { mode: 'mesure'; capteur: string }
+  | { mode: 'texte'; texte: string }
+
 export type Actionneur = {
   id: string
   libelle: string
@@ -190,9 +196,13 @@ export type Actionneur = {
    *  pas la meme chose qu'etre a l'arret. */
   valeur: number | null
   ts: string | null
+  /** Afficheurs seulement : ce qu'on leur a demandé de montrer… */
+  contenu?: Contenu | null
+  /** …et les deux lignes réellement écrites dessus. */
+  lignes?: string[] | null
 }
 
 export const lireActionneurs = () => json<Actionneur[]>('/api/actionneurs')
 
-export const commander = (actionneur: string, valeur: number) =>
-  poster<{ ok: boolean }>('/api/commandes', { actionneur, valeur })
+export const commander = (actionneur: string, valeur: number, contenu?: Contenu) =>
+  poster<{ ok: boolean }>('/api/commandes', { actionneur, valeur, contenu })

@@ -1,8 +1,12 @@
+import { useState } from 'react'
 import {
-  LuBellRing, LuDroplet, LuFan, LuLightbulb, LuLock, LuMonitor, LuSun, LuZap,
+  LuBellRing, LuDroplet, LuFan, LuLightbulb, LuLock, LuMonitor, LuPencil,
+  LuSun, LuZap,
 } from 'react-icons/lu'
 import type { IconType } from 'react-icons'
+import type { Contenu } from '../api'
 import { useActionneurs } from '../useActionneurs'
+import Affichage from './Affichage'
 import Bloc from './Bloc'
 
 /** L'icone est de la presentation pure : elle n'a rien a faire dans le
@@ -71,6 +75,8 @@ function Interrupteur({ actif, attendu }: { actif: boolean; attendu: boolean }) 
 
 export default function Actionneurs({ connecte }: { connecte: boolean }) {
   const { liste, attendus, erreur, basculer } = useActionneurs()
+  const [reglage, setReglage] = useState<string | null>(null)
+  const regle = liste.find((a) => a.id === reglage)
 
   const mention = erreur ? (
     <span role="alert" className="text-micro text-critique">{erreur}</span>
@@ -90,7 +96,10 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
     <Bloc titre="Pilotage" actions={mention} className="md:min-h-0 md:flex-1">
       <div className="divide-y divide-bordure border-y border-bordure
                       md:h-full md:overflow-y-auto">
-        {liste.map(({ id, libelle, detail, valeur }) => {
+        {liste.map(({ id, libelle, detail, valeur, lignes, contenu: quoi }) => {
+          // Seul un actionneur qui PORTE du texte se regle ; les autres
+          // n'ont qu'un etat, et rien a choisir.
+          const reglable = quoi !== undefined && quoi !== null || id === 'ecran'
           const Icone = ICONES[id] ?? LuZap
           const attendu = attendus[id]
           // Pendant l'attente, l'interrupteur montre deja la position
@@ -99,7 +108,13 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
           const actif = (attendu?.valeur ?? valeur ?? 0) > 0
           const muet = valeur === null && !attendu
 
-          const contenu = (
+          // Un afficheur allume dit ce qu'il montre, a la place de sa
+          // description : c'est l'information du moment.
+          const sousTitre = muet ? 'Sans réponse'
+            : actif && lignes?.some(Boolean) ? lignes.filter(Boolean).join(' · ')
+              : detail
+
+          const debut = (
             <>
               <Icone
                 size={17}
@@ -113,10 +128,16 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
                   {libelle}
                 </span>
                 <span className="block truncate text-micro text-texte-faible">
-                  {muet ? 'Sans réponse' : detail}
+                  {sousTitre}
                 </span>
               </span>
 
+            </>
+          )
+
+          const contenu = (
+            <>
+              {debut}
               {connecte
                 ? <Interrupteur actif={actif} attendu={Boolean(attendu)} />
                 : <Etat actif={actif} muet={muet} />}
@@ -124,6 +145,37 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
           )
 
           const classes = 'flex w-full items-center gap-3 px-1 py-3'
+
+          // L'afficheur a deux commandes -- allumer, et choisir quoi
+          // montrer -- donc deux boutons. La ligne entiere ne peut plus
+          // en etre un : on n'imbrique pas un bouton dans un bouton.
+          if (connecte && reglable) {
+            return (
+              <div key={id} className={classes}>
+                {debut}
+                <button
+                  type="button"
+                  onClick={() => setReglage(id)}
+                  aria-label={`Choisir ce qu'affiche ${libelle}`}
+                  className="shrink-0 rounded-pilule p-1.5 text-texte-faible
+                             transition-colors duration-200 hover:bg-survol
+                             hover:text-texte"
+                >
+                  <LuPencil size={14} />
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={actif}
+                  aria-busy={Boolean(attendu)}
+                  disabled={muet}
+                  onClick={() => basculer(id, actif ? 0 : 1)}
+                  className={muet ? 'cursor-not-allowed opacity-40' : ''}
+                >
+                  <Interrupteur actif={actif} attendu={Boolean(attendu)} />
+                </button>
+              </div>
+            )
+          }
 
           // Sans compte, la ligne n'est plus un bouton : rien a cliquer,
           // donc rien a annoncer comme cliquable.
@@ -146,6 +198,19 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
           )
         })}
       </div>
+
+      {regle && (
+        <Affichage
+          actuel={regle.contenu}
+          onFermer={() => setReglage(null)}
+          onValider={(choix: Contenu) => {
+            // Choisir, c'est aussi allumer : personne ne regle un
+            // afficheur pour le laisser eteint.
+            basculer(regle.id, 1, choix)
+            setReglage(null)
+          }}
+        />
+      )}
     </Bloc>
   )
 }

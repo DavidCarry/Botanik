@@ -9,7 +9,10 @@ export type Pousse =
       /** true : la sonde n'a pas répondu, la valeur vient du simulateur. */
       simule?: boolean
     }
-  | { genre: 'etat'; actionneur: string; valeur: number; ts: string }
+  | {
+      genre: 'etat'; actionneur: string; valeur: number; ts: string
+      contenu?: unknown; lignes?: string[]
+    }
 
 /** S'abonne au flux du serveur.
  *

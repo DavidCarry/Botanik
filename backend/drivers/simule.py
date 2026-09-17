@@ -57,12 +57,15 @@ def lire(capteur_id, params):
 _sorties = {}
 
 
-def appliquer(actionneur_id, valeur, params):
+def appliquer(actionneur_id, valeur, params, lignes=None):
     """Accepte l'ordre et renvoie l'etat atteint.
 
     Un driver reel renverrait ce qu'il a pu faire, pas ce qu'on lui a
     demande -- c'est la difference entre un retour d'etat et un echo. Ici
     les deux coincident, faute de materiel pour les faire diverger.
+
+    `lignes` n'est utile qu'a l'afficheur ; on l'accepte pour que tout
+    actionneur reste simulable, y compris celui qui porte du texte.
     """
     _sorties[actionneur_id] = float(valeur)
     return _sorties[actionneur_id]

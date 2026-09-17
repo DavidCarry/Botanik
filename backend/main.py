@@ -505,6 +505,10 @@ def actionneurs():
             "simule": resolus.get(a["id"], {}).get("source") == "simule",
             "valeur": connus.get(a["id"], {}).get("valeur"),
             "ts": connus.get(a["id"], {}).get("ts"),
+            # Un afficheur porte en plus ce qu'on lui a demande de
+            # montrer, et les deux lignes reellement ecrites dessus.
+            "contenu": connus.get(a["id"], {}).get("contenu"),
+            "lignes": connus.get(a["id"], {}).get("lignes"),
             # Secondes pendant lesquelles le modele s'abstient, apres
             # une reprise en main. Zero : il commande a nouveau.
             "verrou_s": verrous.restant(fins.get(a["id"])),
@@ -513,9 +517,47 @@ def actionneurs():
     ]
 
 
+# Longueur utile de l'afficheur : deux lignes de seize caracteres.
+TEXTE_MAXIMAL = 32
+
+
+class Contenu(BaseModel):
+    """Ce qu'un afficheur doit montrer.
+
+    Une INTENTION, pas un texte fige : « la temperature » suit la mesure,
+    la ou « 23.6 C » resterait affiche apres coup.
+    """
+    mode: str
+    capteur: str | None = None
+    texte: str | None = None
+
+
 class Commande(BaseModel):
     actionneur: str
     valeur: float
+    contenu: Contenu | None = None
+
+
+def verifier_contenu(contenu: Contenu) -> dict:
+    """Valide ce qu'on demande d'afficher, avant de l'emettre.
+
+    Le service qui pilote l'ecran tourne sans surveillance : lui envoyer
+    un capteur qui n'existe pas le ferait afficher un identifiant brut
+    pour toujours. On refuse ici, ou le client peut encore l'apprendre.
+    """
+    if contenu.mode == "texte":
+        texte = (contenu.texte or "").strip()
+        if not texte:
+            raise HTTPException(400, "texte vide")
+        return {"mode": "texte", "texte": texte[:TEXTE_MAXIMAL]}
+
+    if contenu.mode == "mesure":
+        connus = {c["id"] for c in registre.capteurs_actifs()}
+        if contenu.capteur not in connus:
+            raise HTTPException(400, f"capteur inconnu : {contenu.capteur}")
+        return {"mode": "mesure", "capteur": contenu.capteur}
+
+    raise HTTPException(400, f"mode d'affichage inconnu : {contenu.mode}")
 
 
 @app.post("/api/commandes")
@@ -537,8 +579,12 @@ def commander(
     if not identifiant:
         raise HTTPException(401, "connexion requise")
 
+    charge = {"valeur": corps.valeur, "source": "manuel"}
+    if corps.contenu is not None:
+        charge["contenu"] = verifier_contenu(corps.contenu)
+
     topic = f"{TOPIC_COMMANDES}/{corps.actionneur}"
-    if not bus.publier(topic, {"valeur": corps.valeur, "source": "manuel"}):
+    if not bus.publier(topic, charge):
         raise HTTPException(503, "broker MQTT injoignable")
     return {"ok": True, "par": identifiant, "topic": topic}
 

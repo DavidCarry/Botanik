@@ -31,8 +31,12 @@ def _sortie(broche: int):
     return _sorties[broche]
 
 
-def appliquer(actionneur_id, valeur, params):
-    """Met la broche au niveau demande et renvoie l'etat atteint."""
+def appliquer(actionneur_id, valeur, params, lignes=None):
+    """Met la broche au niveau demande et renvoie l'etat atteint.
+
+    `lignes` ne concerne que l'afficheur ; on l'accepte et on l'ignore,
+    pour que le service n'ait pas a savoir a qui il parle.
+    """
     sortie = _sortie(params["broche"])
     if float(valeur) > 0:
         sortie.on()

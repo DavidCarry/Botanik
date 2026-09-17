@@ -17,8 +17,47 @@ import paho.mqtt.client as mqtt
 
 import registre
 import service
-from config import MODE, TOPIC_COMMANDES, TOPIC_ETAT
+from config import MODE, TOPIC_COMMANDES, TOPIC_ETAT, TOPIC_MESURES
 from drivers import SORTIES
+
+# Largeur de l'afficheur : au-dela, on coupe plutot que de deborder.
+COLONNES = 16
+
+# Ce que chaque actionneur porteur de texte doit montrer, tel que
+# l'utilisateur l'a demande. C'est une INTENTION -- « la temperature » --
+# et non un texte fige : la valeur affichee doit suivre la mesure.
+_contenu: dict[str, dict] = {}
+
+# Dernieres mesures recues, pour composer ce texte. Le service s'abonne
+# aux mesures uniquement pour cela.
+_mesures: dict[str, dict] = {}
+
+# Libelles des capteurs, lus une fois au registre.
+_libelles: dict[str, str] = {}
+
+# Dernier texte compose par actionneur, pour ne reecrire qu'au changement.
+_lignes: dict[str, list[str]] = {}
+
+# Dernier etat applique, pour rafraichir un afficheur sans le rallumer.
+_etats: dict[str, float] = {}
+
+
+def composer(contenu: dict) -> list[str]:
+    """Les deux lignes a afficher, d'apres l'intention et les mesures.
+
+    Composer ici plutot que dans le driver : le service connait le
+    registre et recoit les mesures, le driver ne connait qu'un ecran.
+    """
+    if contenu.get("mode") == "texte":
+        texte = str(contenu.get("texte", ""))
+        return [texte[:COLONNES], texte[COLONNES:2 * COLONNES]]
+
+    capteur = contenu.get("capteur", "")
+    libelle = _libelles.get(capteur, capteur or "?")
+    mesure = _mesures.get(capteur)
+    if mesure is None:
+        return [libelle, "en attente"]
+    return [libelle, f"{mesure['valeur']} {mesure.get('unite', '')}".strip()]
 
 
 def charger_actionneurs():
@@ -26,7 +65,7 @@ def charger_actionneurs():
     return registre.resoudre(registre.actionneurs_actifs(), SORTIES)
 
 
-def annoncer(client: mqtt.Client, actionneur: str, valeur: float):
+def annoncer(client: mqtt.Client, actionneur: str, valeur: float, **extras):
     """Publie l'etat d'un actionneur, en message retenu.
 
     `retain=True` est essentiel : le broker garde le dernier etat de
@@ -37,6 +76,7 @@ def annoncer(client: mqtt.Client, actionneur: str, valeur: float):
     charge = {
         "valeur": valeur,
         "ts": datetime.now(timezone.utc).isoformat(),
+        **extras,
     }
     client.publish(f"{TOPIC_ETAT}/{actionneur}", json.dumps(charge),
                    qos=1, retain=True)
@@ -48,6 +88,30 @@ def main():
         print("Aucun actionneur actif dans actionneurs.yaml", flush=True)
         return
 
+    _libelles.update({c["id"]: c["libelle"] for c in registre.capteurs_actifs()})
+    premier = next(iter(_libelles), "")
+
+    def actionner(client, actionneur, valeur):
+        """Applique un etat et annonce ce qui a ete atteint.
+
+        L'afficheur recoit en plus le texte a ecrire : c'est le seul
+        actionneur dont l'etat ne se resume pas a allume ou eteint.
+        """
+        cible = actionneurs[actionneur]
+        contenu = _contenu.get(actionneur)
+        lignes = composer(contenu) if contenu else None
+
+        atteint = SORTIES[cible["driver"]].appliquer(
+            actionneur, valeur, cible["params"], lignes,
+        )
+        _etats[actionneur] = atteint
+        if contenu is None:
+            annoncer(client, actionneur, atteint)
+        else:
+            _lignes[actionneur] = lignes
+            annoncer(client, actionneur, atteint, contenu=contenu, lignes=lignes)
+        return atteint
+
     def on_connect(client, userdata, flags, reason_code, properties):
         if reason_code != 0:
             print(f"Connexion MQTT refusee : {reason_code}", flush=True)
@@ -58,11 +122,25 @@ def main():
         # Au demarrage, tout est au repos : on l'annonce plutot que de
         # laisser l'ecran deviner. Un etat retenu d'une session
         # precedente serait devenu faux au redemarrage de la machine.
+        # Les mesures ne servent qu'a nourrir l'afficheur.
+        client.subscribe(f"{TOPIC_MESURES}/#", qos=0)
+
+        # Au demarrage, tout est au repos : on l'annonce plutot que de
+        # laisser l'ecran deviner.
         for actionneur in actionneurs:
             annoncer(client, actionneur, 0.0)
 
     def on_message(client, userdata, msg):
-        actionneur = msg.topic.rsplit("/", 1)[-1]
+        identifiant = msg.topic.rsplit("/", 1)[-1]
+
+        if msg.topic.startswith(TOPIC_MESURES):
+            try:
+                _mesures[identifiant] = json.loads(msg.payload)
+            except json.JSONDecodeError:
+                pass
+            return
+
+        actionneur = identifiant
         cible = actionneurs.get(actionneur)
         if cible is None:
             print(f"Commande ignoree : {actionneur} inconnu ou inactif",
@@ -70,27 +148,53 @@ def main():
             return
 
         try:
-            valeur = float(json.loads(msg.payload)["valeur"])
+            charge = json.loads(msg.payload)
+            valeur = float(charge["valeur"])
         except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
             print(f"Commande illisible sur {msg.topic} : {e}", flush=True)
             return
 
+        # Une commande peut porter ce qu'il faut afficher. On le retient :
+        # l'intention survit a une extinction, et rallumer l'ecran le
+        # remet sur la meme chose.
+        if isinstance(charge.get("contenu"), dict):
+            _contenu[actionneur] = charge["contenu"]
+        elif actionneur == "ecran" and actionneur not in _contenu:
+            _contenu[actionneur] = {"mode": "mesure", "capteur": premier}
+
         try:
-            atteint = SORTIES[cible["driver"]].appliquer(
-                actionneur, valeur, cible["params"]
-            )
+            atteint = actionner(client, actionneur, valeur)
         except Exception as e:
             # Un actionneur qui refuse ne doit pas emporter les autres :
             # on n'annonce simplement aucun etat, et l'ecran le montrera.
             print(f"Echec sur {actionneur} : {e}", flush=True)
             return
 
-        annoncer(client, actionneur, atteint)
         print(f"{actionneur} -> {atteint}", flush=True)
+
+    def suivre_mesures(client):
+        """Garde l'afficheur a jour quand ce qu'il montre a change.
+
+        Un ecran qui affiche « Temperature » doit suivre la temperature,
+        pas figer celle de l'instant ou on l'a allume. On recompose donc
+        a chaque tour, et on ne reecrit que si le texte differe.
+        """
+        for actionneur, contenu in _contenu.items():
+            # Un afficheur eteint n'a rien a rafraichir -- et surtout, le
+            # rafraichir ne doit jamais le rallumer.
+            if actionneur not in actionneurs or not _etats.get(actionneur):
+                continue
+            if composer(contenu) == _lignes.get(actionneur):
+                continue
+            try:
+                actionner(client, actionneur, _etats[actionneur])
+            except Exception as e:
+                print(f"Echec de rafraichissement sur {actionneur} : {e}", flush=True)
 
     print(f"Actionneurs : mode {MODE}, {len(actionneurs)} pilotes", flush=True)
     service.executer(
-        "Actionneurs", periode=0.5,
+        "Actionneurs", periode=1,
+        travail=suivre_mesures,
         on_connect=on_connect, on_message=on_message,
     )
 

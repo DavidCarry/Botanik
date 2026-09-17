@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { commander, lireActionneurs, type Actionneur } from './api'
+import { commander, lireActionneurs, type Actionneur, type Contenu } from './api'
 import { useFlux, type Pousse } from './useFlux'
 
 // Filet de securite : les etats arrivent par le flux, mais une attente
@@ -38,7 +38,15 @@ export function useActionneurs() {
   const surPoussee = useCallback((p: Pousse) => {
     if (p.genre !== 'etat') return
     setListe((l) =>
-      l.map((a) => (a.id === p.actionneur ? { ...a, valeur: p.valeur, ts: p.ts } : a)),
+      l.map((a) => (a.id === p.actionneur
+        ? {
+            ...a, valeur: p.valeur, ts: p.ts,
+            // L'afficheur annonce aussi ce qu'il montre : sans cela, le
+            // choix fait dans une fenetre ne se verrait pas dans l'autre.
+            ...(p.contenu !== undefined ? { contenu: p.contenu as Contenu } : {}),
+            ...(p.lignes !== undefined ? { lignes: p.lignes } : {}),
+          }
+        : a)),
     )
     // L'attente prend fin des que l'actionneur confirme la valeur
     // demandee -- inutile d'attendre le prochain battement.
@@ -92,11 +100,12 @@ export function useActionneurs() {
     return () => { vivant = false; clearInterval(t) }
   }, [])
 
-  const basculer = useCallback(async (id: string, valeur: number) => {
+  const basculer = useCallback(async (id: string, valeur: number,
+                                      contenu?: Contenu) => {
     setErreur(null)
     setAttendus((a) => ({ ...a, [id]: { valeur, depuis: Date.now() } }))
     try {
-      await commander(id, valeur)
+      await commander(id, valeur, contenu)
     } catch {
       setAttendus((a) => {
         const reste = { ...a }

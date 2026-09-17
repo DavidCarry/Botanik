@@ -93,6 +93,5 @@ actionneurs:
     detail: Afficheur de la serre
     actif: true
     pilote: manuel
-    # Type d'afficheur a confirmer (LCD I2C ? OLED ?) : le driver en depend.
-    reel: {driver: ecran, adresse: 0x27}
+    reel: {driver: ecran, adresse: 0x27, port: 1, extenseur: PCF8574}
     simule: {}

@@ -19,3 +19,7 @@ numpy==2.2.1
 gpiozero==2.0.1.post3
 lgpio==0.2.2.0
 spidev==3.8
+
+# Afficheur LCD 16x2 sur extenseur I2C PCF8574.
+RPLCD==1.4.0
+smbus2==0.6.1
