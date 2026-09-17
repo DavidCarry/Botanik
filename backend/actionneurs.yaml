@@ -64,16 +64,26 @@ actionneurs:
   - id: led_rouge
     libelle: LED rouge
     detail: Témoin d'alerte
-    actif: true
+    actif: false
     pilote: manuel
+    # COUPEE PAR PRECAUTION : un telemetre a ultrasons est cable
+    # sur les broches 17 et 27 d'apres test_distance1.py, et le 27
+    # est sa sortie d'echo. La piloter en sortie ferait s'opposer
+    # deux circuits sur le meme fil. A remettre a true des que le
+    # cablage sera confirme -- ou a deplacer sur d'autres broches.
     reel: {driver: gpio, broche: 17}
     simule: {}
 
   - id: led_jaune
     libelle: LED jaune
     detail: Témoin d'attention
-    actif: true
+    actif: false
     pilote: manuel
+    # COUPEE PAR PRECAUTION : un telemetre a ultrasons est cable
+    # sur les broches 17 et 27 d'apres test_distance1.py, et le 27
+    # est sa sortie d'echo. La piloter en sortie ferait s'opposer
+    # deux circuits sur le meme fil. A remettre a true des que le
+    # cablage sera confirme -- ou a deplacer sur d'autres broches.
     reel: {driver: gpio, broche: 27}
     simule: {}
 
