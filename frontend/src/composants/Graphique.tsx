@@ -25,6 +25,21 @@ type Props = {
 // derriere « 16 sept. » -- et une courbe qui traverse sa propre legende
 // se lit mal.
 const MARGE = { haut: 12, bas: 30, gauche: 40, droite: 8 }
+
+// Respiration verticale, en PIXELS, entre les valeurs extremes et le
+// cadre de trace.
+//
+// Elle ne fait pas double emploi avec la marge de valeurs calculee plus
+// bas : celle-ci est bornee au domaine declare au registre, donc ecrasee
+// des qu'une mesure touche ce domaine. Or elles le touchent souvent --
+// un reservoir vide a 0 %, une humidite saturee a 100 %. La courbe se
+// retrouvait alors centree pile sur le bord du cadre, qui la decoupe :
+// la moitie de son epaisseur et tout son halo etaient rases net.
+//
+// Huit pixels : deux pour la demi-epaisseur du trait, le reste pour le
+// halo, dont le flou porte a environ sept pixels.
+const RESPIRATION = 8
+
 const DUREE = 620
 
 /** Lissage Catmull-Rom converti en Beziers cubiques.
@@ -96,9 +111,16 @@ function geometrie(
   bas = Math.max(bas - marge, Math.min(echelle.min, bas))
   haut = Math.min(haut + marge, Math.max(echelle.max, haut))
 
+  // Les valeurs ne vont pas jusqu'aux bords du cadre, elles s'arretent
+  // un peu avant. Sur un cadre trop court pour s'offrir cette
+  // respiration, on la reduit plutot que de retourner l'echelle.
+  const respire = Math.min(RESPIRATION, Math.max((y1 - y0) / 4, 0))
+  const yHaut = y0 + respire
+  const yBas = y1 - respire
+
   const px = (i: number) =>
     valeurs.length === 1 ? (x0 + x1) / 2 : x0 + (i / (valeurs.length - 1)) * (x1 - x0)
-  const py = (v: number) => y1 - ((v - bas) / (haut - bas)) * (y1 - y0)
+  const py = (v: number) => yBas - ((v - bas) / (haut - bas)) * (yBas - yHaut)
 
   const coords = valeurs.map((v, i) => [px(i), py(v)] as [number, number])
   const ligne = lisser(coords)
