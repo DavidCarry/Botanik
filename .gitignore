@@ -15,6 +15,10 @@ npm-debug.log*
 # Secrets et réglages de poste
 .env
 .env.*
+# …sauf l'adresse de la serre pour le build Android : c'est de la
+# configuration de compilation, pas un secret, et sans elle
+# l'application ne sait plus où joindre la Pi.
+!frontend/.env.app
 infra/mosquitto/passwd
 
 # Sauvegardes de la base

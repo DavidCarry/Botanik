@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Botanik</string>
+    <string name="title_activity_main">Botanik</string>
+    <string name="package_name">fr.botanik.serre</string>
+    <string name="custom_url_scheme">fr.botanik.serre</string>
+</resources>

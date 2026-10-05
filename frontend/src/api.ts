@@ -1,14 +1,51 @@
 /** Appels a l'API.
  *
- *  Chemins relatifs : en developpement Vite proxifie vers :8000, en
- *  production c'est le meme serveur qui repond. Aucune URL a configurer,
- *  et rien a changer entre le PC et la Raspberry Pi.
+ *  Deux assemblages, un seul code. Servi par la Raspberry Pi, le
+ *  tableau de bord parle a l'API par des chemins RELATIFS : c'est le
+ *  meme serveur qui repond, il n'y a rien a configurer. Embarquee dans
+ *  l'application Android, la page vient de l'appareil : il lui faut
+ *  alors l'adresse complete de la serre.
+ *
+ *  `VITE_API` porte cette difference. Vide -- le cas du web --, tout se
+ *  comporte comme avant.
  */
+export const BASE: string = import.meta.env.VITE_API ?? ''
+
+/** Vrai quand la page ne vient pas du meme serveur que l'API. */
+export const DISTANT = BASE !== ''
+
+/** Le jeton de session de l'application.
+ *
+ *  Sur le web, le serveur pose un cookie `httponly`, hors de portee du
+ *  JavaScript : c'est plus sur, et on n'y touche pas. Mais un cookie ne
+ *  franchit pas la frontiere entre deux origines sans HTTPS, que la
+ *  serre n'a pas. L'application garde donc le MEME jeton ici et le
+ *  represente dans un en-tete, qui passe partout.
+ */
+const CLE = 'botanik.jeton'
+
+export const jeton = () =>
+  (DISTANT ? localStorage.getItem(CLE) : null) || null
+
+export function garderJeton(valeur: string | null) {
+  if (!DISTANT) return
+  if (valeur) localStorage.setItem(CLE, valeur)
+  else localStorage.removeItem(CLE)
+}
+
+function entetes(base?: HeadersInit): HeadersInit | undefined {
+  const j = jeton()
+  if (!j) return base
+  return { ...(base as Record<string, string>), Authorization: `Bearer ${j}` }
+}
 
 /** Toutes les routes repondent du JSON et signalent l'echec par le code
  *  HTTP : un seul endroit pour lire l'un et verifier l'autre. */
 async function json<T>(chemin: string, options?: RequestInit): Promise<T> {
-  const r = await fetch(chemin, options)
+  const r = await fetch(BASE + chemin, {
+    ...options,
+    headers: entetes(options?.headers),
+  })
   if (!r.ok) throw new Error(`HTTP ${r.status}`)
   return r.json() as Promise<T>
 }
@@ -224,10 +261,12 @@ export async function lireCompte(): Promise<string | null> {
 
 export async function seConnecter(identifiant: string, motDePasse: string) {
   try {
-    const d = await poster<{ identifiant: string }>('/api/connexion', {
-      identifiant,
-      mot_de_passe: motDePasse,
-    })
+    const d = await poster<{ identifiant: string; jeton: string }>(
+      '/api/connexion', { identifiant, mot_de_passe: motDePasse },
+    )
+    // Le navigateur a déjà son cookie et ignore ce jeton ; l'application,
+    // elle, n'a que lui.
+    garderJeton(d.jeton)
     return d.identifiant
   } catch {
     // Le serveur ne dit pas lequel des deux est faux, et c'est voulu :
@@ -236,7 +275,16 @@ export async function seConnecter(identifiant: string, motDePasse: string) {
   }
 }
 
-export const seDeconnecter = () => poster<{ ok: boolean }>('/api/deconnexion')
+export async function seDeconnecter() {
+  try {
+    return await poster<{ ok: boolean }>('/api/deconnexion')
+  } finally {
+    // Quoi qu'il arrive côté serveur, l'appareil oublie le jeton : rester
+    // connecté alors qu'on vient de se déconnecter serait pire qu'une
+    // erreur réseau.
+    garderJeton(null)
+  }
+}
 
 // ---------- Actionneurs ----------
 

@@ -15,7 +15,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import psycopg
-from fastapi import Cookie, FastAPI, HTTPException, Response
+from fastapi import (Cookie, Depends, FastAPI, Header, HTTPException,
+                     Response)
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -133,6 +135,41 @@ async def cycle_de_vie(app: FastAPI):
 
 
 app = FastAPI(title="Botanik", lifespan=cycle_de_vie)
+
+# L'application Android sert ses pages depuis l'APK : elles ne viennent
+# donc plus de la meme origine que l'API, et le navigateur refuse la
+# requete sans cette autorisation explicite. Le navigateur de bureau, lui,
+# charge tout depuis ce serveur et n'est pas concerne.
+#
+# L'origine est « http » et non « https » : une page servie en https ne
+# peut pas appeler une API en clair, et la serre n'a pas de certificat.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost", "capacitor://localhost"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def jeton_session(
+    botanik_session: str | None = Cookie(default=None),
+    authorization: str | None = Header(default=None),
+) -> str | None:
+    """Le jeton de session, d'ou qu'il vienne.
+
+    Le navigateur envoie un cookie, et c'est tres bien : marque httponly,
+    il reste hors de portee du JavaScript de la page.
+
+    L'application Android, elle, affiche des pages embarquees dans l'APK.
+    Elles sont donc sur une autre origine que l'API, et un cookie ne
+    franchit cette frontiere qu'en HTTPS -- que la serre n'a pas. Elle
+    presente donc le MEME jeton dans un en-tete, qui passe partout.
+    """
+    if botanik_session:
+        return botanik_session
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip() or None
+    return None
 
 
 def plages_affichees() -> dict[str, dict | None]:
@@ -559,7 +596,7 @@ def lire_regles():
 
 @app.put("/api/regles/{grandeur}")
 def poser_regle(grandeur: str, corps: RegleRecue,
-                botanik_session: str | None = Cookie(default=None)):
+                botanik_session: str | None = Depends(jeton_session)):
     """Pose ou remplace la regle d'une grandeur."""
     if not compte_ouvert(botanik_session):
         raise HTTPException(401, "connexion requise")
@@ -589,7 +626,7 @@ def poser_regle(grandeur: str, corps: RegleRecue,
 
 @app.delete("/api/regles/{grandeur}")
 def retirer_regle(grandeur: str,
-                  botanik_session: str | None = Cookie(default=None)):
+                  botanik_session: str | None = Depends(jeton_session)):
     """Retire la regle d'une grandeur : la serre cesse de s'en occuper."""
     if not compte_ouvert(botanik_session):
         raise HTTPException(401, "connexion requise")
@@ -653,7 +690,7 @@ def _sujet_connu(conn, sujet: str) -> bool:
 
 @app.put("/api/visages/regles/{sujet}")
 def poser_regle_visage(sujet: str, corps: ActionVisageRecue,
-                       botanik_session: str | None = Cookie(default=None)):
+                       botanik_session: str | None = Depends(jeton_session)):
     """Pose ou remplace ce que la serre fait en voyant ce sujet."""
     if not compte_ouvert(botanik_session):
         raise HTTPException(401, "connexion requise")
@@ -676,7 +713,7 @@ def poser_regle_visage(sujet: str, corps: ActionVisageRecue,
 
 @app.delete("/api/visages/regles/{sujet}")
 def retirer_regle_visage(sujet: str,
-                         botanik_session: str | None = Cookie(default=None)):
+                         botanik_session: str | None = Depends(jeton_session)):
     """La serre continue de reconnaitre ce sujet, sans plus rien en faire."""
     if not compte_ouvert(botanik_session):
         raise HTTPException(401, "connexion requise")
@@ -838,11 +875,14 @@ def connexion(corps: Identifiants, reponse: Response):
         "botanik_session", jeton,
         httponly=True, samesite="lax", max_age=7 * 24 * 3600,
     )
-    return {"identifiant": corps.identifiant}
+    # Le jeton est rendu DANS LA REPONSE en plus du cookie : l'application
+    # Android ne peut pas s'appuyer sur le cookie, elle garde celui-ci et
+    # le represente en en-tete. Le navigateur, lui, l'ignore.
+    return {"identifiant": corps.identifiant, "jeton": jeton}
 
 
 @app.post("/api/deconnexion")
-def deconnexion(reponse: Response, botanik_session: str | None = Cookie(default=None)):
+def deconnexion(reponse: Response, botanik_session: str | None = Depends(jeton_session)):
     with base() as conn:
         auth.fermer_session(conn, botanik_session)
     reponse.delete_cookie("botanik_session")
@@ -859,7 +899,7 @@ def compte_ouvert(jeton: str | None) -> str | None:
 
 
 @app.get("/api/moi")
-def moi(botanik_session: str | None = Cookie(default=None)):
+def moi(botanik_session: str | None = Depends(jeton_session)):
     """Qui est connecte. Le frontend s'en sert pour decider s'il affiche
     le pilotage -- la verification reelle se fait a chaque commande."""
     return {"identifiant": compte_ouvert(botanik_session)}
@@ -972,7 +1012,7 @@ def verifier_contenu(contenu: Contenu) -> dict:
 
 @app.post("/api/commandes")
 def commander(
-    corps: Commande, botanik_session: str | None = Cookie(default=None),
+    corps: Commande, botanik_session: str | None = Depends(jeton_session),
 ):
     """Emet une commande manuelle vers l'actionneur, puis la consigne.
 

@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { BASE } from './api'
 
 /** Un visage vu dans la derniere image de la camera.
  *
@@ -54,7 +55,10 @@ const ecouteurs = new Set<(p: Pousse) => void>()
 
 function brancher() {
   if (source) return
-  source = new EventSource('/api/flux')
+  // Le flux n'est pas protege : un EventSource ne sait pas porter
+  // d'en-tete, et c'est tres bien ainsi -- il n'y a rien a
+  // authentifier pour regarder des mesures.
+  source = new EventSource(BASE + '/api/flux')
   source.onmessage = (e) => {
     let p: Pousse
     try {

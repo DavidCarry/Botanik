@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { LuExpand, LuVideoOff, LuX } from 'react-icons/lu'
+import { BASE } from '../api'
 import Visages from './Visages'
 
 /* Vue de la serre.
@@ -27,7 +28,9 @@ import Visages from './Visages'
  *  reprise d'un flux que le navigateur croit encore valide. */
 function useVue() {
   const [depuis] = useState(() => Date.now())
-  return `/api/camera.mjpg?t=${depuis}`
+  // Une balise `img` ne porte pas d'en-tete non plus, et n'en a pas
+  // besoin : le flux video est ouvert a tous.
+  return `${BASE}/api/camera.mjpg?t=${depuis}`
 }
 
 /** Ce qui remplace la vue quand la camera ne repond pas. */
