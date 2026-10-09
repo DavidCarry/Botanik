@@ -46,8 +46,24 @@ async function json<T>(chemin: string, options?: RequestInit): Promise<T> {
     ...options,
     headers: entetes(options?.headers),
   })
-  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  if (!r.ok) throw new Error(await motif(r))
   return r.json() as Promise<T>
+}
+
+/** Ce que le serveur reproche, ou le code HTTP à défaut.
+ *
+ *  Les routes refusent en DISANT pourquoi — « aucun visage trouvé —
+ *  reprendre la photo », « la clarté utile doit tenir entre 0 et 100 ».
+ *  Jeter un « HTTP 400 » perdait ces phrases, et l'écran ne pouvait
+ *  qu'annoncer un échec sans dire quoi reprendre. */
+async function motif(r: Response): Promise<string> {
+  try {
+    const d = await r.json() as { detail?: unknown }
+    if (typeof d.detail === 'string' && d.detail !== '') return d.detail
+  } catch {
+    /* corps vide, ou qui n'est pas du JSON : le code suffira */
+  }
+  return `HTTP ${r.status}`
 }
 
 /** Meme chose que `poster`, pour les methodes qui ne sont pas POST. */
@@ -368,8 +384,35 @@ export type ReglagesVisages = {
 
 export const lireReglagesVisages = () => json<ReglagesVisages>('/api/visages')
 
+/** Ce que la serre a retenu d'une photo apprise. Elle le renvoie pour
+ *  qu'on puisse VÉRIFIER : un visage de 40 px sur une photo de groupe,
+ *  c'est une référence prise sur la mauvaise tête. */
+export type VisageAppris = {
+  ok: boolean
+  nom: string
+  largeur: number
+  hauteur: number
+  confiance: number
+  /** Visages laissés de côté sur la photo : on garde le plus grand. */
+  ecartes: number
+  /** Combien la serre a de références de cette personne, celle-ci comprise. */
+  references: number
+}
+
+export const apprendreVisage = (nom: string, image: string) =>
+  poster<VisageAppris>('/api/visages', { nom, image })
+
 export const poserRegleVisage = (sujet: string, action: ActionRegle) =>
   envoyer<{ ok: boolean }>(`/api/visages/regles/${sujet}`, 'PUT', { action })
+
+/** Oublie une personne : ses empreintes et son déclencheur.
+ *
+ *  Sans retour. Aucune photo n'est gardée — seulement les 128 nombres
+ *  qu'on en tire — donc il faudra reprendre une photo pour réapprendre
+ *  quelqu'un. */
+export const oublierVisage = (nom: string) =>
+  envoyer<{ ok: boolean; references: number }>(
+    `/api/visages/${encodeURIComponent(nom)}`, 'DELETE')
 
 export const retirerRegleVisage = (sujet: string) =>
   envoyer<{ ok: boolean }>(`/api/visages/regles/${sujet}`, 'DELETE')

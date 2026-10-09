@@ -25,11 +25,15 @@ import bdd
 import empreintes
 import schema
 import visages
-from config import VISAGES_SCORE_REFERENCE
 
 
 def apprendre(regard, conn, fichier: str) -> bool:
-    """Enregistre le plus grand visage d'une photo. Dit si ca a marche."""
+    """Enregistre le plus grand visage d'une photo. Dit si ca a marche.
+
+    Le travail lui-meme est dans `visages.apprendre` : ici on ne fait
+    que lire le fichier, en tirer le nom, et raconter ce qui s'est
+    passe.
+    """
     import cv2
 
     nom = os.path.splitext(os.path.basename(fichier))[0].strip().lower()
@@ -38,29 +42,18 @@ def apprendre(regard, conn, fichier: str) -> bool:
         print(f"  {nom:14} illisible : {fichier}")
         return False
 
-    # Meme reduction que sur la vue en direct. Une photo de telephone
-    # fait deux mille pixels de haut, et le detecteur y cherche des
-    # visages qui occupent une FRACTION du cadre : sur un gros plan
-    # pleine page, il n'en trouve aucun.
-    reduite = regard.reduire(image)
-    haut, large = reduite.shape[:2]
-    regard.detecteur.setInputSize((large, haut))
-    _, trouves = regard.detecteur.detect(reduite)
-
-    if trouves is None or len(trouves) == 0:
-        print(f"  {nom:14} aucun visage trouve — reprendre la photo, "
-              f"de face et nette")
+    try:
+        vu = visages.apprendre(regard, conn, nom, image,
+                               os.path.basename(fichier))
+    except ValueError as refus:
+        print(f"  {nom:14} {refus}")
         return False
-    if len(trouves) > 1:
-        print(f"  {nom:14} {len(trouves)} visages sur la photo : "
-              f"on garde le plus grand")
 
-    visage = max(trouves, key=lambda v: v[2] * v[3])
-    empreinte = regard.reconnaisseur.feature(
-        regard.reconnaisseur.alignCrop(reduite, visage))
-    empreintes.enregistrer(conn, nom, empreinte, os.path.basename(fichier))
-    print(f"  {nom:14} appris — visage de {int(visage[2])}x{int(visage[3])} px, "
-          f"confiance {visage[14]:.2f}")
+    if vu["ecartes"]:
+        print(f"  {nom:14} {vu['ecartes'] + 1} visages sur la photo : "
+              f"on garde le plus grand")
+    print(f"  {nom:14} appris — visage de {vu['largeur']}x{vu['hauteur']} px, "
+          f"confiance {vu['confiance']:.2f}")
     return True
 
 
@@ -96,14 +89,7 @@ def main(args: list[str]) -> int:
             return 1
 
         visages.cv2.setNumThreads(1)
-        regard = visages.Regard(
-            # Moins severe qu'en direct : c'est une photo choisie, et le
-            # resultat s'affiche pour etre verifie.
-            visages.cv2.FaceDetectorYN.create(
-                visages.chemin(visages.VISAGES_MODELE), "", (640, 640),
-                score_threshold=VISAGES_SCORE_REFERENCE),
-            visages.reconnaisseur(),
-        )
+        regard = visages.regard_de_reference()
         if regard.reconnaisseur is None:
             print(f"Modele de reconnaissance absent : "
                   f"{visages.chemin(visages.VISAGES_SFACE)}")

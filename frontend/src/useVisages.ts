@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  lireReglagesVisages, poserRegleVisage, retirerRegleVisage,
-  type ActionRegle, type ReglagesVisages,
+  apprendreVisage, lireReglagesVisages, oublierVisage, poserRegleVisage,
+  retirerRegleVisage,
+  type ActionRegle, type ReglagesVisages, type VisageAppris,
 } from './api'
 import { useFlux, type Pousse, type Visage } from './useFlux'
 
@@ -22,9 +23,9 @@ export function useVisages(): Visage[] {
   return visages
 }
 
-// Les personnes n'apparaissent qu'en apprenant un visage, ce qui se fait
-// hors de l'écran : une relecture de temps en temps suffit à voir
-// arriver un nouveau venu.
+// Une personne apprise depuis cet écran apparait tout de suite -- on
+// relit juste apres. Cette relecture periodique sert aux autres : une
+// reference posee en ligne de commande, ou depuis un autre onglet.
 const RAFRAICHISSEMENT_MS = 15_000
 
 const VIDE: ReglagesVisages = {
@@ -41,6 +42,13 @@ export function useReglagesVisages() {
   const [reglages, setReglages] = useState<ReglagesVisages>(VIDE)
   const [occupe, setOccupe] = useState<string | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
+  const [apprentissage, setApprentissage] = useState(false)
+  const [appris, setAppris] = useState<VisageAppris | null>(null)
+  // Son propre motif de refus, distinct de celui des regles : les deux
+  // s'affichent a des endroits differents -- celui-ci dans la carte
+  // d'apprentissage, l'autre en tete de page -- et partager l'etat les
+  // faisait apparaitre en double.
+  const [refus, setRefus] = useState<string | null>(null)
 
   const vivant = useRef(true)
 
@@ -63,8 +71,10 @@ export function useReglagesVisages() {
     try {
       await faire()
       await relire()
-    } catch {
-      setErreur('Enregistrement refusé')
+    } catch (refus) {
+      // Le serveur dit pourquoi il refuse ; le repeter vaut mieux que
+      // d'annoncer un echec sans motif.
+      setErreur(refus instanceof Error ? refus.message : 'Enregistrement refusé')
     } finally {
       if (vivant.current) setOccupe(null)
     }
@@ -81,5 +91,39 @@ export function useReglagesVisages() {
     [agir],
   )
 
-  return { reglages, occupe, erreur, enregistrer, retirer }
+  /** Oublie une personne. Le compte rendu d'apprentissage qui traine
+   *  encore a l'ecran ne parle peut-etre que d'elle : on l'efface. */
+  const oublier = useCallback(
+    (nom: string) => {
+      setAppris(null)
+      return agir(nom, () => oublierVisage(nom))
+    },
+    [agir],
+  )
+
+  /** Apprend une personne, et dit si ça a marché.
+   *
+   *  Son propre indicateur d'occupation plutôt que celui des sujets :
+   *  `occupe` porte un identifiant de sujet, et une personne qu'on est
+   *  en train d'apprendre n'en a pas encore.
+   */
+  const apprendre = useCallback(async (nom: string, image: string) => {
+    setApprentissage(true)
+    setRefus(null)
+    setAppris(null)
+    try {
+      const vu = await apprendreVisage(nom, image)
+      setAppris(vu)
+      await relire()
+      return true
+    } catch (souci) {
+      setRefus(souci instanceof Error ? souci.message : 'Apprentissage refusé')
+      return false
+    } finally {
+      if (vivant.current) setApprentissage(false)
+    }
+  }, [relire])
+
+  return { reglages, occupe, erreur, enregistrer, retirer, oublier,
+           apprendre, apprentissage, appris, refus }
 }

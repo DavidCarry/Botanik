@@ -40,6 +40,7 @@ from config import (
     VISAGES_RECONNAISSANCE_S,
     VISAGES_S,
     VISAGES_SCORE,
+    VISAGES_SCORE_REFERENCE,
     VISAGES_SFACE,
     VISAGES_SIMILARITE,
     VISAGES_SUIVI,
@@ -337,6 +338,73 @@ def reconnaisseur():
     """
     voie = chemin(VISAGES_SFACE)
     return cv2.FaceRecognizerSF.create(voie, "") if os.path.exists(voie) else None
+
+
+def regard_de_reference():
+    """Un regard regle pour APPRENDRE, et non pour surveiller.
+
+    Son detecteur est moins severe qu'en direct, et c'est voulu : une
+    reference est une photo choisie, dont le resultat est annonce pour
+    etre verifie. En direct, la meme indulgence encadrerait une plante
+    toutes les deux secondes.
+    """
+    return Regard(
+        cv2.FaceDetectorYN.create(
+            chemin(VISAGES_MODELE), "", (VISAGES_LARGEUR, VISAGES_LARGEUR),
+            score_threshold=VISAGES_SCORE_REFERENCE),
+        reconnaisseur(),
+    )
+
+
+def apprendre(regard, conn, nom: str, image, origine: str) -> dict:
+    """Enregistre le plus grand visage d'une image comme reference de `nom`.
+
+    Le coeur de l'apprentissage, et le seul : le script en ligne de
+    commande et la route de l'API passent tous les deux par ici. Deux
+    copies de cette suite d'appels finiraient par differer, et l'une des
+    deux produirait des empreintes que l'autre ne reconnaitrait pas.
+
+    Leve `ValueError` quand la photo ne convient pas, avec de quoi le
+    dire a celui qui l'a fournie : c'est presque toujours la photo qu'il
+    faut reprendre, pas un reglage qu'il faut changer.
+    """
+    if regard.reconnaisseur is None:
+        raise ValueError("modèle de reconnaissance absent sur la serre")
+
+    # Meme reduction que sur la vue en direct. Une photo de telephone
+    # fait deux mille pixels de haut, et le detecteur y cherche des
+    # visages qui occupent une FRACTION du cadre : sur un gros plan
+    # pleine page, il n'en trouve aucun.
+    reduite = regard.reduire(image)
+    haut, large = reduite.shape[:2]
+    regard.detecteur.setInputSize((large, haut))
+    _, trouves = regard.detecteur.detect(reduite)
+
+    if trouves is None or len(trouves) == 0:
+        raise ValueError("aucun visage trouvé — reprendre la photo, "
+                         "de face et nette")
+
+    # Le plus grand, et non le mieux note : sur une photo de groupe, c'est
+    # celui qui pose qui est au premier plan.
+    visage = max(trouves, key=lambda v: v[2] * v[3])
+    try:
+        empreinte = regard.reconnaisseur.feature(
+            regard.reconnaisseur.alignCrop(reduite, visage))
+    except cv2.error as e:
+        # Visage trop au bord : le redressement sort du cadre.
+        raise ValueError("visage trop près du bord — recadrer la photo") from e
+
+    empreintes.enregistrer(conn, nom, empreinte, origine)
+    return {
+        "nom": nom,
+        "largeur": int(visage[2]),
+        "hauteur": int(visage[3]),
+        "confiance": round(float(visage[14]), 2),
+        # Les visages qu'on a laisses de cote, pour que l'ecran puisse le
+        # dire : une reference prise sur la mauvaise tete d'une photo de
+        # groupe est une erreur qu'on ne voit pas autrement.
+        "ecartes": len(trouves) - 1,
+    }
 
 
 def main() -> int:

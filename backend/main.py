@@ -8,7 +8,9 @@ etre declarees AVANT, sinon elles ne sont jamais atteintes.
 """
 
 import asyncio
+import base64
 import json
+import re
 import time
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
@@ -744,6 +746,100 @@ def lire_visages():
     }
 
 
+class VisageRecu(BaseModel):
+    nom: str
+    # La photo en base64, avec ou sans l'en-tete « data: » que met un
+    # navigateur.
+    #
+    # Du JSON et non du multipart : `UploadFile` reclamerait
+    # `python-multipart`, une dependance de plus a poser sur une Pi dont
+    # l'installation des dependances est deja fragile. Et l'interface
+    # reduit la photo avant de l'envoyer, donc le corps reste leger --
+    # le base64 ne coute ses trente pour cent que sur quelques centaines
+    # de kilo-octets.
+    image: str
+
+
+# Au-dela, on refuse sans meme decoder. Une reference n'a pas besoin de
+# plus : le detecteur ramene de toute facon l'image a 640 pixels de
+# large, et accepter n'importe quoi ouvrirait la porte a saturer la
+# memoire de la Pi avec un seul appel.
+VISAGE_OCTETS_MAX = 8 * 1024 * 1024
+
+# Ce qu'un nom de personne peut contenir. Il sert de CLE a une regle de
+# visage et s'affiche tel quel : on ecarte d'emblee ce qui romprait l'un
+# ou l'autre. Une lettre pour commencer, trente-deux caracteres au plus.
+NOM_VISAGE = re.compile(r"^[^\W\d_][\w .'’-]{0,31}$")
+
+
+@app.post("/api/visages")
+def apprendre_visage(corps: VisageRecu,
+                     botanik_session: str | None = Depends(jeton_session)):
+    """Apprend une personne a partir d'une photo.
+
+    Ce qui est garde n'est PAS la photo mais son empreinte -- les 128
+    nombres que le modele tire du visage. La photo est oubliee des que la
+    reponse part, et la carte de la Pi ne porte donc jamais de galerie de
+    portraits.
+
+    Plusieurs photos d'une meme personne s'ajoutent les unes aux autres,
+    de face puis de trois quarts : c'est la meilleure des ressemblances
+    qui decidera. Reapprendre quelqu'un ne remplace donc rien, ca
+    l'affine.
+
+    Le service de reconnaissance relit les references toutes les dix
+    secondes : la nouvelle personne est nommee devant la camera sans
+    qu'on redemarre quoi que ce soit.
+    """
+    if not compte_ouvert(botanik_session):
+        raise HTTPException(401, "connexion requise")
+
+    nom = corps.nom.strip().lower()
+    if not NOM_VISAGE.match(nom):
+        raise HTTPException(400, "nom invalide : une lettre pour commencer, "
+                                 "32 caractères au plus")
+    if nom in decision.SUJETS_RESERVES:
+        raise HTTPException(400, f"« {nom} » désigne déjà autre chose")
+
+    brut = corps.image.split(",", 1)[-1]
+    try:
+        octets = base64.b64decode(brut, validate=True)
+    except ValueError as e:
+        raise HTTPException(400, "image illisible") from e
+    if not octets:
+        raise HTTPException(400, "image vide")
+    if len(octets) > VISAGE_OCTETS_MAX:
+        raise HTTPException(413, "image trop lourde")
+
+    # Importe ICI, et non en tete de fichier : OpenCV et ses modeles
+    # pesent des dizaines de mega-octets, et l'API ne s'en sert que
+    # lorsqu'on apprend quelqu'un -- c'est-a-dire presque jamais. Les
+    # charger au demarrage les ferait porter a l'API pour toujours.
+    import visages
+
+    if visages.cv2 is None:
+        raise HTTPException(503, "OpenCV absent sur la serre")
+    # Une detection n'a pas besoin de tous les coeurs, et l'API en
+    # partage quatre avec six autres services.
+    visages.cv2.setNumThreads(1)
+
+    image = visages.cv2.imdecode(np.frombuffer(octets, dtype=np.uint8),
+                                 visages.cv2.IMREAD_COLOR)
+    if image is None:
+        raise HTTPException(400, "image illisible — JPEG ou PNG attendu")
+
+    try:
+        with base() as conn:
+            vu = visages.apprendre(visages.regard_de_reference(), conn, nom,
+                                   image, "interface")
+            vu["references"] = next(
+                (c for n, c in empreintes.inventaire(conn) if n == nom), 1)
+    except ValueError as e:
+        raise HTTPException(400, str(e)) from e
+
+    return {"ok": True, **vu}
+
+
 def _sujet_connu(conn, sujet: str) -> bool:
     if sujet in (decision.QUICONQUE, decision.INCONNU):
         return True
@@ -783,6 +879,43 @@ def retirer_regle_visage(sujet: str,
         efface = regles_visages.retirer(conn, sujet)
     bus.publier(TOPIC_REGLES, {"visage": sujet})
     return {"ok": efface}
+
+
+@app.delete("/api/visages/{nom}")
+def oublier_visage(nom: str,
+                   botanik_session: str | None = Depends(jeton_session)):
+    """Oublie une personne : ses empreintes ET son declencheur.
+
+    Les deux, et pas seulement les empreintes. Une regle laissee derriere
+    designerait un sujet que la serre ne peut plus reconnaitre -- donc une
+    ligne morte, invisible a l'ecran puisque la page ne liste que les
+    personnes connues. Elle RESSUSCITERAIT au premier reapprentissage du
+    meme nom, avec une action que plus personne n'avait en tete.
+
+    C'est sans retour : on ne garde pas les photos, seulement les 128
+    nombres qu'on en tire, et il faudra reprendre une photo pour
+    reapprendre quelqu'un. L'ecran demande confirmation avant d'appeler.
+
+    Declaree APRES les routes `/api/visages/regles/...`, sinon son
+    `{nom}` les avalerait.
+    """
+    if not compte_ouvert(botanik_session):
+        raise HTTPException(401, "connexion requise")
+
+    vise = nom.strip().lower()
+    if vise in decision.SUJETS_RESERVES or vise == "regles":
+        raise HTTPException(400, f"« {vise} » n'est pas une personne")
+
+    with base() as conn:
+        efface = empreintes.retirer(conn, vise)
+        if not efface:
+            raise HTTPException(404, f"« {vise} » n'est pas connu de la serre")
+        regles_visages.retirer(conn, vise)
+
+    # Le service de reconnaissance relit ses references toutes les dix
+    # secondes ; le cerveau, lui, doit perimer ses regles tout de suite.
+    bus.publier(TOPIC_REGLES, {"visage": vise})
+    return {"ok": True, "references": efface}
 
 
 @app.get("/api/sante")
