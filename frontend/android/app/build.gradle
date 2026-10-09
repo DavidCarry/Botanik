@@ -10,12 +10,12 @@ android {
         // Le compteur qu'Android compare pour autoriser une mise a
         // jour : il doit croitre a chaque publication, sans quoi
         // l'installation par-dessus est refusee.
-        versionCode 2
+        versionCode 3
         // Le numero lisible, celui du projet. On le garde identique
         // au tag de la release et au message de commit : trois
         // numeros differents pour une meme version, c'est trois
         // occasions de se tromper.
-        versionName "0.1.2"
+        versionName "0.1.8"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
