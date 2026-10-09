@@ -22,17 +22,29 @@
 #
 # `actif: false` retire un element de TOUTE la chaine : il ne parait plus
 # a l'ecran, le cerveau ne lui envoie plus d'ordre, et le service ne le
-# pilote pas. C'est le cas de la pompe et de la ventilation, commandees
-# mais pas encore livrees -- les declarer sans les avoir donnerait un
-# tableau de bord qui promet des actions impossibles. Les remettre a
-# `true` le jour de la livraison suffira.
+# pilote pas. C'est le cas de la ventilation et de l'eclairage,
+# commandes mais pas encore livres -- les declarer sans les avoir
+# donnerait un tableau de bord qui promet des actions impossibles. Les
+# remettre a `true` le jour de la livraison suffira.
 
 actionneurs:
   - id: pompe
     libelle: Arrosage
     detail: 20 mL par impulsion
-    actif: false
-    reel: {driver: gpio, broche: 12}
+    actif: true
+    # Par impulsions, et pas autrement. Une pompe qui tourne tant que le
+    # sol est sec noierait le pot bien avant que la sonde ne change
+    # d'avis : l'eau met des minutes a gagner la terre autour d'elle,
+    # l'ordre serait maintenu tout ce temps. Un coup, puis l'attente que
+    # la mesure veuille bien reagir.
+    #
+    # CADENCE PROVISOIRE, comme le plein et le vide du telemetre : elle
+    # depend du debit de cette pompe-ci, qui reste a mesurer -- un verre
+    # sous le tuyau et un chronometre. 2 s d'arrosage, une minute de
+    # repos.
+    salve: {actif_s: 2, repos_s: 60}
+    # Relais sur GPIO 26 (actif a l'etat haut), conforme au montage.
+    reel: {driver: gpio, broche: 26}
     simule: {}
 
   - id: ventilation
