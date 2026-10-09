@@ -109,6 +109,24 @@ PREPONDERANCE = {SEUIL: 1, VISAGE: 2}
 # opposition au choix de l'utilisateur.
 RECOUVREMENT = "regle"
 
+# Rang d'un ordre d'actionneur, quand plusieurs regles visent le meme.
+#
+# L'ARRET demande par une regle ACTIVE l'emporte toujours : une
+# protection battue par une demande de marche ne protege rien. C'est le
+# pendant de PREPONDERANCE pour ce qui s'allume, a ceci pres que le
+# critere n'est pas QUI demande mais CE QUI est demande.
+#
+# Avant ces rangs, c'etait la derniere regle traitee qui gagnait, donc
+# l'ordre de `GRANDEURS`. « Trop de soleil, eteins la lampe » posee sur
+# la luminosite perdait contre « budget non atteint, allume la lampe »
+# posee sur l'eclairement du jour, traite apres -- la lampe s'allumait
+# en plein soleil. Le meme montage sur la pompe marchait, par chance :
+# le niveau d'eau est traite apres l'humidite du sol.
+#
+# L'ordre de `GRANDEURS` ne departage donc plus que des rangs EGAUX, et
+# seulement pour savoir quelle regle le journal citera.
+RANG_REPOS, RANG_MARCHE, RANG_ARRET = 0, 1, 2
+
 
 class Jugement(NamedTuple):
     """Ce que le reseau pense d'une grandeur."""
@@ -298,14 +316,18 @@ def devant(sujet: str, presents: set[str]) -> bool:
     return sujet in presents
 
 
-def _appliquer(ordres: dict, affichages: dict, action: Action | None,
-               actif: bool, origine: str) -> None:
+def _appliquer(ordres: dict, rangs: dict, affichages: dict,
+               action: Action | None, actif: bool, origine: str) -> None:
     """Traduit une action, et l'etat de son declencheur, en ordre.
 
     Le SEUL endroit qui sache ce que declencher veut dire. Les bornes et
     les visages y passent tous les deux : c'est ce qui garantit qu'une
     action se comporte pareil, quelle que soit la raison qui l'a
     reveillee.
+
+    `rangs` retient, par actionneur, la force de l'ordre deja retenu --
+    voir RANG_ARRET. Il ne sort pas d'ici : seuls les ordres comptent
+    pour l'appelant.
     """
     if action is None or action.genre == "aucun":
         return
@@ -325,13 +347,30 @@ def _appliquer(ordres: dict, affichages: dict, action: Action | None,
 
     if action.genre == "actionneur" and action.cible:
         vise = float(action.valeur or 0.0)
-        # Au repos, l'actionneur revient a l'inverse de ce que l'action
-        # demande : sans cela, un bipeur declenche par un reservoir vide
-        # sonnerait encore une fois rempli.
-        voulu = vise if actif else (0.0 if vise > 0 else 1.0)
-        # Une regle active ne se laisse pas ecraser par une regle au
-        # repos.
-        if actif or action.cible not in ordres:
+
+        if actif:
+            voulu, rang = vise, (RANG_ARRET if vise == 0.0 else RANG_MARCHE)
+        elif vise > 0:
+            # Une action « Allumer » relachee rend l'actionneur a
+            # l'arret : sans cela, un bipeur declenche par un reservoir
+            # vide sonnerait encore une fois rempli.
+            voulu, rang = 0.0, RANG_REPOS
+        else:
+            # Une action « Eteindre » relachee ne demande RIEN, et c'est
+            # tout l'interet d'une protection : tant que la borne n'est
+            # pas franchie, elle laisse les autres regles decider.
+            #
+            # On l'inversait autrefois en « allumer », par symetrie avec
+            # le cas precedent. Une protection devenait alors un ordre
+            # de marche : « si l'eau est basse, coupe la pompe » mettait
+            # la pompe en route tout le reste du temps.
+            return
+
+        # A rang egal, le premier arrive garde la main -- la valeur est
+        # de toute facon la meme, seule change la regle que le journal
+        # citera.
+        if rang > rangs.get(action.cible, -1):
+            rangs[action.cible] = rang
             ordres[action.cible] = Commande(voulu, origine)
 
 
@@ -341,9 +380,10 @@ def _declenchements(regles: dict[str, Regle],
                     presents: set[str]):
     """Chaque action reglee par l'utilisateur, avec son etat du moment.
 
-    Les bornes d'abord, les visages ensuite. L'ordre ne compte que pour
-    departager deux regles actives sur le meme actionneur -- il est
-    arbitraire, mais stable.
+    Les bornes d'abord, les visages ensuite. Cet ordre ne decide plus de
+    rien : deux regles actives sur le meme actionneur se departagent par
+    leur RANG (voir RANG_ARRET), et l'ordre ne tranche plus que des
+    rangs egaux -- qui demandent de toute facon la meme chose.
     """
     for grandeur in GRANDEURS:
         regle = regles.get(grandeur)
@@ -369,6 +409,9 @@ def decider(regles: dict[str, Regle],
     deux regles commandent la meme LED chacune de leur cote.
     """
     ordres: dict[str, Commande] = {}
+    # Par actionneur : la force de l'ordre retenu, pour qu'un arret
+    # demande ne soit pas ecrase par une demande de marche.
+    rangs: dict[str, int] = {}
     # Par afficheur : le message qui l'emporte, son rang et son origine.
     # Un rang de zero signifie qu'aucune regle ne demande rien en ce
     # moment -- il faudra alors lever le recouvrement.
@@ -377,7 +420,7 @@ def decider(regles: dict[str, Regle],
     for action, actif, origine in _declenchements(regles, franchis,
                                                   regles_visages or {},
                                                   presents or set()):
-        _appliquer(ordres, affichages, action, actif, origine)
+        _appliquer(ordres, rangs, affichages, action, actif, origine)
 
     for cible, (_, action, origine) in affichages.items():
         # Poser le recouvrement, ou le lever. Le lever n'eteint pas
