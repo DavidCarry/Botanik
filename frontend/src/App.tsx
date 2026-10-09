@@ -11,6 +11,7 @@ import Declencheurs from './composants/Declencheurs'
 import Evenements from './composants/Evenements'
 import FlechesVue from './composants/FlechesVue'
 import Fond from './composants/Fond'
+import InviteDefilement from './composants/InviteDefilement'
 import Mesures from './composants/Mesures'
 import NavPages from './composants/NavPages'
 import Regles from './composants/Regles'
@@ -30,7 +31,12 @@ import { vues as vuesDe, type Vue } from './vues'
 // Les marges laterales s'elargissent des la tablette pour degager les
 // fleches de changement de vue, posees aux bords de la page. Au-dela, le
 // cadre ne change plus : tablette et bureau montrent la meme chose.
-const CADRE = 'w-full shrink-0 px-4 sm:px-8 md:h-full md:px-[4.75rem] md:py-4'
+// La marge DROITE est plus large que la gauche sous `md` : c'est la
+// colonne de pastilles qui s'y loge, et sans elle les cartes passaient
+// dessous. Des la tablette les pastilles disparaissent, et les marges
+// redeviennent egales.
+const CADRE = 'w-full shrink-0 pl-4 pr-9 sm:pl-8 sm:pr-12 ' +
+              'md:h-full md:px-[4.75rem] md:py-4'
 
 /** Une page du mobile : exactement un ecran, aimantee, degagee de la
  *  barre qui flotte au-dessus et de la fleche posee en bas.
@@ -44,8 +50,12 @@ const CADRE = 'w-full shrink-0 px-4 sm:px-8 md:h-full md:px-[4.75rem] md:py-4'
  *  Une page porte une ou plusieurs sections ENTIERES, jamais une moitie
  *  de section. Celles qui sont trop longues -- les reglages, les
  *  visages -- defilent a l'interieur : un defilement, et un seul. */
-const PAGE = 'h-[100dvh] snap-start pt-[4.2rem] pb-14 sm:pt-[4.6rem] ' +
-             'md:[display:contents]'
+//  `snap-always` est ce qui fait qu'on avance d'UNE page a la fois :
+//  sans lui, un geste un peu vif emporte l'elan par-dessus plusieurs
+//  points d'aimantation et on se retrouve a la derniere page. Avec lui,
+//  le defilement a interdiction de franchir un point sans s'y arreter.
+const PAGE = 'h-[100dvh] snap-start snap-always pt-[4.2rem] pb-5 ' +
+             'sm:pt-[4.6rem] sm:pb-7 md:[display:contents]'
 
 export default function App() {
   const auth = useAuth()
@@ -134,11 +144,15 @@ export default function App() {
           <section className={CADRE}>
             <div className="mx-auto grid h-full max-w-page
                             md:grid-cols-[62fr_38fr] md:gap-x-8">
-              {/* Page mobile : les mesures, seules sur leur ecran. */}
-              <div data-page className={PAGE}>
-                <Bloc titre="Mesures" className="h-full md:min-h-0">
+              {/* Page mobile : les mesures, et sous elles l'invite a
+                  passer a la suite. L'invite vit DANS cette page, donc
+                  elle s'en va avec elle -- rien a ecouter, rien a
+                  eteindre. */}
+              <div data-page className={`${PAGE} flex flex-col`}>
+                <Bloc titre="Mesures" className="min-h-0 flex-1">
                   <Mesures />
                 </Bloc>
+                <InviteDefilement />
               </div>
 
               {/* Le pilotage, et sous lui ce que la camera voit : on
