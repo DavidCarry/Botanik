@@ -22,10 +22,10 @@
 #
 # `actif: false` retire un element de TOUTE la chaine : il ne parait plus
 # a l'ecran, le cerveau ne lui envoie plus d'ordre, et le service ne le
-# pilote pas. C'est le cas de la ventilation et de l'eclairage,
-# commandes mais pas encore livres -- les declarer sans les avoir
-# donnerait un tableau de bord qui promet des actions impossibles. Les
-# remettre a `true` le jour de la livraison suffira.
+# pilote pas. C'est le cas de la ventilation, commandee mais pas encore
+# livree -- la declarer sans l'avoir donnerait un tableau de bord qui
+# promet une action impossible. La remettre a `true` le jour de la
+# livraison suffira.
 
 actionneurs:
   - id: pompe
@@ -61,8 +61,16 @@ actionneurs:
   - id: lumiere
     libelle: Éclairage
     detail: LED horticole, budget quotidien
-    actif: false
-    reel: {driver: gpio, broche: 16}
+    actif: true
+    # Aucune salve ici, contrairement a la pompe : une lampe horticole
+    # est faite pour rester allumee, et c'est le budget quotidien qui
+    # borne son usage, pas une cadence.
+    #
+    # Relais sur GPIO 19 (actif a l'etat haut). Le code de test porte un
+    # commentaire qui annonce le GPIO 22 : c'est le commentaire qui a
+    # tort, il ouvre bien le 19 -- et le 22 est deja la LED verte, que
+    # le controle de cablage aurait refuse de partager.
+    reel: {driver: gpio, broche: 19}
     simule: {}
 
   - id: bipeur

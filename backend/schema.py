@@ -132,7 +132,9 @@ CREATE TABLE IF NOT EXISTS afficheurs (
 -- ensuite si elle a ete choisie ou heritee.
 CREATE TABLE IF NOT EXISTS eclairement (
     seul       BOOLEAN PRIMARY KEY DEFAULT true CHECK (seul),
-    utile      DOUBLE PRECISION NOT NULL,
+    mode       TEXT             NOT NULL DEFAULT 'ia'
+                                CHECK (mode IN ('ia', 'manuel')),
+    utile      DOUBLE PRECISION,
     modifie_le TIMESTAMPTZ      NOT NULL DEFAULT now()
 );
 """
@@ -162,6 +164,29 @@ UPDATE commandes SET source = 'seuil' WHERE source = 'regle';
 ALTER TABLE IF EXISTS commandes
     ADD CONSTRAINT commandes_source_check
     CHECK (source IN ('manuel', 'seuil', 'visage'));
+
+-- `eclairement` est nee sans mode : sa clarte utile se saisissait a la
+-- main, et seulement a la main. Elle se regle depuis comme les bornes
+-- d'une regle, « ia » ou « manuel », d'ou la colonne qui s'ajoute -- et
+-- la valeur qui cesse d'etre obligatoire, puisqu'en mode « ia » il n'y
+-- en a pas.
+ALTER TABLE IF EXISTS eclairement
+    ADD COLUMN IF NOT EXISTS mode TEXT NOT NULL DEFAULT 'ia';
+
+-- Une ligne ecrite avant le mode portait forcement un chiffre tape a la
+-- main : c'est du manuel, et le dire evite de l'effacer en silence.
+UPDATE eclairement SET mode = 'manuel' WHERE utile IS NOT NULL;
+
+-- La contrainte est posee a part, et non sur la colonne ajoutee : sur
+-- une base neuve elle existe deja (voir TABLES), et `ADD COLUMN IF NOT
+-- EXISTS` n'aurait alors rien pose du tout.
+ALTER TABLE IF EXISTS eclairement
+    DROP CONSTRAINT IF EXISTS eclairement_mode_check;
+
+ALTER TABLE IF EXISTS eclairement
+    ADD CONSTRAINT eclairement_mode_check CHECK (mode IN ('ia', 'manuel'));
+
+ALTER TABLE IF EXISTS eclairement ALTER COLUMN utile DROP NOT NULL;
 """
 
 

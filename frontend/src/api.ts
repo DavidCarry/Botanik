@@ -209,8 +209,23 @@ export type Reglages = {
    *  jour, dans l'unité du capteur de luminosité.
    *
    *  Ce n'est pas une borne : elle ne déclenche rien. Elle dit ce que
-   *  « douze heures de lumière » veut dire. */
-  lumiere_utile: number
+   *  « douze heures de lumière » veut dire. Elle se règle en revanche
+   *  comme une borne, « IA » ou « Manuel ». */
+  lumiere_utile: ClarteUtile
+}
+
+/** Il n'y a pas de « Aucune » ici : le cumul a toujours besoin d'une
+ *  définition de ce qu'il compte. */
+export type ModeClarte = 'ia' | 'manuel'
+
+export type ClarteUtile = {
+  mode: ModeClarte
+  /** Le chiffre saisi. Gardé même en mode « IA », où il ne sert pas, pour
+   *  que repasser en manuel retrouve la dernière valeur tapée. */
+  valeur: number | null
+  /** Ce que « IA » vaut : la clarté sur laquelle le réseau a été
+   *  entraîné. Une constante, contrairement aux seuils balayés. */
+  appris: number
 }
 
 export const lireReglages = () => json<Reglages>('/api/regles')
@@ -221,8 +236,8 @@ export const poserRegle = (grandeur: string, bas: BorneRegle, haut: BorneRegle) 
 export const retirerRegle = (grandeur: string) =>
   envoyer<{ ok: boolean }>(`/api/regles/${grandeur}`, 'DELETE')
 
-export const poserLumiereUtile = (utile: number) =>
-  envoyer<{ ok: boolean }>('/api/eclairement', 'PUT', { utile })
+export const poserLumiereUtile = (mode: ModeClarte, utile: number | null) =>
+  envoyer<{ ok: boolean }>('/api/eclairement', 'PUT', { mode, utile })
 
 // ---------- Santé de la chaîne ----------
 

@@ -1,6 +1,8 @@
 import { useEffect, useState, type ReactNode } from 'react'
 import { LuBrain, LuCheck, LuRotateCcw, LuTrash2 } from 'react-icons/lu'
-import type { BorneRegle, GrandeurReglee, ModeBorne } from '../api'
+import type {
+  BorneRegle, ClarteUtile, GrandeurReglee, ModeBorne, ModeClarte,
+} from '../api'
 import { useRegles } from '../useRegles'
 import Bloc from './Bloc'
 import EditeurAction, { CHAMP } from './EditeurAction'
@@ -17,6 +19,13 @@ const MODES: { valeur: ModeBorne; libelle: string }[] = [
   { valeur: 'aucun', libelle: 'Aucune' },
 ]
 
+/** Les deux modes du seuil de clarté, dérivés de ceux d'une borne : il
+ *  n'y a pas de « Aucune », le cumul a toujours besoin d'une définition
+ *  de ce qu'il compte. */
+const MODES_CLARTE = MODES.filter(
+  (m): m is { valeur: ModeClarte; libelle: string } => m.valeur !== 'aucun',
+)
+
 const VIDE: BorneRegle = { mode: 'aucun', valeur: null, action: null }
 
 /* Les deux boutons que portent a la fois une carte de grandeur et le
@@ -29,6 +38,38 @@ const VALIDER = `flex items-center gap-1.5 rounded-pilule border border-bordure
 
 const DEFAIRE = `rounded-pilule p-1.5 text-texte-faible transition-colors
                  duration-200 hover:bg-survol hover:text-texte`
+
+/** Un groupe de pilules exclusives : les modes d'une borne, ou ceux du
+ *  seuil de clarté. Même dessin pour la même promesse — on choisit qui
+ *  fixe le chiffre, pas le chiffre. */
+function Bascule<T extends string>({
+  choix, valeur, onChange,
+}: {
+  choix: readonly { valeur: T; libelle: string }[]
+  valeur: T
+  onChange: (v: T) => void
+}) {
+  return (
+    <div className="flex gap-0.5 rounded-pilule border border-bordure bg-surface-creuse p-0.5">
+      {choix.map((c) => (
+        <button
+          key={c.valeur}
+          type="button"
+          aria-pressed={valeur === c.valeur}
+          onClick={() => onChange(c.valeur)}
+          className={`flex-1 rounded-pilule px-2 py-1 text-micro font-medium
+                      transition-colors duration-200 ${
+            valeur === c.valeur
+              ? 'bg-accent-voile text-accent-vif'
+              : 'text-texte-faible hover:text-texte-doux'
+          }`}
+        >
+          {c.libelle}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 /** Un côté d'une grandeur : où passe la borne, et ce qui se passe quand
  *  elle est franchie. */
@@ -48,24 +89,11 @@ function Cote({
         {titre}
       </span>
 
-      <div className="flex gap-0.5 rounded-pilule border border-bordure bg-surface-creuse p-0.5">
-        {MODES.map((m) => (
-          <button
-            key={m.valeur}
-            type="button"
-            aria-pressed={borne.mode === m.valeur}
-            onClick={() => onChange({ ...borne, mode: m.valeur })}
-            className={`flex-1 rounded-pilule px-2 py-1 text-micro font-medium
-                        transition-colors duration-200 ${
-              borne.mode === m.valeur
-                ? 'bg-accent-voile text-accent-vif'
-                : 'text-texte-faible hover:text-texte-doux'
-            }`}
-          >
-            {m.libelle}
-          </button>
-        ))}
-      </div>
+      <Bascule
+        choix={MODES}
+        valeur={borne.mode}
+        onChange={(mode) => onChange({ ...borne, mode })}
+      />
 
       {borne.mode === 'manuel' && (
         <label className="flex items-center gap-2">
@@ -111,77 +139,110 @@ function Cote({
  *  C'est la définition de ce qu'on compte — sans elle on réglait « douze
  *  heures de lumière » sans pouvoir dire douze heures de quoi.
  *
+ *  Elle se règle en revanche comme une borne, « IA » ou « Manuel », avec
+ *  la même bascule. « IA » vaut la clarté sur laquelle le réseau a été
+ *  entraîné : une constante, et non un seuil balayé qui bougerait à
+ *  chaque relecture — c'est pourquoi la ligne ne dit pas « en ce
+ *  moment », contrairement aux bornes.
+ *
  *  Et elle ne concerne que le cumul. Le jugement « luminosité trop
- *  faible » du réseau, lui, a été appris avec sa propre valeur : les
- *  deux peuvent différer, et seul un réentraînement les réaligne.
+ *  faible » du réseau, lui, garde la valeur apprise : en mode « IA » les
+ *  deux coïncident, en manuel ils peuvent diverger.
  */
-function ClarteUtile({
-  valeur, unite, occupe, onEnregistrer,
+function SeuilClarte({
+  reglage, unite, occupe, onEnregistrer,
 }: {
-  valeur: number
+  reglage: ClarteUtile
   unite: string
   occupe: boolean
-  onEnregistrer: (utile: number) => void
+  onEnregistrer: (mode: ModeClarte, utile: number | null) => void
 }) {
   // La saisie est gardée en texte et non en nombre : un champ vidé pour
   // être retapé vaut '' le temps de la frappe, ce qu'un `number` ne sait
   // pas représenter sans se transformer en zéro sous le doigt.
   //
-  // Elle part de la valeur du serveur et ne la resynchronise jamais
-  // elle-même : l'appelant donne à ce composant une `key` tirée de cette
-  // valeur, donc une valeur qui change le remonte avec une saisie
-  // neuve. C'est la même promesse que pour les bornes -- le serveur fait
-  // foi -- obtenue sans effet qui rappellerait `setState` au rendu
-  // suivant.
-  const [saisie, setSaisie] = useState(String(valeur))
+  // Mode et saisie partent du serveur et ne s'y resynchronisent jamais
+  // d'eux-mêmes : l'appelant donne à ce composant une `key` tirée des
+  // deux, donc un réglage qui change le remonte avec un état neuf.
+  const [mode, setMode] = useState<ModeClarte>(reglage.mode)
+  const [saisie, setSaisie] = useState(
+    reglage.valeur === null ? '' : String(reglage.valeur),
+  )
+
+  const defaire = () => {
+    setMode(reglage.mode)
+    setSaisie(reglage.valeur === null ? '' : String(reglage.valeur))
+  }
 
   const nombre = Number(saisie)
-  const valide = saisie.trim() !== '' && Number.isFinite(nombre)
-  const modifie = valide && nombre !== valeur
+  const chiffre =
+    saisie.trim() === '' || !Number.isFinite(nombre) ? null : nombre
+
+  // En manuel il FAUT un chiffre. En « IA » il est seulement conservé,
+  // pour que le retour en manuel retrouve la dernière valeur tapée.
+  const complet = mode === 'ia' || chiffre !== null
+  const modifie =
+    complet && (mode !== reglage.mode || chiffre !== reglage.valeur)
 
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-carte
-                    border border-bordure bg-surface-creuse p-3">
-      <div className="min-w-0 flex-1">
-        <span className="block text-nano uppercase tracking-etiquette text-texte-faible">
-          Compte à partir de
+    <div className="space-y-2.5 rounded-carte border border-bordure
+                    bg-surface-creuse p-3">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="min-w-0 flex-1">
+          <span className="block text-nano uppercase tracking-etiquette text-texte-faible">
+            Compte à partir de
+          </span>
+          <p className="mt-1 text-nano leading-relaxed text-texte-faible">
+            Sous cette clarté, le temps qui passe ne compte pas dans le cumul.
+          </p>
+        </div>
+
+        <span className="flex items-center gap-2">
+          {modifie && (
+            <button
+              type="button"
+              onClick={defaire}
+              aria-label="Abandonner la modification de la clarté utile"
+              className={DEFAIRE}
+            >
+              <LuRotateCcw size={14} />
+            </button>
+          )}
+          <button
+            type="button"
+            disabled={!modifie || occupe}
+            onClick={() => onEnregistrer(mode, chiffre)}
+            className={VALIDER}
+          >
+            <LuCheck size={13} />
+            {modifie ? 'Enregistrer' : 'À jour'}
+          </button>
         </span>
-        <p className="mt-1 text-nano leading-relaxed text-texte-faible">
-          Sous cette clarté, le temps qui passe ne compte pas dans le cumul.
-        </p>
       </div>
 
-      <label className="flex items-center gap-2">
-        <input
-          type="number"
-          step="any"
-          value={saisie}
-          onChange={(e) => setSaisie(e.target.value)}
-          aria-label="Clarté à partir de laquelle la lumière compte"
-          className={CHAMP}
-        />
-        <span className="shrink-0 text-micro text-texte-faible">{unite}</span>
-      </label>
+      <Bascule choix={MODES_CLARTE} valeur={mode} onChange={setMode} />
 
-      {modifie && (
-        <button
-          type="button"
-          onClick={() => setSaisie(String(valeur))}
-          aria-label="Abandonner la modification de la clarté utile"
-          className={DEFAIRE}
-        >
-          <LuRotateCcw size={14} />
-        </button>
+      {mode === 'manuel' ? (
+        <label className="flex items-center gap-2">
+          <input
+            type="number"
+            step="any"
+            value={saisie}
+            onChange={(e) => setSaisie(e.target.value)}
+            aria-label="Clarté à partir de laquelle la lumière compte"
+            className={CHAMP}
+          />
+          <span className="shrink-0 text-micro text-texte-faible">{unite}</span>
+        </label>
+      ) : (
+        <p className="flex items-center gap-1.5 text-micro text-texte-faible">
+          <LuBrain size={12} className="shrink-0" />
+          suit la clarté apprise —{' '}
+          <span className="tabular-nums text-texte-doux">
+            {reglage.appris} {unite}
+          </span>
+        </p>
       )}
-      <button
-        type="button"
-        disabled={!modifie || occupe}
-        onClick={() => onEnregistrer(nombre)}
-        className={VALIDER}
-      >
-        <LuCheck size={13} />
-        {modifie ? 'Enregistrer' : 'À jour'}
-      </button>
     </div>
   )
 }
@@ -335,9 +396,9 @@ export default function Regles() {
             onEnregistrer={(bas, haut) => enregistrer(g.id, bas, haut)}
             onRetirer={() => retirer(g.id)}
             enTete={g.id === 'eclairement_jour' ? (
-              <ClarteUtile
-                key={reglages.lumiere_utile}
-                valeur={reglages.lumiere_utile}
+              <SeuilClarte
+                key={`${reglages.lumiere_utile.mode}:${reglages.lumiere_utile.valeur}`}
+                reglage={reglages.lumiere_utile}
                 unite={uniteClarte}
                 occupe={occupe === 'lumiere_utile'}
                 onEnregistrer={reglerLumiereUtile}

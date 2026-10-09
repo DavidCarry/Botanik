@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
   lireReglages, poserLumiereUtile, poserRegle, retirerRegle,
-  type BorneRegle, type Reglages,
+  type BorneRegle, type ModeClarte, type Reglages,
 } from './api'
 
 // Les seuils appris se deplacent avec la chaleur et la lumiere : les
@@ -9,9 +9,12 @@ import {
 const RAFRAICHISSEMENT_MS = 15_000
 
 // `lumiere_utile` n'a pas de defaut qui veuille dire quelque chose : il
-// vit en base, avec un repli cote serveur. Ce zero ne s'affiche jamais --
+// vit en base, avec un repli cote serveur. Ceci ne s'affiche jamais --
 // la page annonce « Lecture des reglages... » tant que la liste est vide.
-const VIDE: Reglages = { grandeurs: [], actionneurs: [], lumiere_utile: 0 }
+const VIDE: Reglages = {
+  grandeurs: [], actionneurs: [],
+  lumiere_utile: { mode: 'ia', valeur: null, appris: 0 },
+}
 
 /** Les reglages, et de quoi les modifier.
  *
@@ -68,7 +71,8 @@ export function useRegles() {
   // de clarte et les bornes de « Lumiere recue » s'enregistrent
   // separement, et l'un ne doit pas griser l'autre.
   const reglerLumiereUtile = useCallback(
-    (utile: number) => agir('lumiere_utile', () => poserLumiereUtile(utile)),
+    (mode: ModeClarte, utile: number | null) =>
+      agir('lumiere_utile', () => poserLumiereUtile(mode, utile)),
     [agir],
   )
 
