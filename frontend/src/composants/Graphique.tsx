@@ -42,23 +42,68 @@ const RESPIRATION = 8
 
 const DUREE = 620
 
-/** Lissage Catmull-Rom converti en Beziers cubiques.
- *  Une polyligne brute fait un angle a chaque mesure ; la tension
- *  arrondit les sommets sans jamais s'ecarter des points. */
+/** Lissage MONOTONE, converti en Beziers cubiques.
+ *
+ *  Une polyligne brute fait un angle a chaque mesure. Le lissage
+ *  arrondit ces sommets -- mais le faire naivement, en orientant la
+ *  courbe d'apres les deux voisins de chaque point, la fait DEPASSER le
+ *  point sur une variation brutale. Elle remonte au-dessus du maximum
+ *  mesure avant de redescendre.
+ *
+ *  Ce n'est pas qu'un defaut d'aspect : la courbe affiche alors une
+ *  valeur qui n'a jamais ete relevee, et peut donner a voir un seuil
+ *  franchi qui ne l'a pas ete. Sur un tableau de supervision, c'est un
+ *  mensonge.
+ *
+ *  La methode de Fritsch-Carlson bride les tangentes de sorte que chaque
+ *  segment reste ENTRE ses deux extremites. La courbe ne peut donc plus
+ *  sortir de l'intervalle de ses propres mesures -- ni du cadre.
+ */
 function lisser(pts: [number, number][]): string {
   if (pts.length === 0) return ''
   if (pts.length === 1) return `M ${pts[0][0]} ${pts[0][1]}`
 
-  const T = 0.18
+  const n = pts.length
+  // Pente de chaque segment.
+  const pentes: number[] = []
+  for (let i = 0; i < n - 1; i++) {
+    const dx = pts[i + 1][0] - pts[i][0]
+    pentes.push(dx === 0 ? 0 : (pts[i + 1][1] - pts[i][1]) / dx)
+  }
+
+  // Tangente en chaque point : la moyenne des deux pentes voisines, et
+  // la pente elle-meme aux extremites.
+  const t: number[] = [pentes[0]]
+  for (let i = 1; i < n - 1; i++) t.push((pentes[i - 1] + pentes[i]) / 2)
+  t.push(pentes[n - 2])
+
+  // Le bridage. Un segment plat impose une tangente nulle a ses deux
+  // bouts, sinon la courbe ondulerait autour d'une valeur constante.
+  for (let i = 0; i < n - 1; i++) {
+    if (pentes[i] === 0) {
+      t[i] = 0
+      t[i + 1] = 0
+      continue
+    }
+    const a = t[i] / pentes[i]
+    const b = t[i + 1] / pentes[i]
+    // Une tangente de signe oppose a la pente ferait repartir la courbe
+    // a l'envers avant de suivre le segment.
+    if (a < 0) t[i] = 0
+    if (b < 0) t[i + 1] = 0
+    const r = Math.hypot(a, b)
+    if (r > 3) {
+      t[i] = (3 / r) * a * pentes[i]
+      t[i + 1] = (3 / r) * b * pentes[i]
+    }
+  }
+
   let d = `M ${pts[0][0]} ${pts[0][1]}`
-  for (let i = 0; i < pts.length - 1; i++) {
-    const p0 = pts[i - 1] ?? pts[i]
-    const p1 = pts[i]
-    const p2 = pts[i + 1]
-    const p3 = pts[i + 2] ?? p2
-    d += ` C ${p1[0] + (p2[0] - p0[0]) * T} ${p1[1] + (p2[1] - p0[1]) * T},`
-    d += ` ${p2[0] - (p3[0] - p1[0]) * T} ${p2[1] - (p3[1] - p1[1]) * T},`
-    d += ` ${p2[0]} ${p2[1]}`
+  for (let i = 0; i < n - 1; i++) {
+    const h = (pts[i + 1][0] - pts[i][0]) / 3
+    d += ` C ${pts[i][0] + h} ${pts[i][1] + t[i] * h},`
+    d += ` ${pts[i + 1][0] - h} ${pts[i + 1][1] - t[i + 1] * h},`
+    d += ` ${pts[i + 1][0]} ${pts[i + 1][1]}`
   }
   return d
 }
