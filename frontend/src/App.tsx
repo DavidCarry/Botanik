@@ -31,11 +31,11 @@ import { vues as vuesDe, type Vue } from './vues'
 // Les marges laterales s'elargissent des la tablette pour degager les
 // fleches de changement de vue, posees aux bords de la page. Au-dela, le
 // cadre ne change plus : tablette et bureau montrent la meme chose.
-// La marge DROITE est plus large que la gauche sous `md` : c'est la
+// La marge GAUCHE est plus large que la droite sous `md` : c'est la
 // colonne de pastilles qui s'y loge, et sans elle les cartes passaient
 // dessous. Des la tablette les pastilles disparaissent, et les marges
 // redeviennent egales.
-const CADRE = 'w-full shrink-0 pl-4 pr-9 sm:pl-8 sm:pr-12 ' +
+const CADRE = 'w-full shrink-0 pl-9 pr-4 sm:pl-12 sm:pr-8 ' +
               'md:h-full md:px-[4.75rem] md:py-4'
 
 /** Une page du mobile : exactement un ecran, aimantee, degagee de la

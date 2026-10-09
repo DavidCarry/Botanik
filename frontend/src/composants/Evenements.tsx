@@ -69,7 +69,7 @@ export default function Evenements() {
     // Meme trame que le pilotage et les seuils du modele : des lignes
     // separees d'un filet, sans carte ni fond. Un survol arrondi au
     // milieu d'une liste filetee cassait cet alignement.
-    <ul className="h-full divide-y divide-bordure overflow-y-auto">
+    <ul className="h-full divide-y divide-bordure overflow-y-auto pr-2">
       {liste.map((e, i) => (
         <li
           key={`${e.ts}-${e.sujet}-${i}`}

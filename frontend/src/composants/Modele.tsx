@@ -50,7 +50,7 @@ export default function Modele() {
 
       {/* Un seuil par grandeur. Ceux qui ne pilotent rien sont marques :
           les afficher sans le dire laisserait croire a une action. */}
-      <ul className="min-h-0 flex-1 divide-y divide-bordure overflow-y-auto">
+      <ul className="min-h-0 flex-1 divide-y divide-bordure overflow-y-auto pr-2">
         {grandeurs.map((g) => {
           const s = m.seuils?.[g]
           const inerte = g === 'temperature_air'

@@ -384,7 +384,7 @@ export default function Regles() {
           </span>}
       className="h-full md:min-h-0"
     >
-      <div className="h-full space-y-4 overflow-y-auto pr-1">
+      <div className="h-full space-y-4 overflow-y-auto pr-2">
         {reglages.grandeurs.length === 0 ? (
           <p className="text-micro text-texte-faible">Lecture des réglages…</p>
         ) : reglages.grandeurs.map((g) => (

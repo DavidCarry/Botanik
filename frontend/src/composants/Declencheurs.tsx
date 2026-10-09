@@ -330,7 +330,7 @@ export default function Declencheurs() {
           </span>}
       className="h-full md:min-h-0"
     >
-      <div className="grid h-full content-start gap-3 overflow-y-auto pr-1
+      <div className="grid h-full content-start gap-3 overflow-y-auto pr-2
                       sm:grid-cols-2 xl:grid-cols-3">
         <Apprendre
           occupe={apprentissage}

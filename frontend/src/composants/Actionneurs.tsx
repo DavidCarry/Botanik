@@ -125,8 +125,8 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
     // et laisser la liste s'etirer librement en dessous de `md` etait ce
     // qui rendait la page plus haute que l'ecran.
     <Bloc titre="Pilotage" actions={mention} className="min-h-0 flex-1">
-      <div className="h-full divide-y divide-bordure overflow-y-auto
-                      border-y border-bordure">
+      <div className="h-full divide-y divide-bordure overflow-y-auto border-y
+                      border-bordure pr-2">
         {liste.map(({ id, libelle, detail, valeur, lignes, simule,
                       contenu: quoi }) => {
           // Seul un actionneur qui PORTE du texte se regle ; les autres

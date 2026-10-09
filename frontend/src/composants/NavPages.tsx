@@ -6,7 +6,7 @@ type Props = {
 
 /** Où l'on en est dans les pages du mobile, et de quoi y sauter.
  *
- *  Une colonne de pastilles au bord droit : avec six pages et aucun
+ *  Une colonne de pastilles au bord gauche : avec six pages et aucun
  *  défilement libre, rien d'autre ne dirait où l'on se trouve. La page
  *  courante s'allonge plutôt que de changer de couleur seulement — ça
  *  se repère du coin de l'œil.
@@ -24,7 +24,7 @@ export default function NavPages({ rang, total, onAller }: Props) {
   return (
     <nav
       aria-label="Pages"
-      className="fixed right-2 top-1/2 z-20 flex -translate-y-1/2 flex-col
+      className="fixed left-2 top-1/2 z-20 flex -translate-y-1/2 flex-col
                  items-center gap-2 md:hidden"
     >
       {Array.from({ length: total }, (_, i) => (
