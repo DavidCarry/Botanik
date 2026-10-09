@@ -119,9 +119,14 @@ export default function Actionneurs({ connecte }: { connecte: boolean }) {
     //
     // En hauteur contrainte, c'est la LISTE qui cede, pas la camera :
     // l'en-tete reste en place et les lignes defilent dessous.
-    <Bloc titre="Pilotage" actions={mention} className="md:min-h-0 md:flex-1">
-      <div className="divide-y divide-bordure border-y border-bordure
-                      md:h-full md:overflow-y-auto">
+    //
+    // Sans distinction de format, desormais : le bloc est borne des deux
+    // cotes -- une colonne au bureau, une page d'un ecran sur mobile --
+    // et laisser la liste s'etirer librement en dessous de `md` etait ce
+    // qui rendait la page plus haute que l'ecran.
+    <Bloc titre="Pilotage" actions={mention} className="min-h-0 flex-1">
+      <div className="h-full divide-y divide-bordure overflow-y-auto
+                      border-y border-bordure">
         {liste.map(({ id, libelle, detail, valeur, lignes, simule,
                       contenu: quoi }) => {
           // Seul un actionneur qui PORTE du texte se regle ; les autres

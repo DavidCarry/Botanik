@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { LuCpu, LuTriangleAlert } from 'react-icons/lu'
 import Actionneurs from './composants/Actionneurs'
 import Alertes from './composants/Alertes'
@@ -11,12 +11,13 @@ import Declencheurs from './composants/Declencheurs'
 import Evenements from './composants/Evenements'
 import FlechesVue from './composants/FlechesVue'
 import Fond from './composants/Fond'
-import InviteDefilement from './composants/InviteDefilement'
 import Mesures from './composants/Mesures'
+import NavPages from './composants/NavPages'
 import Regles from './composants/Regles'
 import Modale from './composants/Modale'
 import Modele from './composants/Modele'
 import Systeme from './composants/Systeme'
+import { usePages } from './usePages'
 import { useAuth } from './useAuth'
 import { useAlertes } from './useAlertes'
 import { useCourbes } from './useCourbes'
@@ -29,7 +30,22 @@ import { vues as vuesDe, type Vue } from './vues'
 // Les marges laterales s'elargissent des la tablette pour degager les
 // fleches de changement de vue, posees aux bords de la page. Au-dela, le
 // cadre ne change plus : tablette et bureau montrent la meme chose.
-const CADRE = 'w-full shrink-0 px-4 pb-5 sm:px-8 sm:pb-7 md:h-full md:px-[4.75rem] md:py-4'
+const CADRE = 'w-full shrink-0 px-4 sm:px-8 md:h-full md:px-[4.75rem] md:py-4'
+
+/** Une page du mobile : exactement un ecran, aimantee, degagee de la
+ *  barre qui flotte au-dessus et de la fleche posee en bas.
+ *
+ *  Au-dela de `md`, l'enveloppe DISPARAIT -- `display: contents` la
+ *  retire de la mise en page, et ses enfants redeviennent les cellules
+ *  de la grille comme s'il n'y avait jamais eu de page. Le bureau n'est
+ *  donc touche par rien de tout ceci : il glisse lateralement, sans le
+ *  moindre defilement, exactement comme avant.
+ *
+ *  Une page porte une ou plusieurs sections ENTIERES, jamais une moitie
+ *  de section. Celles qui sont trop longues -- les reglages, les
+ *  visages -- defilent a l'interieur : un defilement, et un seul. */
+const PAGE = 'h-[100dvh] snap-start pt-[4.2rem] pb-14 sm:pt-[4.6rem] ' +
+             'md:[display:contents]'
 
 export default function App() {
   const auth = useAuth()
@@ -41,6 +57,7 @@ export default function App() {
   const [systemeOuvert, setSystemeOuvert] = useState(false)
   const [alertesOuvertes, setAlertesOuvertes] = useState(false)
   const [cameraOuverte, setCameraOuverte] = useState(false)
+  const defilement = useRef<HTMLDivElement>(null)
 
   // Tant qu'on n'a pas de reponse, on ne crie pas : la premiere lecture
   // est en vol, et un echec basculera l'etat en moins d'une seconde.
@@ -58,6 +75,10 @@ export default function App() {
   // vue recente, l'ecran retombe sur la photo du chassis et le dit.
   const cameraEnDirect = sante?.camera_s != null
 
+  // Les pages du mobile sont relevees dans le DOM : se connecter en
+  // ajoute deux, et `vues.length` suffit a le signaler.
+  const pages = usePages(defilement, vues.length)
+
   const liaison: EtatLiaison = !joignable
     ? 'hors_ligne'
     : sante && !sante.archivage_ok
@@ -65,7 +86,7 @@ export default function App() {
       : 'en_ligne'
 
   return (
-    <div className="min-h-dvh md:h-dvh md:overflow-hidden">
+    <div className="h-dvh overflow-hidden">
       <Fond />
       <Bandeau
         auth={auth}
@@ -79,15 +100,27 @@ export default function App() {
         onSysteme={() => setSystemeOuvert(true)}
       />
 
-      {/* Deux vues, un seul balisage. Des la tablette elles glissent
-          lateralement ; sur mobile elles s'empilent et defilent, et la
-          navigation disparait -- le pouce fait deja le travail.
+      {/* Un seul balisage pour les deux formats. Des la tablette, les
+          vues glissent lateralement sans defiler. Sur mobile, elles se
+          decoupent en PAGES d'un ecran, aimantees : on ne defile plus
+          librement, on passe d'une page a la suivante.
 
-          Le retrait degage la barre, qui flotte au-dessus. */}
-      <div className="pt-[4.2rem] sm:pt-[4.6rem] md:h-dvh md:overflow-hidden">
+          C'est le conteneur ci-dessous qui defile, et lui seul. Il
+          remplace le defilement de la fenetre, qui se melait a celui de
+          chaque bloc -- deux defilements concurrents, dont aucun n'allait
+          ou l'on croyait.
+
+          Le retrait du haut appartient aux pages et non au conteneur :
+          chacune doit faire un ecran exactement, barre comprise. */}
+      <div
+        ref={defilement}
+        className="h-dvh snap-y snap-mandatory overflow-y-auto
+                   overscroll-y-contain md:snap-none md:overflow-hidden
+                   md:pt-[4.6rem]"
+      >
         <div
-          className="mx-auto flex max-w-page flex-col gap-9 sm:gap-11
-                     md:h-full md:max-w-none md:flex-row md:gap-0
+          className="mx-auto flex max-w-page flex-col
+                     md:h-full md:max-w-none md:flex-row
                      md:[translate:var(--glissement)_0]
                      md:transition-[translate] md:duration-500 md:ease-[var(--ease-doux)]"
           style={{
@@ -99,23 +132,19 @@ export default function App() {
               qu'on ne lit pas l'un sans l'autre : une pompe qui tourne
               n'a de sens qu'en regard d'un sol trop sec. */}
           <section className={CADRE}>
-            <div className="mx-auto grid h-full max-w-page gap-9 sm:gap-11
+            <div className="mx-auto grid h-full max-w-page
                             md:grid-cols-[62fr_38fr] md:gap-x-8">
-              <Bloc titre="Mesures" className="md:min-h-0">
-                <div className="h-[calc(100dvh-11.5rem)] md:h-full">
+              {/* Page mobile : les mesures, seules sur leur ecran. */}
+              <div data-page className={PAGE}>
+                <Bloc titre="Mesures" className="h-full md:min-h-0">
                   <Mesures />
-                </div>
-              </Bloc>
-
-              {/* L'invite se place SOUS LES BULLES, la ou s'arrete le
-                  premier ecran -- et non tout en bas de la vue, ou plus
-                  personne n'a besoin qu'on lui dise de defiler.
-                  Masquee des la tablette, elle ne prend pas de cellule
-                  dans la grille a deux colonnes. */}
-              <InviteDefilement />
+                </Bloc>
+              </div>
 
               {/* Le pilotage, et sous lui ce que la camera voit : on
-                  commande un actionneur en regardant ce qu'il fait.
+                  commande un actionneur en regardant ce qu'il fait. Les
+                  deux tiennent sur une meme page mobile, pour la meme
+                  raison qu'ils partagent une colonne au bureau.
 
                   La camera occupe une part FIXE de la colonne : sinon une
                   liste d'actionneurs un peu longue la reduisait a un
@@ -123,13 +152,15 @@ export default function App() {
                   manque. Jamais plus haute que large non plus -- d'ou le
                   plafond, mesure sur la largeur de la colonne (`@container`)
                   et augmente de la hauteur de l'en-tete. */}
-              <div className="@container flex flex-col gap-6 md:min-h-0">
-                <Actionneurs connecte={Boolean(auth.compte)} />
-                <Bloc titre="Caméra"
-                      className="md:h-[42%] md:max-h-[calc(100cqw+1.8rem)] md:shrink-0">
-                  <Camera onAgrandir={() => setCameraOuverte(true)}
-                          enDirect={cameraEnDirect} />
-                </Bloc>
+              <div data-page className={PAGE}>
+                <div className="@container flex h-full flex-col gap-6 md:min-h-0">
+                  <Actionneurs connecte={Boolean(auth.compte)} />
+                  <Bloc titre="Caméra"
+                        className="shrink-0 md:h-[42%] md:max-h-[calc(100cqw+1.8rem)]">
+                    <Camera onAgrandir={() => setCameraOuverte(true)}
+                            enDirect={cameraEnDirect} />
+                  </Bloc>
+                </div>
               </div>
             </div>
           </section>
@@ -139,24 +170,28 @@ export default function App() {
               n'est plus ici : il vit aupres des mesures, ou il se lit en
               regard de ce qui l'a declenche. */}
           <section className={CADRE}>
-            <div className="mx-auto grid h-full max-w-page gap-9 sm:gap-11
+            <div className="mx-auto grid h-full max-w-page
                             md:grid-cols-[58fr_42fr] md:grid-rows-2 md:gap-x-8 md:gap-y-5">
-              <Bloc titre="Courbes" actions={<EnTeteCourbes etat={courbes} />}
-                    className="md:row-span-2">
-                <div className="h-[clamp(350px,52dvh,540px)] md:h-full">
+              <div data-page className={PAGE}>
+                <Bloc titre="Courbes" actions={<EnTeteCourbes etat={courbes} />}
+                      className="h-full md:row-span-2">
                   <Courbes etat={courbes} />
-                </div>
-              </Bloc>
+                </Bloc>
+              </div>
 
-              <Bloc titre="Journal">
-                <div className="h-[clamp(220px,30dvh,360px)] md:h-full">
+              {/* Deux sections courtes sur une meme page : le journal
+                  prend la place qui reste, le modele ce qu'il lui faut.
+                  Au bureau elles retrouvent leurs deux rangees, l'une
+                  au-dessus de l'autre. */}
+              <div data-page className={`${PAGE} flex flex-col gap-6`}>
+                <Bloc titre="Journal" className="min-h-0 flex-1">
                   <Evenements />
-                </div>
-              </Bloc>
+                </Bloc>
 
-              <Bloc titre="Modèle">
-                <Modele />
-              </Bloc>
+                <Bloc titre="Modèle" className="shrink-0 md:min-h-0">
+                  <Modele />
+                </Bloc>
+              </div>
             </div>
           </section>
 
@@ -165,7 +200,9 @@ export default function App() {
           {auth.compte && (
             <section className={CADRE}>
               <div className="mx-auto h-full max-w-page">
-                <div className="h-[calc(100dvh-11.5rem)] md:h-full">
+                {/* Trop longue pour un ecran, et on ne la coupe pas :
+                    c'est la seule page qui defile a l'interieur. */}
+                <div data-page className={PAGE}>
                   <Regles />
                 </div>
               </div>
@@ -179,7 +216,9 @@ export default function App() {
           {auth.compte && (
             <section className={CADRE}>
               <div className="mx-auto h-full max-w-page">
-                <div className="h-[calc(100dvh-11.5rem)] md:h-full">
+                {/* Longue elle aussi, et pour la meme raison gardee
+                    d'un seul tenant. */}
+                <div data-page className={PAGE}>
                   <Declencheurs />
                 </div>
               </div>
@@ -193,6 +232,8 @@ export default function App() {
         total={vues.length}
         onAller={(i) => setVue(vues[i].valeur)}
       />
+
+      <NavPages rang={pages.rang} total={pages.total} onAller={pages.aller} />
 
       {cameraOuverte && (
         <CameraPleine onFermer={() => setCameraOuverte(false)}
