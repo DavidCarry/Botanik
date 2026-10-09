@@ -8,6 +8,11 @@ elle s'y est tenue -- il suffit de le lui demander.
 L'avantage sur un compteur entretenu en memoire : un service qui
 redemarre a midi retrouve immediatement le bon cumul, au lieu de repartir
 de zero et de rallumer la lampe pour rien.
+
+Et comme le cumul est RECALCULE et non accumule, changer le seuil de
+lumiere utile rejoue tout l'historique du jour : le chiffre devient juste
+immediatement, au lieu de melanger deux definitions de « eclaire » selon
+l'heure a laquelle on a change d'avis.
 """
 
 from config import ARCHIVAGE_S
@@ -38,9 +43,44 @@ REQUETE = """
 """
 
 
+def utile(conn) -> float:
+    """La clarte a partir de laquelle la lumiere compte, en pourcent.
+
+    Reglable, parce que « eclaire » n'a pas de valeur universelle : cela
+    depend du capteur, de son orientation et de ce qu'on cultive. Tant
+    que personne n'a tranche, on garde le defaut du code -- celui avec
+    lequel le reseau a ete entraine.
+
+    ATTENTION a ce que ce reglage ne fait PAS : il ne touche que le
+    cumul. Le jugement « luminosite instantanee trop faible », lui, a ete
+    appris par le reseau avec `ECLAIREMENT_UTILE`, et seul un
+    reentrainement l'en ferait changer. Les deux chiffres peuvent donc
+    diverger, et c'est assume : l'un dit ce qui compte dans un budget,
+    l'autre ce qui declenche une action tout de suite.
+    """
+    with conn.cursor() as cur:
+        cur.execute("SELECT utile FROM eclairement")
+        ligne = cur.fetchone()
+    return float(ligne[0]) if ligne else float(ECLAIREMENT_UTILE)
+
+
+def regler(conn, valeur: float) -> None:
+    """Pose le seuil de lumiere utile, en remplacant le precedent."""
+    with conn.cursor() as cur:
+        cur.execute(
+            """INSERT INTO eclairement (seul, utile, modifie_le)
+               VALUES (true, %s, now())
+               ON CONFLICT (seul) DO UPDATE SET
+                   utile = EXCLUDED.utile,
+                   modifie_le = now()""",
+            (float(valeur),),
+        )
+
+
 def heures_du_jour(conn, capteur: str = "luminosite") -> float:
     """Heures d'eclairement utile accumulees depuis minuit."""
+    seuil = utile(conn)
     with conn.cursor() as cur:
-        cur.execute(REQUETE, (ECLAIREMENT_UTILE, capteur, TROU_MAXIMAL_S))
+        cur.execute(REQUETE, (seuil, capteur, TROU_MAXIMAL_S))
         ligne = cur.fetchone()
     return round(float(ligne[0]) if ligne and ligne[0] is not None else 0.0, 3)

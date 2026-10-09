@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { LuBrain, LuCheck, LuRotateCcw, LuTrash2 } from 'react-icons/lu'
 import type { BorneRegle, GrandeurReglee, ModeBorne } from '../api'
 import { useRegles } from '../useRegles'
@@ -18,6 +18,17 @@ const MODES: { valeur: ModeBorne; libelle: string }[] = [
 ]
 
 const VIDE: BorneRegle = { mode: 'aucun', valeur: null, action: null }
+
+/* Les deux boutons que portent a la fois une carte de grandeur et le
+ * reglage de clarte : valider, et revenir a ce qui est enregistre. */
+const VALIDER = `flex items-center gap-1.5 rounded-pilule border border-bordure
+                 bg-accent-voile px-3 py-1 text-micro font-medium text-accent-vif
+                 transition-colors duration-200 hover:border-bordure-forte
+                 disabled:cursor-not-allowed disabled:border-bordure
+                 disabled:bg-transparent disabled:text-texte-faible`
+
+const DEFAIRE = `rounded-pilule p-1.5 text-texte-faible transition-colors
+                 duration-200 hover:bg-survol hover:text-texte`
 
 /** Un côté d'une grandeur : où passe la borne, et ce qui se passe quand
  *  elle est franchie. */
@@ -94,15 +105,100 @@ function Cote({
   )
 }
 
+/** À partir de quelle clarté la lumière compte dans le cumul du jour.
+ *
+ *  Ce n'est PAS une borne : rien ne se déclenche quand on la franchit.
+ *  C'est la définition de ce qu'on compte — sans elle on réglait « douze
+ *  heures de lumière » sans pouvoir dire douze heures de quoi.
+ *
+ *  Et elle ne concerne que le cumul. Le jugement « luminosité trop
+ *  faible » du réseau, lui, a été appris avec sa propre valeur : les
+ *  deux peuvent différer, et seul un réentraînement les réaligne.
+ */
+function ClarteUtile({
+  valeur, unite, occupe, onEnregistrer,
+}: {
+  valeur: number
+  unite: string
+  occupe: boolean
+  onEnregistrer: (utile: number) => void
+}) {
+  // La saisie est gardée en texte et non en nombre : un champ vidé pour
+  // être retapé vaut '' le temps de la frappe, ce qu'un `number` ne sait
+  // pas représenter sans se transformer en zéro sous le doigt.
+  //
+  // Elle part de la valeur du serveur et ne la resynchronise jamais
+  // elle-même : l'appelant donne à ce composant une `key` tirée de cette
+  // valeur, donc une valeur qui change le remonte avec une saisie
+  // neuve. C'est la même promesse que pour les bornes -- le serveur fait
+  // foi -- obtenue sans effet qui rappellerait `setState` au rendu
+  // suivant.
+  const [saisie, setSaisie] = useState(String(valeur))
+
+  const nombre = Number(saisie)
+  const valide = saisie.trim() !== '' && Number.isFinite(nombre)
+  const modifie = valide && nombre !== valeur
+
+  return (
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-carte
+                    border border-bordure bg-surface-creuse p-3">
+      <div className="min-w-0 flex-1">
+        <span className="block text-nano uppercase tracking-etiquette text-texte-faible">
+          Compte à partir de
+        </span>
+        <p className="mt-1 text-nano leading-relaxed text-texte-faible">
+          Sous cette clarté, le temps qui passe ne compte pas dans le cumul.
+        </p>
+      </div>
+
+      <label className="flex items-center gap-2">
+        <input
+          type="number"
+          step="any"
+          value={saisie}
+          onChange={(e) => setSaisie(e.target.value)}
+          aria-label="Clarté à partir de laquelle la lumière compte"
+          className={CHAMP}
+        />
+        <span className="shrink-0 text-micro text-texte-faible">{unite}</span>
+      </label>
+
+      {modifie && (
+        <button
+          type="button"
+          onClick={() => setSaisie(String(valeur))}
+          aria-label="Abandonner la modification de la clarté utile"
+          className={DEFAIRE}
+        >
+          <LuRotateCcw size={14} />
+        </button>
+      )}
+      <button
+        type="button"
+        disabled={!modifie || occupe}
+        onClick={() => onEnregistrer(nombre)}
+        className={VALIDER}
+      >
+        <LuCheck size={13} />
+        {modifie ? 'Enregistrer' : 'À jour'}
+      </button>
+    </div>
+  )
+}
+
 /** Une grandeur et sa règle, modifiable puis enregistrable. */
 function Carte({
-  grandeur, actionneurs, occupe, onEnregistrer, onRetirer,
+  grandeur, actionneurs, occupe, onEnregistrer, onRetirer, enTete,
 }: {
   grandeur: GrandeurReglee
   actionneurs: { id: string; libelle: string }[]
   occupe: boolean
   onEnregistrer: (bas: BorneRegle, haut: BorneRegle) => void
   onRetirer: () => void
+  /** Posé entre l'intitulé et les deux bornes. Ne sert qu'à « Lumière
+   *  reçue », seule grandeur à porter un réglage qui n'est pas une
+   *  borne : le cas particulier reste dans la liste, pas ici. */
+  enTete?: ReactNode
 }) {
   const depuisServeur = (): [BorneRegle, BorneRegle] => [
     grandeur.regle?.bas ?? VIDE,
@@ -143,8 +239,7 @@ function Carte({
                 setHaut(h)
               }}
               aria-label={`Abandonner les modifications de ${grandeur.libelle}`}
-              className="rounded-pilule p-1.5 text-texte-faible transition-colors
-                         duration-200 hover:bg-survol hover:text-texte"
+              className={DEFAIRE}
             >
               <LuRotateCcw size={14} />
             </button>
@@ -166,17 +261,15 @@ function Carte({
             type="button"
             disabled={!modifie || occupe}
             onClick={() => onEnregistrer(bas, haut)}
-            className="flex items-center gap-1.5 rounded-pilule border border-bordure
-                       bg-accent-voile px-3 py-1 text-micro font-medium text-accent-vif
-                       transition-colors duration-200 hover:border-bordure-forte
-                       disabled:cursor-not-allowed disabled:border-bordure
-                       disabled:bg-transparent disabled:text-texte-faible"
+            className={VALIDER}
           >
             <LuCheck size={13} />
             {modifie ? 'Enregistrer' : 'À jour'}
           </button>
         </span>
       </div>
+
+      {enTete}
 
       <div className="grid gap-3 sm:grid-cols-2">
         <Cote
@@ -209,7 +302,16 @@ function Carte({
  *  les frontières -- une borne réglée sur « IA » le suit.
  */
 export default function Regles() {
-  const { reglages, occupe, erreur, enregistrer, retirer } = useRegles()
+  const {
+    reglages, occupe, erreur, enregistrer, retirer, reglerLumiereUtile,
+  } = useRegles()
+
+  // L'unité du seuil de clarté est celle du CAPTEUR de luminosité, pas
+  // celle du cumul : on y saisit une clarté, pas des heures. Le repli
+  // sert au cas où ce capteur serait désactivé — le cumul, lui, reste
+  // réglable.
+  const uniteClarte =
+    reglages.grandeurs.find((g) => g.id === 'luminosite')?.unite ?? '%'
 
   return (
     <Bloc
@@ -232,6 +334,15 @@ export default function Regles() {
             occupe={occupe === g.id}
             onEnregistrer={(bas, haut) => enregistrer(g.id, bas, haut)}
             onRetirer={() => retirer(g.id)}
+            enTete={g.id === 'eclairement_jour' ? (
+              <ClarteUtile
+                key={reglages.lumiere_utile}
+                valeur={reglages.lumiere_utile}
+                unite={uniteClarte}
+                occupe={occupe === 'lumiere_utile'}
+                onEnregistrer={reglerLumiereUtile}
+              />
+            ) : undefined}
           />
         ))}
       </div>

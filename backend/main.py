@@ -574,6 +574,7 @@ def lire_regles():
     capteurs = {c["id"]: c for c in registre.capteurs_actifs()}
     with base() as conn:
         posees = {r["grandeur"]: r for r in regles.brutes(conn)}
+        lumiere_utile = eclairement.utile(conn)
 
     # Toutes les grandeurs jugees, pas seulement celles qui sortent d'un
     # capteur : la lumiere recue est un cumul, et c'est pourtant elle qui
@@ -598,6 +599,10 @@ def lire_regles():
             {"id": a["id"], "libelle": a["libelle"]}
             for a in registre.actionneurs_actifs()
         ],
+        # A partir de quelle clarte la lumiere compte dans le cumul. Pas
+        # une borne de regle : ce reglage ne declenche rien, il dit ce
+        # que « douze heures de lumiere » veut dire.
+        "lumiere_utile": lumiere_utile,
     }
 
 
@@ -642,6 +647,46 @@ def retirer_regle(grandeur: str,
     bus.publier(TOPIC_REGLES, {"grandeur": grandeur})
     bus.diffuser({"genre": "plages", "plages": plages_affichees()})
     return {"ok": efface}
+
+
+class ClarteUtile(BaseModel):
+    utile: float
+
+
+@app.put("/api/eclairement")
+def regler_eclairement(corps: ClarteUtile,
+                       botanik_session: str | None = Depends(jeton_session)):
+    """Pose la clarte a partir de laquelle la lumiere compte dans le cumul.
+
+    Sa propre route, et non une troisieme borne de la regle
+    `eclairement_jour` : ce n'est pas un seuil qui declenche, c'est la
+    definition de ce qu'on compte. Le ranger parmi les bornes aurait
+    demande un mode de plus a cote de « ia » et « manuel », pour une
+    valeur qui n'agit sur rien.
+    """
+    if not compte_ouvert(botanik_session):
+        raise HTTPException(401, "connexion requise")
+
+    # Borne sur l'echelle declaree du capteur, et non sur un 0-100 ecrit
+    # ici : le jour ou la luminosite se mesurera en lux, cette route
+    # suivra sans qu'on y pense.
+    capteur = next((c for c in registre.capteurs_actifs()
+                    if c["id"] == "luminosite"), None)
+    if capteur is None:
+        raise HTTPException(409, "aucun capteur de luminosite actif")
+    echelle = capteur["echelle"]
+    if not float(echelle["min"]) <= corps.utile <= float(echelle["max"]):
+        raise HTTPException(400, "la clarté utile doit tenir entre "
+                                 f"{echelle['min']} et {echelle['max']}")
+
+    with base() as conn:
+        eclairement.regler(conn, corps.utile)
+
+    # Le cumul change de sens : le cerveau perime son contexte des qu'il
+    # voit passer ce message et le relit au tour suivant, au lieu
+    # d'attendre sa relecture periodique.
+    bus.publier(TOPIC_REGLES, {"grandeur": "eclairement_jour"})
+    return {"ok": True}
 
 
 # ---------------------------------------------------------------

@@ -61,9 +61,16 @@ FENETRE_ECLAIRAGE = (6.0, 22.0)
 # Seuil a partir duquel l'eclairement compte comme « suffisant », dans
 # l'unite du capteur -- un pourcentage de clarte, pas des lux.
 #
-# Defini ICI et nulle part ailleurs : le calcul du budget quotidien s'en
-# sert aussi, et deux constantes qui doivent rester egales finissent
-# toujours par diverger.
+# Deux emplois, et un seul est fige :
+#
+#   ici        il etiquette « luminosite instantanee trop faible », donc
+#              le reseau l'apprend. En changer demande un reentrainement.
+#   le cumul   il n'est plus que le DEFAUT : `eclairement.utile()` lit
+#              d'abord le reglage pose depuis les reglages.
+#
+# C'est pourquoi la valeur reste ici : c'est celle avec laquelle le
+# modele en place a ete entraine, et un reglage absent doit retomber
+# dessus plutot que sur un chiffre invente ailleurs.
 ECLAIREMENT_UTILE = 25.0
 
 # Au-dela, la lumiere brule les jeunes pousses.

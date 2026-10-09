@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  lireReglages, poserRegle, retirerRegle,
+  lireReglages, poserLumiereUtile, poserRegle, retirerRegle,
   type BorneRegle, type Reglages,
 } from './api'
 
@@ -8,7 +8,10 @@ import {
 // relire regulierement evite d'afficher un « suit l'IA : 50,6 % » perime.
 const RAFRAICHISSEMENT_MS = 15_000
 
-const VIDE: Reglages = { grandeurs: [], actionneurs: [] }
+// `lumiere_utile` n'a pas de defaut qui veuille dire quelque chose : il
+// vit en base, avec un repli cote serveur. Ce zero ne s'affiche jamais --
+// la page annonce « Lecture des reglages... » tant que la liste est vide.
+const VIDE: Reglages = { grandeurs: [], actionneurs: [], lumiere_utile: 0 }
 
 /** Les reglages, et de quoi les modifier.
  *
@@ -61,10 +64,19 @@ export function useRegles() {
     [agir],
   )
 
+  // Sa propre cle d'occupation, et non celle de la grandeur : le seuil
+  // de clarte et les bornes de « Lumiere recue » s'enregistrent
+  // separement, et l'un ne doit pas griser l'autre.
+  const reglerLumiereUtile = useCallback(
+    (utile: number) => agir('lumiere_utile', () => poserLumiereUtile(utile)),
+    [agir],
+  )
+
   const retirer = useCallback(
     (grandeur: string) => agir(grandeur, () => retirerRegle(grandeur)),
     [agir],
   )
 
-  return { reglages, joignable, occupe, erreur, enregistrer, retirer }
+  return { reglages, joignable, occupe, erreur, enregistrer, retirer,
+           reglerLumiereUtile }
 }

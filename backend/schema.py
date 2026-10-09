@@ -114,6 +114,27 @@ CREATE TABLE IF NOT EXISTS afficheurs (
     allume     BOOLEAN     NOT NULL DEFAULT false,
     modifie_le TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- A partir de quelle clarte la lumiere COMPTE dans le cumul du jour.
+--
+-- Le cumul se reglait en heures mais pas en pourcentage : on pouvait
+-- demander douze heures de lumiere sans pouvoir dire douze heures de
+-- QUOI. C'est ce chiffre-la.
+--
+-- Une seule ligne, et la contrainte s'en charge : `seul` ne peut valoir
+-- que `true`, donc une seconde pose remplace la premiere au lieu
+-- d'installer un reglage concurrent. Ce n'est pas un reglage par
+-- capteur, c'est la definition de « eclaire » pour toute la serre, et
+-- deux definitions a la fois n'auraient aucun sens.
+--
+-- Table VIDE = personne n'y a touche. Le defaut vient alors du code, ce
+-- qui evite de semer une ligne au premier demarrage et de se demander
+-- ensuite si elle a ete choisie ou heritee.
+CREATE TABLE IF NOT EXISTS eclairement (
+    seul       BOOLEAN PRIMARY KEY DEFAULT true CHECK (seul),
+    utile      DOUBLE PRECISION NOT NULL,
+    modifie_le TIMESTAMPTZ      NOT NULL DEFAULT now()
+);
 """
 
 # Ce qui a change APRES coup sur une table d'`init.sql`, qu'une base deja

@@ -205,6 +205,12 @@ export type GrandeurReglee = {
 export type Reglages = {
   grandeurs: GrandeurReglee[]
   actionneurs: { id: string; libelle: string }[]
+  /** La clarté à partir de laquelle la lumière compte dans le cumul du
+   *  jour, dans l'unité du capteur de luminosité.
+   *
+   *  Ce n'est pas une borne : elle ne déclenche rien. Elle dit ce que
+   *  « douze heures de lumière » veut dire. */
+  lumiere_utile: number
 }
 
 export const lireReglages = () => json<Reglages>('/api/regles')
@@ -214,6 +220,9 @@ export const poserRegle = (grandeur: string, bas: BorneRegle, haut: BorneRegle) 
 
 export const retirerRegle = (grandeur: string) =>
   envoyer<{ ok: boolean }>(`/api/regles/${grandeur}`, 'DELETE')
+
+export const poserLumiereUtile = (utile: number) =>
+  envoyer<{ ok: boolean }>('/api/eclairement', 'PUT', { utile })
 
 // ---------- Santé de la chaîne ----------
 
