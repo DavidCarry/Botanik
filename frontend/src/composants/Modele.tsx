@@ -55,14 +55,11 @@ export default function Modele() {
           const s = m.seuils?.[g]
           const inerte = g === 'temperature_air'
 
-          // Le budget de lumiere n'a pas de bascule lisible avant la fin
-          // de journee : a midi, on ne peut pas avoir recu douze heures,
-          // donc le reseau juge « insuffisant » sur toute l'etendue
-          // possible. Montrer « — » laisserait croire a une panne ; on
-          // affiche l'avancement, qui est l'information utile.
-          const budget =
-            g === 'eclairement_jour' && (!s || (s.bas === null && s.haut === null))
-          if (budget) {
+          // Le budget de lumiere s'affiche en avancement et non en
+          // seuil. Son seuil EST la cible, douze heures, et l'annoncer
+          // comme les autres ne dirait rien de plus que la colonne d'a
+          // cote : ce qu'on veut savoir ici, c'est ou on en est.
+          if (g === 'eclairement_jour') {
             return (
               <li key={g} className="flex items-center gap-2 py-1.5">
                 <span className="min-w-0 flex-1 truncate text-micro text-texte-doux">

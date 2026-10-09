@@ -22,23 +22,6 @@ from decision import GRANDEURS
 PAS = 500
 
 
-def _etendue(grandeur: str, bornes: np.ndarray, entree: int,
-             contexte: dict[str, float]) -> tuple[float, float]:
-    """L'intervalle sur lequel il est licite d'interroger le reseau.
-
-    Les bornes physiques ne suffisent pas : le cumul d'eclairement ne peut
-    pas depasser le temps ecoule depuis minuit. Balayer jusqu'a 24 h a
-    neuf heures du matin revient a questionner le reseau sur des
-    situations qui n'existent pas, et sur lesquelles il n'a jamais rien
-    appris -- il repond alors n'importe quoi, et le seuil lu devient
-    absurde (on a vu un seuil bas au-dessus du seuil haut).
-    """
-    mini, maxi = float(bornes[entree, 0]), float(bornes[entree, 1])
-    if grandeur == "eclairement_jour":
-        maxi = min(maxi, max(contexte.get("heure", maxi), 0.5))
-    return mini, maxi
-
-
 def _indices(grandeur: str) -> tuple[int, int, int]:
     """Colonne d'entree a balayer, et les deux sorties a lire."""
     entree = donnees.ENTREES.index(grandeur)
@@ -63,8 +46,28 @@ def frontieres(poids: dict, bornes: np.ndarray,
 
     resultat: dict[str, dict] = {}
     for grandeur in GRANDEURS:
+        # Le cumul d'eclairement ne se lit pas en balayant, et aucune
+        # astuce n'y changera rien : il ne peut pas depasser le temps
+        # ecoule depuis minuit. A neuf heures du matin, les douze heures
+        # visees sont hors d'atteinte, le reseau juge donc « insuffisant »
+        # sur toute l'etendue interrogeable, et il n'y a aucune bascule a
+        # trouver. On a d'abord cru lire un seuil : c'etait le bord du
+        # balayage, et il donnait « lumiere suffisante au-dela de 9 h ».
+        #
+        # Son seuil est donc pris la ou le reseau l'a appris -- le budget
+        # du jour et sa tolerance. Deux constantes, et non une frontiere
+        # qui se deplace avec la chaleur : c'est la seule grandeur du
+        # projet dont le seuil « IA » ne respire pas, parce que c'est un
+        # objectif et non un etat.
+        if grandeur == "eclairement_jour":
+            resultat[grandeur] = {
+                "bas": donnees.CIBLE_LUMIERE_H,
+                "haut": donnees.CIBLE_LUMIERE_H + donnees.MARGE_LUMIERE_H,
+            }
+            continue
+
         entree, i_bas, i_haut = _indices(grandeur)
-        mini, maxi = _etendue(grandeur, bornes, entree, contexte)
+        mini, maxi = float(bornes[entree, 0]), float(bornes[entree, 1])
 
         grille = np.linspace(mini, maxi, PAS)
         X = np.repeat(base, PAS, axis=0)

@@ -575,17 +575,24 @@ def lire_regles():
     with base() as conn:
         posees = {r["grandeur"]: r for r in regles.brutes(conn)}
 
+    # Toutes les grandeurs jugees, pas seulement celles qui sortent d'un
+    # capteur : la lumiere recue est un cumul, et c'est pourtant elle qui
+    # porte le budget quotidien -- la filtrer la rendait inreglable.
+    # Capteur ou non, une grandeur se decrit par les memes trois champs.
     return {
         "grandeurs": [
             {
                 "id": g,
-                "libelle": capteurs.get(g, {}).get("libelle", g),
-                "unite": capteurs.get(g, {}).get("unite", ""),
-                "echelle": capteurs.get(g, {}).get("echelle"),
+                "libelle": d["libelle"],
+                "unite": d.get("unite", ""),
+                "echelle": d.get("echelle"),
                 "seuil_ia": appris.get(g),
                 "regle": posees.get(g),
             }
-            for g in decision.GRANDEURS if g in capteurs
+            for g in decision.GRANDEURS
+            # Une grandeur qu'on ne sait pas nommer n'est pas proposee :
+            # un capteur desactive disparait des reglages, comme avant.
+            if (d := capteurs.get(g) or registre.HORS_CAPTEUR.get(g))
         ],
         "actionneurs": [
             {"id": a["id"], "libelle": a["libelle"]}

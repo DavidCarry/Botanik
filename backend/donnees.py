@@ -39,7 +39,14 @@ ENTREES = [
 SORTIES = [f"{g}_{cote}" for g in GRANDEURS for cote in ("bas", "haut")]
 
 # Bornes des entrees qui ne viennent pas du registre des capteurs.
-HORS_REGISTRE = {"eclairement_jour": (0.0, 24.0), "heure": (0.0, 24.0)}
+#
+# Tirees de leur echelle declaree, et non recopiees : c'est la meme
+# echelle qui borne le reseau ici et qui graduera le champ de saisie
+# dans les reglages.
+HORS_REGISTRE = {
+    grandeur: (float(d["echelle"]["min"]), float(d["echelle"]["max"]))
+    for grandeur, d in registre.HORS_CAPTEUR.items()
+}
 
 # Duree d'eclairement visee par jour, et tolerance au-dela de laquelle
 # on considere qu'il y en a eu trop. Une plante a besoin de nuit autant

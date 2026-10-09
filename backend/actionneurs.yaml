@@ -30,7 +30,7 @@
 actionneurs:
   - id: pompe
     libelle: Arrosage
-    detail: 20 mL par impulsion
+    detail: 21 mL par impulsion
     actif: true
     # Par impulsions, et pas autrement. Une pompe qui tourne tant que le
     # sol est sec noierait le pot bien avant que la sonde ne change
@@ -38,11 +38,15 @@ actionneurs:
     # l'ordre serait maintenu tout ce temps. Un coup, puis l'attente que
     # la mesure veuille bien reagir.
     #
-    # CADENCE PROVISOIRE, comme le plein et le vide du telemetre : elle
-    # depend du debit de cette pompe-ci, qui reste a mesurer -- un verre
-    # sous le tuyau et un chronometre. 2 s d'arrosage, une minute de
-    # repos.
-    salve: {actif_s: 2, repos_s: 60}
+    # La cadence vient du debit, 100 L/h, soit 27,8 mL/s :
+    #
+    #   0,75 s  ->  20,8 mL par impulsion
+    #   60 s    ->  21 mL par minute au plus, tant que le sol reste sec
+    #
+    # 0,75 et non 0,7 : le cerveau bat au quart de seconde, une duree
+    # qui n'en est pas un multiple serait arrondie au tour suivant sans
+    # qu'on sache laquelle s'applique.
+    salve: {actif_s: 0.75, repos_s: 60}
     # Relais sur GPIO 26 (actif a l'etat haut), conforme au montage.
     reel: {driver: gpio, broche: 26}
     simule: {}

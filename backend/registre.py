@@ -38,6 +38,35 @@ def actionneurs_actifs():
     return _actifs(ACTIONNEURS, "actionneurs")
 
 
+# Les grandeurs qui ne sortent d'aucun capteur.
+#
+# `eclairement_jour` est un cumul recalcule depuis l'archive -- le temps
+# passe sous une lumiere suffisante depuis minuit -- et `heure` est
+# simplement l'heure qu'il est. Aucune des deux n'a de ligne dans
+# capteurs.yaml, et il faut pourtant savoir les nommer et les borner :
+# le reseau les prend en entree, et l'API les expose au meme titre que
+# les mesures.
+#
+# Memes trois champs qu'une entree de capteurs.yaml, pour que tout ce
+# qui decrit une grandeur se lise pareil, d'ou qu'elle vienne.
+#
+# Declarees ICI et nulle part ailleurs : `donnees.HORS_REGISTRE` en tire
+# les bornes qui normalisent les entrees du reseau. Deux echelles qui
+# doivent rester egales finiraient par diverger.
+HORS_CAPTEUR = {
+    "eclairement_jour": {
+        "libelle": "Lumière reçue",
+        "unite": "h",
+        "echelle": {"min": 0.0, "max": 24.0},
+    },
+    "heure": {
+        "libelle": "Heure",
+        "unite": "h",
+        "echelle": {"min": 0.0, "max": 24.0},
+    },
+}
+
+
 # Broches occupees par les bus, quel que soit le registre. Les declarer
 # permet de refuser une collision avec l'I2C ou le SPI, qu'aucun fichier
 # du projet ne mentionne mais qui sont bien cablees.
