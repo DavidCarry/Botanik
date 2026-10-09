@@ -54,7 +54,14 @@ const CADRE = 'w-full shrink-0 pl-9 pr-4 sm:pl-12 sm:pr-8 ' +
 //  sans lui, un geste un peu vif emporte l'elan par-dessus plusieurs
 //  points d'aimantation et on se retrouve a la derniere page. Avec lui,
 //  le defilement a interdiction de franchir un point sans s'y arreter.
-const PAGE = 'h-[100dvh] snap-start snap-always pt-[4.2rem] pb-5 ' +
+//  `min-w-0` n'est pas un detail : sans lui, la page deborde en
+//  largeur. Les cellules de la grille etaient les blocs eux-memes, qui
+//  portent `overflow-hidden` -- leur taille minimale automatique vaut
+//  donc zero et ils se laissent comprimer. L'enveloppe de page s'est
+//  intercalee entre la grille et eux, en `overflow: visible` : son
+//  minimum redevenait celui de son contenu, soit la largeur entiere
+//  d'une ligne de journal ou des legendes d'un graphique.
+const PAGE = 'h-[100dvh] min-w-0 snap-start snap-always pt-[4.2rem] pb-5 ' +
              'sm:pt-[4.6rem] sm:pb-7 md:[display:contents]'
 
 export default function App() {
